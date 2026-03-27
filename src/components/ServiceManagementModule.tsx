@@ -149,7 +149,7 @@ export const ServiceManagementModule = ({
   };
 
   const GanttChart = ({ demand }: { demand: ServiceDemand }) => {
-    const start = safeParseISO(demand.openedAt);
+    const start = safeParseISO(demand.startDate || demand.openedAt);
     const end = safeParseISO(demand.estimatedDeliveryDate);
     const today = new Date();
     
@@ -204,7 +204,7 @@ export const ServiceManagementModule = ({
           </div>
           <div className="space-y-4">
             {filteredDemands.map(demand => {
-              const start = safeParseISO(demand.openedAt);
+              const start = safeParseISO(demand.startDate || demand.openedAt);
               const end = safeParseISO(demand.estimatedDeliveryDate);
               
               const startOffset = Math.max(differenceInDays(start, startDate), 0);
