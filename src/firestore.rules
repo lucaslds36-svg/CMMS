@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "lucas.lds36@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    // Validation helpers
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    function validString(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+
+    // Database entries (user-specific)
+    match /users/{userId}/databaseEntries/{key} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) || isAdmin();
+    }
+
+    // Shared collections
+    match /assets/{assetId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /work-orders/{woId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /preventive-plans/{planId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /demandas {
+      allow list: if isAuthenticated();
+      match /{requestId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() && hasRequiredFields(['dataAbertura', 'solicitante', 'descricao', 'status']) && validString('solicitante', 1, 100) && validString('descricao', 1, 1000);
+        allow update: if isAuthenticated() && validString('solicitante', 1, 100) && validString('descricao', 1, 1000);
+      }
+    }
+
+    match /employees/{empId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}

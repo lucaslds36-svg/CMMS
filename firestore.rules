@@ -92,16 +92,40 @@ service cloud.firestore {
     }
 
     function isValidUser(data) {
-      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'role', 'createdAt']) &&
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'role', 'createdAt', 'permissions']) &&
              data.uid is string && data.email is string &&
-             data.role in ['admin', 'user'];
+             data.role in ['admin', 'user'] &&
+             (data.photoURL is string || data.photoURL == null) &&
+             data.createdAt is string &&
+             (!('permissions' in data) || data.permissions is map);
+    }
+
+    function isValidServiceDemand(data) {
+      return hasOnlyAllowedFields(['id', 'openedAt', 'requesterUid', 'requesterName', 'description', 'area', 'executorType', 'responsibleId', 'responsibleName', 'priority', 'estimatedDeliveryDate', 'startDate', 'status', 'needsMaterial', 'materialRequisition', 'scopeChanges', 'statusHistory', 'closedAt']) &&
+             data.id is string &&
+             data.openedAt is string &&
+             data.requesterUid is string &&
+             data.description is string &&
+             data.area in ['Trefila', 'Cordeira Car', 'Cordeira Truck', 'Semi Pronto', 'Logistica', 'Centralizado', 'Área externa', 'Utilidades'] &&
+             data.executorType in ['Próprio', 'Terceiro'] &&
+             data.responsibleId is string &&
+             data.priority in ['Alta', 'Média', 'Baixa'] &&
+             data.estimatedDeliveryDate is string &&
+             (!('startDate' in data) || data.startDate is string) &&
+             (!('closedAt' in data) || data.closedAt is string) &&
+             data.status in ['Em Aberto', 'Em andamento', 'Parado', 'Cancelado', 'Concluído'] &&
+             data.needsMaterial is bool &&
+             (!('materialRequisition' in data) || data.materialRequisition is map) &&
+             data.scopeChanges is list &&
+             data.statusHistory is list;
     }
 
     function isValidEmployee(data) {
-      return hasOnlyAllowedFields(['ID', 'Name', 'Function', 'Status', 'id']) &&
+      return hasOnlyAllowedFields(['ID', 'Name', 'Function', 'Status', 'Type', 'id']) &&
              data.ID is string && data.Name is string &&
              data.Function in ['Mecânico', 'Eletrônico', 'Outro'] &&
-             data.Status in ['Ativo', 'Férias', 'Afastado'];
+             data.Status in ['Ativo', 'Férias', 'Afastado'] &&
+             data.Type in ['Próprio', 'Terceiro'];
     }
 
     function isValidFailureRecord(data) {
@@ -111,11 +135,13 @@ service cloud.firestore {
     }
 
     function isValidDatabaseEntry(data) {
-      return hasOnlyAllowedFields(['uid', 'key', 'data', 'updatedAt']) &&
-             data.uid is string &&
-             data.key is string &&
-             data.data is string &&
-             data.updatedAt is timestamp;
+      return hasOnlyAllowedFields(['uid', 'key', 'data', 'updatedAt', 'isChunked', 'chunkCount']) &&
+             (!('uid' in data) || data.uid is string) &&
+             (!('key' in data) || data.key is string) &&
+             (!('data' in data) || data.data is string) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp) &&
+             (!('isChunked' in data) || data.isChunked is bool) &&
+             (!('chunkCount' in data) || data.chunkCount is number);
     }
 
     // ===============================================================
@@ -159,6 +185,18 @@ service cloud.firestore {
     match /failure-records/{recordId} {
       allow read: if isAuthenticated();
       allow create, update: if isAuthenticated() && isValidFailureRecord(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /serviceDemands/{id} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidServiceDemand(request.resource.data) && request.resource.data.requesterUid == request.auth.uid;
+      allow update: if isAuthenticated() && isValidServiceDemand(request.resource.data) && 
+                    (
+                      (resource.data.status != 'Concluído' && request.resource.data.status == 'Concluído' && resource.data.requesterUid == request.auth.uid) ||
+                      (request.resource.data.status != 'Concluído') ||
+                      isAdmin()
+                    );
       allow delete: if isAdmin();
     }
 

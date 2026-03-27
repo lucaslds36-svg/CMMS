@@ -8,15 +8,46 @@
         "uid": { "type": "string", "description": "The user ID." },
         "key": { "type": "string", "description": "The key of the data (e.g., bditssData, dinamicaData)." },
         "data": { "type": "string", "description": "The JSON stringified data." },
-        "updatedAt": { "type": "string", "description": "The timestamp of the last update." }
+        "updatedAt": { "type": "string", "description": "The timestamp of the last update." },
+        "isChunked": { "type": "boolean", "description": "Whether the data is chunked." },
+        "chunkCount": { "type": "integer", "description": "The number of chunks." }
       },
       "required": ["uid", "key", "data"]
+    },
+    "ServiceDemand": {
+      "title": "ServiceDemand",
+      "description": "Represents a service demand.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "openedAt": { "type": "string" },
+        "requesterUid": { "type": "string" },
+        "requesterName": { "type": "string" },
+        "description": { "type": "string" },
+        "area": { "type": "string" },
+        "executorType": { "type": "string" },
+        "responsibleId": { "type": "string" },
+        "responsibleName": { "type": "string" },
+        "priority": { "type": "string" },
+        "estimatedDeliveryDate": { "type": "string" },
+        "status": { "type": "string" },
+        "needsMaterial": { "type": "boolean" },
+        "materialRequisition": { "type": "object" },
+        "scopeChanges": { "type": "array" },
+        "statusHistory": { "type": "array" },
+        "closedAt": { "type": "string" }
+      },
+      "required": ["id", "openedAt", "requesterUid", "description", "area", "executorType", "responsibleId", "priority", "estimatedDeliveryDate", "status"]
     }
   },
   "firestore": {
     "users/{uid}/databaseEntries/{key}": {
       "schema": "DatabaseEntry",
       "description": "Stores database entries for each user."
+    },
+    "serviceDemands/{id}": {
+      "schema": "ServiceDemand",
+      "description": "Stores service demands."
     }
   }
 }
