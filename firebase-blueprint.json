@@ -1,0 +1,22 @@
+{
+  "entities": {
+    "DatabaseEntry": {
+      "title": "DatabaseEntry",
+      "description": "Represents a database entry for the application.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The user ID." },
+        "key": { "type": "string", "description": "The key of the data (e.g., bditssData, dinamicaData)." },
+        "data": { "type": "string", "description": "The JSON stringified data." },
+        "updatedAt": { "type": "string", "description": "The timestamp of the last update." }
+      },
+      "required": ["uid", "key", "data"]
+    }
+  },
+  "firestore": {
+    "users/{uid}/databaseEntries/{key}": {
+      "schema": "DatabaseEntry",
+      "description": "Stores database entries for each user."
+    }
+  }
+}
