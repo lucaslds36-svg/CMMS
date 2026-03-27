@@ -60,6 +60,7 @@ export const ServiceManagementModule = ({
 }: ServiceManagementModuleProps) => {
   const [showModal, setShowModal] = useState(false);
   const [editingDemand, setEditingDemand] = useState<ServiceDemand | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
   const [search, setSearch] = useState('');
   const [filterArea, setFilterArea] = useState<string>('Todas');
   const [filterStatus, setFilterStatus] = useState<string>('Todos');
@@ -71,6 +72,7 @@ export const ServiceManagementModule = ({
     responsibleId: '',
     priority: 'Média',
     estimatedDeliveryDate: format(addDays(new Date(), 7), 'yyyy-MM-dd'),
+    executorName: '',
     needsMaterial: false,
     materialRequisition: {
       item: '',
@@ -81,7 +83,7 @@ export const ServiceManagementModule = ({
 
   const areas = ['Trefila', 'Cordeira Car', 'Cordeira Truck', 'Semi Pronto', 'Logistica', 'Centralizado', 'Área externa', 'Utilidades'];
   const priorities = ['Alta', 'Média', 'Baixa'];
-  const statuses = ['Em Aberto', 'Em andamento', 'Parado', 'Cancelado', 'Concluído'];
+  const statuses = ['Não Iniciado', 'Em andamento', 'Parado', 'Cancelado', 'Concluído'];
 
   const getStatusInfo = (demand: ServiceDemand) => {
     if (demand.status === 'Concluído') return { label: 'Concluído', color: 'bg-emerald-100 text-emerald-700' };
@@ -391,14 +393,20 @@ export const ServiceManagementModule = ({
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center space-x-1">
                         <button 
-                          onClick={() => setEditingDemand(demand)}
+                          onClick={() => {
+                            setEditingDemand(demand);
+                            setIsEditing(false);
+                          }}
                           className="p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-all"
                           title="Ver Detalhes"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={() => setEditingDemand(demand)}
+                          onClick={() => {
+                            setEditingDemand(demand);
+                            setIsEditing(true);
+                          }}
                           className="p-1.5 bg-amber-500 text-white rounded hover:bg-amber-600 transition-all"
                           title="Editar"
                         >
@@ -489,6 +497,19 @@ export const ServiceManagementModule = ({
                         <option value="Terceiro">Terceiro</option>
                       </select>
                     </div>
+
+                    {formData.executorType === 'Terceiro' && (
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Nome do Executante (Terceiro)</label>
+                        <input 
+                          type="text"
+                          className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
+                          placeholder="Nome do executante..."
+                          value={formData.executorName || ''}
+                          onChange={e => setFormData({...formData, executorName: e.target.value})}
+                        />
+                      </div>
+                    )}
 
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Responsável</label>
@@ -638,7 +659,7 @@ export const ServiceManagementModule = ({
                     <h3 className="text-2xl font-bold text-slate-900">Detalhes da Demanda</h3>
                     <p className="text-slate-500 text-sm">ID: {editingDemand.id}</p>
                   </div>
-                  <button onClick={() => setEditingDemand(null)} className="p-2 hover:bg-slate-100 rounded-full">
+                  <button onClick={() => { setEditingDemand(null); setIsEditing(false); }} className="p-2 hover:bg-slate-100 rounded-full">
                     <X className="w-6 h-6" />
                   </button>
                 </div>
@@ -671,6 +692,7 @@ export const ServiceManagementModule = ({
                           className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
                           value={editingDemand.estimatedDeliveryDate || ''}
                           onChange={e => setEditingDemand({...editingDemand, estimatedDeliveryDate: e.target.value})}
+                          disabled={!isEditing || userProfile?.role !== 'admin'}
                         />
                       </div>
                       <div>
@@ -679,7 +701,24 @@ export const ServiceManagementModule = ({
                       </div>
                     </div>
 
+                    {editingDemand.executorType === 'Terceiro' && (
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Nome do Executante (Terceiro)</label>
+                        <input 
+                          type="text"
+                          className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                          value={editingDemand.executorName || ''}
+                          onChange={e => setEditingDemand({...editingDemand, executorName: e.target.value})}
+                          disabled={!isEditing}
+                        />
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Status</label>
+                        <p className="text-sm font-bold text-slate-900">{editingDemand.status}</p>
+                      </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Solicitante</label>
                         <p className="text-sm font-bold text-slate-900">{editingDemand.requesterName}</p>
@@ -694,6 +733,7 @@ export const ServiceManagementModule = ({
                           className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
                           value={editingDemand.startDate || ''}
                           onChange={e => setEditingDemand({...editingDemand, startDate: e.target.value})}
+                          disabled={!isEditing}
                         />
                       </div>
                       <div>
@@ -703,7 +743,31 @@ export const ServiceManagementModule = ({
                           className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
                           value={editingDemand.closedAt || ''}
                           onChange={e => setEditingDemand({...editingDemand, closedAt: e.target.value})}
+                          disabled={!isEditing}
                         />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <label className="block text-xs font-bold text-slate-400 uppercase">Status</label>
+                      <div className="flex gap-2">
+                        {['Não Iniciado', 'Em andamento', 'Concluído'].map(status => (
+                          <button
+                            key={status}
+                            type="button"
+                            disabled={!isEditing}
+                            onClick={() => setEditingDemand({...editingDemand, status: status as any})}
+                            className={cn(
+                              "px-4 py-2 rounded-xl text-sm font-bold transition-all",
+                              editingDemand.status === status 
+                                ? "bg-blue-600 text-white shadow-lg shadow-blue-200" 
+                                : "bg-slate-100 text-slate-600 hover:bg-slate-200",
+                              !isEditing && "opacity-50 cursor-not-allowed"
+                            )}
+                          >
+                            {status}
+                          </button>
+                        ))}
                       </div>
                     </div>
 

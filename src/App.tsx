@@ -3634,18 +3634,25 @@ export default function App() {
         const mergedDemand = { ...existingDemand, ...demand };
         
         // Filter to only include allowed fields
-        const allowedFields = ['id', 'openedAt', 'requesterUid', 'requesterName', 'description', 'area', 'executorType', 'responsibleId', 'responsibleName', 'priority', 'estimatedDeliveryDate', 'startDate', 'status', 'needsMaterial', 'materialRequisition', 'scopeChanges', 'statusHistory', 'closedAt'];
+        const allowedFields = ['id', 'openedAt', 'requesterUid', 'requesterName', 'description', 'area', 'executorType', 'responsibleId', 'responsibleName', 'priority', 'estimatedDeliveryDate', 'startDate', 'executorName', 'status', 'needsMaterial', 'materialRequisition', 'scopeChanges', 'statusHistory', 'closedAt'];
         const updatedDemand: any = {};
         allowedFields.forEach(field => {
           if (field in mergedDemand) {
-            updatedDemand[field] = mergedDemand[field as keyof ServiceDemand];
+            const value = mergedDemand[field as keyof ServiceDemand];
+            if (value !== undefined) {
+              updatedDemand[field] = value;
+            }
           }
         });
         
         await updateDocument('serviceDemands', demand.id, updatedDemand);
       } else {
         const id = demand.id || `SD-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
-        await createDocument('serviceDemands', { ...demand, id }, id);
+        const newDemand: any = { ...demand, id };
+        Object.keys(newDemand).forEach(key => {
+          if (newDemand[key] === undefined) delete newDemand[key];
+        });
+        await createDocument('serviceDemands', newDemand, id);
       }
       showToast('Demanda salva com sucesso!');
     } catch (error) {

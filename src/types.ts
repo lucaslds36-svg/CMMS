@@ -62,7 +62,7 @@ export interface ServiceDemandScopeChange {
 
 export interface ServiceDemandStatusChange {
   id: string;
-  status: 'Em Aberto' | 'Em andamento' | 'Parado' | 'Cancelado' | 'Concluído';
+  status: 'Não Iniciado' | 'Em andamento' | 'Parado' | 'Cancelado' | 'Concluído';
   date: string;
   user: string;
 }
@@ -86,7 +86,8 @@ export interface ServiceDemand {
   priority: 'Alta' | 'Média' | 'Baixa';
   estimatedDeliveryDate: string;
   startDate?: string;
-  status: 'Em Aberto' | 'Em andamento' | 'Parado' | 'Cancelado' | 'Concluído';
+  executorName?: string;
+  status: 'Não Iniciado' | 'Em andamento' | 'Parado' | 'Cancelado' | 'Concluído';
   needsMaterial: boolean;
   materialRequisition?: MaterialRequisition;
   scopeChanges: ServiceDemandScopeChange[];
