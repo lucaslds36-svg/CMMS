@@ -16,7 +16,8 @@ import {
   Filter,
   MoreVertical,
   Box,
-  Eye
+  Eye,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, parseISO, differenceInDays, isAfter, isBefore, addDays, startOfMonth, eachDayOfInterval, isToday } from 'date-fns';
@@ -279,29 +280,29 @@ export const ServiceManagementModule = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-slate-500 text-sm font-medium">Total de Demandas</span>
-            <Box className="w-5 h-5 text-blue-500" />
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-slate-500 text-xs font-medium">Total</span>
+            <Box className="w-4 h-4 text-blue-500" />
           </div>
-          <div className="text-3xl font-bold text-slate-900">{demands.length}</div>
+          <div className="text-2xl font-bold text-slate-900">{demands.length}</div>
         </div>
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-slate-500 text-sm font-medium">Em Andamento</span>
-            <Clock className="w-5 h-5 text-amber-500" />
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-slate-500 text-xs font-medium">Em Andamento</span>
+            <Clock className="w-4 h-4 text-amber-500" />
           </div>
-          <div className="text-3xl font-bold text-slate-900">
+          <div className="text-2xl font-bold text-slate-900">
             {demands.filter(d => d.status === 'Em andamento').length}
           </div>
         </div>
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-slate-500 text-sm font-medium">Concluídas</span>
-            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-slate-500 text-xs font-medium">Concluídas</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
           </div>
-          <div className="text-3xl font-bold text-slate-900">
+          <div className="text-2xl font-bold text-slate-900">
             {demands.filter(d => d.status === 'Concluído').length}
           </div>
         </div>
@@ -343,99 +344,73 @@ export const ServiceManagementModule = ({
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/50">
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Demanda</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Área / Executor</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Responsável</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Prioridade</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Progresso (Gantt)</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Ações</th>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">OS</th>
+                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Título</th>
+                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Ativo</th>
+                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Técnico</th>
+                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Status</th>
+                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Prioridade</th>
+                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase text-center">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredDemands.map((demand) => {
                 const statusInfo = getStatusInfo(demand);
                 return (
-                  <tr key={demand.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="max-w-xs">
-                        <div className="font-bold text-slate-900 truncate" title={demand.description}>
-                          {demand.description}
-                        </div>
-                        <div className="text-xs text-slate-400 mt-1">
-                          Aberto em: {format(safeParseISO(demand.openedAt), 'dd/MM/yyyy')} por {demand.requesterName}
-                        </div>
-                      </div>
+                  <tr key={demand.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-3 text-sm font-bold text-blue-700">#{demand.id.replace('SD-', '')}</td>
+                    <td className="px-4 py-3">
+                      <div className="text-sm font-bold text-slate-900">{demand.description}</div>
+                      <div className="text-xs text-slate-500">{demand.area}</div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-slate-700">{demand.area}</div>
-                      <div className="text-xs text-slate-400">{demand.executorType}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">
-                          {demand.responsibleName.charAt(0)}
-                        </div>
-                        <span className="text-sm text-slate-600 font-medium">{demand.responsibleName}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={cn(
-                        "px-2.5 py-1 rounded-full text-xs font-bold",
-                        demand.priority === 'Alta' ? "bg-rose-50 text-rose-600" :
-                        demand.priority === 'Média' ? "bg-amber-50 text-amber-600" :
-                        "bg-emerald-50 text-emerald-600"
-                      )}>
-                        {demand.priority}
+                    <td className="px-4 py-3 text-sm text-slate-600">
+                      <span className="px-2 py-1 bg-slate-100 rounded text-xs border border-slate-200">
+                        {demand.responsibleName}
                       </span>
                     </td>
-                    <td className="px-6 py-4 min-w-[200px]">
-                      <div className="space-y-1">
-                        <GanttChart demand={demand} />
-                        <div className="flex justify-between text-[10px] text-slate-400 font-medium">
-                          <span>{format(safeParseISO(demand.openedAt), 'dd/MM')}</span>
-                          <span>{format(safeParseISO(demand.estimatedDeliveryDate), 'dd/MM')}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3 text-sm text-slate-600">{demand.responsibleName}</td>
+                    <td className="px-4 py-3">
                       <span className={cn(
-                        "px-2.5 py-1 rounded-full text-xs font-bold",
-                        statusInfo.color
+                        "px-2 py-1 rounded text-xs font-bold text-white",
+                        statusInfo.color.replace('bg-', 'bg-').replace('text-', 'text-') // Assuming color mapping needs adjustment
                       )}>
                         {statusInfo.label}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <td className="px-4 py-3">
+                      <span className={cn(
+                        "px-2 py-1 rounded text-xs font-bold text-white",
+                        demand.priority === 'Alta' ? "bg-rose-600" :
+                        demand.priority === 'Média' ? "bg-amber-500" :
+                        "bg-emerald-600"
+                      )}>
+                        {demand.priority}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center space-x-1">
                         <button 
-                          onClick={() => {
-                            setEditingDemand(demand);
-                          }}
-                          className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-blue-600 transition-all"
+                          onClick={() => setEditingDemand(demand)}
+                          className="p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-all"
                           title="Ver Detalhes"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
-                        {demand.status !== 'Concluído' && demand.status !== 'Cancelado' && (
-                          <div className="relative group/menu">
-                            <button className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition-all">
-                              <MoreVertical className="w-4 h-4" />
-                            </button>
-                            <div className="absolute right-0 bottom-full mb-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 hidden group-hover/menu:block z-20">
-                              {statuses.filter(s => s !== demand.status).map(s => (
-                                <button
-                                  key={s}
-                                  onClick={() => onUpdateStatus(demand.id, s as any)}
-                                  className="w-full px-4 py-2 text-left text-sm hover:bg-slate-50 transition-colors"
-                                >
-                                  Mudar para {s}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                        <button 
+                          onClick={() => setEditingDemand(demand)}
+                          className="p-1.5 bg-amber-500 text-white rounded hover:bg-amber-600 transition-all"
+                          title="Editar"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => {/* Implement delete logic */}}
+                          className="p-1.5 bg-rose-600 text-white rounded hover:bg-rose-700 transition-all"
+                          title="Excluir"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>
