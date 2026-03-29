@@ -3645,31 +3645,36 @@ export default function App() {
       ]
     },
     {
-      title: 'Operacional',
+      title: 'Manutenção',
       items: [
-        { id: 'assets', label: 'Ativos', icon: Box, permission: 'assets' },
         { id: 'wos', label: 'Ordens de Serviço', icon: Wrench, permission: 'workOrders' },
         { id: 'preventive', label: 'Preventivas', icon: Calendar, permission: 'preventive' },
+        { id: 'service-management', label: 'Gestão de Serviços', icon: ClipboardList, permission: 'serviceManagement' },
       ]
     },
     {
-      title: 'Gestão & Análise',
+      title: 'Engenharia',
       items: [
-        { id: 'service-management', label: 'Gestão de Serviços', icon: ClipboardList, permission: 'serviceManagement' },
-        { id: 'improvement-management', label: 'Gestão de Melhorias', icon: Lightbulb, permission: 'serviceManagement' },
         { id: 'failure-analysis', label: 'Análise de Falhas', icon: AlertCircle, permission: 'failureAnalysis' },
+        { id: 'improvement-management', label: 'Gestão de Melhorias', icon: Lightbulb, permission: 'serviceManagement' },
+      ]
+    },
+    {
+      title: 'Cadastros',
+      items: [
+        { id: 'assets', label: 'Ativos', icon: Box, permission: 'assets' },
+        { id: 'employees', label: 'Funcionários', icon: UserPlus, permission: 'employees' },
       ]
     },
     {
       title: 'Administração',
       items: [
         { id: 'database', label: 'Banco de Dados', icon: Database, permission: 'database' },
-        { id: 'employees', label: 'Funcionários', icon: UserPlus, permission: 'employees' },
         { id: 'users', label: 'Usuários', icon: ShieldCheck, permission: 'users' },
       ]
     },
     {
-      title: 'Sistema',
+      title: 'Conta',
       items: [
         { id: 'profile', label: 'Meu Perfil', icon: UserIcon },
         { id: 'settings', label: 'Configurações', icon: Settings },

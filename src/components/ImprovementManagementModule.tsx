@@ -166,31 +166,33 @@ export const ImprovementManagementModule = ({
     if (!activeSubModal) return null;
     const { type, mode, data } = activeSubModal;
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-white p-6 rounded-3xl w-full max-w-md space-y-4">
-          <h3 className="text-xl font-bold">{mode === 'create' ? 'Adicionar' : 'Editar'} {type}</h3>
-          {type === 'task' && (
-            <>
-              <input placeholder="Nome da Tarefa" value={subItemData?.name || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, name: e.target.value})} />
-              <input placeholder="Responsável" value={subItemData?.responsible || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, responsible: e.target.value})} />
-              <input type="date" value={subItemData?.plannedDate || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, plannedDate: e.target.value})} />
-            </>
-          )}
-          {type === 'indicator' && (
-            <>
-              <input placeholder="Nome do Indicador" value={subItemData?.name || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, name: e.target.value})} />
-              <input placeholder="Antes" value={subItemData?.before || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, before: e.target.value})} />
-              <input placeholder="Depois" value={subItemData?.after || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, after: e.target.value})} />
-            </>
-          )}
-          {type === 'adjustment' && (
-            <>
-              <input placeholder="Descrição" value={subItemData?.description || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, description: e.target.value})} />
-              <input placeholder="Responsável" value={subItemData?.responsible || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, responsible: e.target.value})} />
-              <input type="date" value={subItemData?.date || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, date: e.target.value})} />
-            </>
-          )}
-          <div className="flex justify-end gap-2">
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white p-6 rounded-3xl w-full max-w-md flex flex-col max-h-full">
+          <h3 className="text-xl font-bold shrink-0">{mode === 'create' ? 'Adicionar' : 'Editar'} {type}</h3>
+          <div className="space-y-4 overflow-y-auto py-4 flex-1 min-h-0">
+            {type === 'task' && (
+              <>
+                <input placeholder="Nome da Tarefa" value={subItemData?.name || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, name: e.target.value})} />
+                <input placeholder="Responsável" value={subItemData?.responsible || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, responsible: e.target.value})} />
+                <input type="date" value={subItemData?.plannedDate || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, plannedDate: e.target.value})} />
+              </>
+            )}
+            {type === 'indicator' && (
+              <>
+                <input placeholder="Nome do Indicador" value={subItemData?.name || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, name: e.target.value})} />
+                <input placeholder="Antes" value={subItemData?.before || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, before: e.target.value})} />
+                <input placeholder="Depois" value={subItemData?.after || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, after: e.target.value})} />
+              </>
+            )}
+            {type === 'adjustment' && (
+              <>
+                <input placeholder="Descrição" value={subItemData?.description || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, description: e.target.value})} />
+                <input placeholder="Responsável" value={subItemData?.responsible || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, responsible: e.target.value})} />
+                <input type="date" value={subItemData?.date || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, date: e.target.value})} />
+              </>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 shrink-0 pt-2 border-t border-slate-100">
             <button onClick={() => setActiveSubModal(null)} className="px-4 py-2 text-slate-600">Cancelar</button>
             <button onClick={handleSaveSubItem} className="px-4 py-2 bg-blue-600 text-white rounded-xl">Salvar</button>
           </div>
@@ -214,11 +216,11 @@ export const ImprovementManagementModule = ({
     const testDays = selectedProject.testStartDate ? differenceInDays(new Date(), new Date(selectedProject.testStartDate)) : 0;
     
     return (
-      <div className="p-6 space-y-6 bg-slate-100 min-h-screen">
+      <div className="p-4 sm:p-6 space-y-6 bg-slate-100 min-h-screen">
         <button onClick={() => {setSelectedProject(null); setModalMode(null);}} className="text-slate-500 hover:text-slate-900">← Voltar</button>
         
         {/* Header */}
-        <div className="bg-white p-6 rounded-3xl shadow-sm flex justify-between items-center">
+        <div className="bg-white p-6 rounded-3xl shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h2 className="text-2xl font-bold text-slate-900">{selectedProject.title}</h2>
             <div className="flex gap-4 text-sm text-slate-600 mt-2">
@@ -248,7 +250,7 @@ export const ImprovementManagementModule = ({
         </div>
 
         {/* Grid Layout */}
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Card: Descrição */}
           <div className="bg-white p-6 rounded-3xl shadow-sm space-y-4">
             <h3 className="font-bold text-lg">Descrição do Projeto</h3>
@@ -263,16 +265,16 @@ export const ImprovementManagementModule = ({
             <p>Início do Teste: {selectedProject.testStartDate ? format(new Date(selectedProject.testStartDate), 'dd/MM/yyyy') : '-'}</p>
             <p>Tempo Planejado: {selectedProject.plannedTestDays} dias</p>
             <p>Tempo em Teste: {testDays} dias</p>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <button onClick={() => startTest(selectedProject)} className="bg-blue-600 text-white px-4 py-2 rounded-xl">Iniciar Teste</button>
               <button onClick={() => finishTest(selectedProject, 'Sucesso')} className="bg-emerald-600 text-white px-4 py-2 rounded-xl">Finalizar (Sucesso)</button>
             </div>
           </div>
 
           {/* Card: Plano de Ação */}
-          <div className="bg-white p-6 rounded-3xl shadow-sm col-span-2">
+          <div className="bg-white p-6 rounded-3xl shadow-sm col-span-1 lg:col-span-2 overflow-x-auto">
             <h3 className="font-bold text-lg mb-4">Plano de Ação</h3>
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[600px]">
               <thead>
                 <tr className="text-left text-slate-500">
                   <th className="pb-2">Tarefa</th>
@@ -310,9 +312,9 @@ export const ImprovementManagementModule = ({
           </div>
 
           {/* Card: Indicadores */}
-          <div className="bg-white p-6 rounded-3xl shadow-sm">
+          <div className="bg-white p-6 rounded-3xl shadow-sm overflow-x-auto">
             <h3 className="font-bold text-lg mb-4">Indicadores</h3>
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[400px]">
               <thead>
                 <tr className="text-left text-slate-500">
                   <th className="pb-2">Indicador</th>
@@ -353,7 +355,7 @@ export const ImprovementManagementModule = ({
           {activeSubModal && renderSubItemModal()}
 
           {/* Card: Encerramento */}
-          <div className="bg-white p-6 rounded-3xl shadow-sm col-span-2 space-y-4">
+          <div className="bg-white p-6 rounded-3xl shadow-sm col-span-1 lg:col-span-2 space-y-4">
             <h3 className="font-bold text-lg">Encerramento</h3>
             <select 
               className="w-full p-3 border rounded-xl"
@@ -400,8 +402,8 @@ export const ImprovementManagementModule = ({
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="p-4 sm:p-6 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-2xl font-bold text-slate-900">Gestão de Melhorias</h2>
         <button 
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700"
@@ -412,61 +414,63 @@ export const ImprovementManagementModule = ({
       </div>
 
       {showNewModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-3xl w-full max-w-lg space-y-4">
-            <h3 className="text-xl font-bold">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-3xl w-full max-w-lg flex flex-col max-h-full">
+            <h3 className="text-xl font-bold shrink-0">
               {modalMode === 'create' ? 'Novo Projeto de Melhoria' : 'Editar Projeto'}
             </h3>
-            <input 
-              placeholder="Título" 
-              className="w-full p-3 border rounded-xl"
-              value={newProject.title || ''}
-              onChange={e => setNewProject({...newProject, title: e.target.value})}
-            />
-            <input 
-              placeholder="ID do Ativo" 
-              className="w-full p-3 border rounded-xl"
-              value={newProject.assetId || ''}
-              onChange={e => setNewProject({...newProject, assetId: e.target.value})}
-            />
-            <input 
-              placeholder="Nome do Ativo" 
-              className="w-full p-3 border rounded-xl"
-              value={newProject.assetName || ''}
-              onChange={e => setNewProject({...newProject, assetName: e.target.value})}
-            />
-            <input 
-              placeholder="Descrição" 
-              className="w-full p-3 border rounded-xl"
-              value={newProject.description || ''}
-              onChange={e => setNewProject({...newProject, description: e.target.value})}
-            />
-            <input 
-              placeholder="Objetivo" 
-              className="w-full p-3 border rounded-xl"
-              value={newProject.objective || ''}
-              onChange={e => setNewProject({...newProject, objective: e.target.value})}
-            />
-            <input 
-              placeholder="Indicador" 
-              className="w-full p-3 border rounded-xl"
-              value={newProject.indicator || ''}
-              onChange={e => setNewProject({...newProject, indicator: e.target.value})}
-            />
-            <input 
-              type="number"
-              placeholder="Dias Planejados para Teste" 
-              className="w-full p-3 border rounded-xl"
-              value={newProject.plannedTestDays || ''}
-              onChange={e => setNewProject({...newProject, plannedTestDays: parseInt(e.target.value)})}
-            />
-            <input 
-              placeholder="Responsável" 
-              className="w-full p-3 border rounded-xl"
-              value={newProject.responsible || ''}
-              onChange={e => setNewProject({...newProject, responsible: e.target.value})}
-            />
-            <div className="flex justify-end gap-2">
+            <div className="space-y-4 overflow-y-auto py-4 flex-1 min-h-0">
+              <input 
+                placeholder="Título" 
+                className="w-full p-3 border rounded-xl"
+                value={newProject.title || ''}
+                onChange={e => setNewProject({...newProject, title: e.target.value})}
+              />
+              <input 
+                placeholder="ID do Ativo" 
+                className="w-full p-3 border rounded-xl"
+                value={newProject.assetId || ''}
+                onChange={e => setNewProject({...newProject, assetId: e.target.value})}
+              />
+              <input 
+                placeholder="Nome do Ativo" 
+                className="w-full p-3 border rounded-xl"
+                value={newProject.assetName || ''}
+                onChange={e => setNewProject({...newProject, assetName: e.target.value})}
+              />
+              <input 
+                placeholder="Descrição" 
+                className="w-full p-3 border rounded-xl"
+                value={newProject.description || ''}
+                onChange={e => setNewProject({...newProject, description: e.target.value})}
+              />
+              <input 
+                placeholder="Objetivo" 
+                className="w-full p-3 border rounded-xl"
+                value={newProject.objective || ''}
+                onChange={e => setNewProject({...newProject, objective: e.target.value})}
+              />
+              <input 
+                placeholder="Indicador" 
+                className="w-full p-3 border rounded-xl"
+                value={newProject.indicator || ''}
+                onChange={e => setNewProject({...newProject, indicator: e.target.value})}
+              />
+              <input 
+                type="number"
+                placeholder="Dias Planejados para Teste" 
+                className="w-full p-3 border rounded-xl"
+                value={newProject.plannedTestDays || ''}
+                onChange={e => setNewProject({...newProject, plannedTestDays: parseInt(e.target.value)})}
+              />
+              <input 
+                placeholder="Responsável" 
+                className="w-full p-3 border rounded-xl"
+                value={newProject.responsible || ''}
+                onChange={e => setNewProject({...newProject, responsible: e.target.value})}
+              />
+            </div>
+            <div className="flex justify-end gap-2 shrink-0 pt-2 border-t border-slate-100">
               <button onClick={() => {setShowNewModal(false); setSelectedProject(null); setModalMode(null);}} className="px-4 py-2 text-slate-600">
                 Cancelar
               </button>
@@ -476,8 +480,8 @@ export const ImprovementManagementModule = ({
         </div>
       )}
 
-      <div className="bg-white rounded-3xl shadow-sm overflow-hidden">
-        <table className="w-full">
+      <div className="bg-white rounded-3xl shadow-sm overflow-x-auto">
+        <table className="w-full min-w-[800px]">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
             <tr>
               <th className="px-6 py-4 text-left">Projeto</th>

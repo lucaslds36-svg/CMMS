@@ -245,19 +245,19 @@ export const FailureAnalysisModule = ({
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleChartClick = (key: string, value: string) => {
-    if (value === 'N/A') return;
-    setFilters(prev => {
-      const isSelected = prev[key] === value;
-      const newValue = isSelected ? '' : value;
-      
-      if (showToast) {
-        if (isSelected) showToast(`Filtro de ${key} removido`, 'success');
-        else showToast(`Filtrando por ${key}: ${value}`, 'success');
-      }
-      
-      return { ...prev, [key]: newValue };
-    });
+  const handleChartClick = (key: string, value: any) => {
+    const strValue = String(value).trim();
+    if (!strValue || strValue === 'N/A' || strValue === 'undefined') return;
+    
+    const isSelected = filters[key] === strValue;
+    const newValue = isSelected ? '' : strValue;
+    
+    if (showToast) {
+      if (isSelected) showToast(`Filtro de ${key} removido`, 'success');
+      else showToast(`Filtrando por ${key}: ${strValue}`, 'success');
+    }
+    
+    setFilters(prev => ({ ...prev, [key]: newValue }));
   };
 
   const clearFilters = () => {
@@ -467,7 +467,7 @@ export const FailureAnalysisModule = ({
                 <span>Limpar Filtros</span>
               </button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               <div className="flex flex-col col-span-1 sm:col-span-2">
                 <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">
                   Intervalo de Datas (Dia)
@@ -489,10 +489,45 @@ export const FailureAnalysisModule = ({
                 </div>
               </div>
 
-              {Object.keys(filters).filter(k => k !== 'startDate' && k !== 'endDate').map(filterKey => (
-                <div key={filterKey} className="flex flex-col">
+              {/* Filtro Agrupado: Tipo e Máquina */}
+              <div className="flex flex-col col-span-1 sm:col-span-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
+                <label className="text-[10px] font-bold text-slate-500 uppercase mb-2 ml-1 flex items-center">
+                  <Filter className="w-3 h-3 mr-1" /> Filtro Combinado (Tipo & Máquina)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Tipo (Grupo)</label>
+                    <select 
+                      className="text-xs border border-slate-200 rounded-lg p-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                      value={filters['Grupo']}
+                      onChange={(e) => handleFilterChange('Grupo', e.target.value)}
+                    >
+                      <option value="">Todos</option>
+                      {getUniqueValues('Grupo').map((val: any, idx) => (
+                        <option key={idx} value={val}>{val}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Máquina</label>
+                    <select 
+                      className="text-xs border border-slate-200 rounded-lg p-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                      value={filters['Máquina']}
+                      onChange={(e) => handleFilterChange('Máquina', e.target.value)}
+                    >
+                      <option value="">Todas</option>
+                      {getUniqueValues('Máquina').map((val: any, idx) => (
+                        <option key={idx} value={val}>{val}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {Object.keys(filters).filter(k => k !== 'startDate' && k !== 'endDate' && k !== 'Grupo' && k !== 'Máquina').map(filterKey => (
+                <div key={filterKey} className="flex flex-col col-span-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">
-                    {filterKey === 'Grupo' ? 'Tipo (Grupo)' : filterKey}
+                    {filterKey}
                   </label>
                   <select 
                     className="text-xs border border-slate-200 rounded-lg p-2 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
