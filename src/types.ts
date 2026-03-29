@@ -60,6 +60,73 @@ export interface ServiceDemandScopeChange {
   user: string;
 }
 
+export interface EngineeringTask {
+  id: string;
+  name: string;
+  responsible: string;
+  plannedDate: string;
+  completedDate?: string;
+  status: 'Pendente' | 'Em andamento' | 'Concluído';
+  type: 'Interno' | 'Externo';
+  requiresMaterial: boolean;
+  investmentValue?: number;
+}
+
+export interface EngineeringAdjustment {
+  id: string;
+  date: string;
+  description: string;
+  responsible: string;
+}
+
+export interface EngineeringIndicator {
+  id: string;
+  name: string;
+  before: number;
+  after: number;
+  variation: number;
+}
+
+export interface EngineeringComment {
+  id: string;
+  text: string;
+  user: string;
+  date: string;
+}
+
+export interface EngineeringStatusChange {
+  id: string;
+  status: string;
+  date: string;
+  user: string;
+}
+
+export interface EngineeringProject {
+  id: string;
+  title: string;
+  assetId: string;
+  assetName: string;
+  description: string;
+  objective: string;
+  indicator: string;
+  responsible: string;
+  status: 'Planejado' | 'Em execução' | 'Em teste' | 'Validado' | 'Cancelado';
+  startDate: string; // ISO string
+  testStartDate?: string; // ISO string
+  plannedTestDays: number;
+  testStatus: 'Não iniciado' | 'Em teste' | 'Aprovado' | 'Reprovado';
+  result?: 'Sucesso' | 'Parcial' | 'Falha';
+  lessonsLearned?: string;
+  standardize: boolean;
+  createdAt: string;
+  updatedAt: string;
+  tasks?: EngineeringTask[];
+  adjustments?: EngineeringAdjustment[];
+  indicators?: EngineeringIndicator[];
+  comments?: EngineeringComment[];
+  statusHistory?: EngineeringStatusChange[];
+}
+
 export interface ServiceDemandStatusChange {
   id: string;
   status: 'Não Iniciado' | 'Em andamento' | 'Parado' | 'Cancelado' | 'Concluído';

@@ -102,13 +102,17 @@ export const FailureAnalysisModule = ({
           return obj;
         }).filter(obj => Object.keys(obj).length > 0);
         setRawData(objects);
+        // Notify parent about the converted data if needed
+        if (onDataUpdate) {
+          setTimeout(() => onDataUpdate(objects), 0);
+        }
       } else {
         setRawData(data);
       }
     } else {
       setRawData([]);
     }
-  }, [data]);
+  }, [data, onDataUpdate]);
 
   const formatDate = (dateVal: any) => {
     if (!dateVal) return '';
@@ -243,8 +247,17 @@ export const FailureAnalysisModule = ({
 
   const handleChartClick = (key: string, value: string) => {
     if (value === 'N/A') return;
-    setFilters(prev => ({ ...prev, [key]: value }));
-    if (showToast) showToast(`Filtrando por ${key}: ${value}`, 'success');
+    setFilters(prev => {
+      const isSelected = prev[key] === value;
+      const newValue = isSelected ? '' : value;
+      
+      if (showToast) {
+        if (isSelected) showToast(`Filtro de ${key} removido`, 'success');
+        else showToast(`Filtrando por ${key}: ${value}`, 'success');
+      }
+      
+      return { ...prev, [key]: newValue };
+    });
   };
 
   const clearFilters = () => {
@@ -253,16 +266,38 @@ export const FailureAnalysisModule = ({
     });
   };
 
-  const getUniqueValues = (key: string) => {
-    let possibleNames = [key, key.toUpperCase(), key.toLowerCase()];
-    if (key === 'Grupo') possibleNames = ['Grupo', 'Tipo', 'Tipo (Grupo)', 'Categoria'];
-    if (key === 'Máquina') possibleNames = ['Máquina', 'Maquina', 'Equipamento', 'Ativo'];
-    if (key === 'Parte') possibleNames = ['Parte', 'Componente', 'Subconjunto'];
-    if (key === 'Causa') possibleNames = ['Causa', 'Motivo', 'Falha'];
-    if (key === 'Setor') possibleNames = ['Setor', 'Área', 'Area', 'Departamento'];
+  // Pre-calculate column mappings for filters to improve performance
+  const filterColMapping = useMemo(() => {
+    const mapping: Record<string, string> = {};
+    Object.keys(filters).forEach(key => {
+      if (key === 'startDate' || key === 'endDate') return;
+      let possibleNames = [key, key.toUpperCase(), key.toLowerCase()];
+      if (key === 'Grupo') possibleNames = ['Grupo', 'Tipo', 'Tipo (Grupo)', 'Categoria'];
+      if (key === 'Máquina') possibleNames = ['Máquina', 'Maquina', 'Equipamento', 'Ativo'];
+      if (key === 'Parte') possibleNames = ['Parte', 'Componente', 'Subconjunto'];
+      if (key === 'Causa') possibleNames = ['Causa', 'Motivo', 'Falha'];
+      if (key === 'Setor') possibleNames = ['Setor', 'Área', 'Area', 'Departamento'];
+      mapping[key] = getColName(possibleNames);
+    });
+    return mapping;
+  }, [rawData, filters]);
 
-    const actualKey = getColName(possibleNames);
-    const values = rawData.map(row => row[actualKey]).filter(val => val !== undefined && val !== null && val !== '');
+  const getUniqueValues = (key: string) => {
+    const actualKey = filterColMapping[key];
+    if (!actualKey) return [];
+    
+    // Filter rawData by other active filters to show only relevant options (cascading)
+    // This ensures that if "Tipo" is selected, only machines of that type appear, and vice versa.
+    const dataForOptions = rawData.filter(row => {
+      return Object.entries(filters).every(([fKey, fValue]) => {
+        if (!fValue || fKey === key || fKey === 'startDate' || fKey === 'endDate') return true;
+        const fActualKey = filterColMapping[fKey];
+        if (!fActualKey) return true;
+        return String(row[fActualKey]) === String(fValue);
+      });
+    });
+
+    const values = dataForOptions.map(row => row[actualKey]).filter(val => val !== undefined && val !== null && val !== '');
     return Array.from(new Set(values)).sort((a: any, b: any) => {
       if (typeof a === 'number' && typeof b === 'number') return a - b;
       return String(a).localeCompare(String(b));

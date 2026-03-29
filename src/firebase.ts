@@ -74,21 +74,36 @@ export const subscribeToCollection = <T>(
   });
 };
 
+const sanitizeData = (data: any) => {
+  if (typeof data !== 'object' || data === null) return data;
+  const sanitized = { ...data };
+  Object.keys(sanitized).forEach(key => {
+    if (sanitized[key] === undefined) {
+      delete sanitized[key];
+    } else if (typeof sanitized[key] === 'object' && sanitized[key] !== null && !(sanitized[key] instanceof Timestamp)) {
+      sanitized[key] = sanitizeData(sanitized[key]);
+    }
+  });
+  return sanitized;
+};
+
 export const createDocument = async (collectionName: string, data: any, id?: string) => {
+  const sanitizedData = sanitizeData(data);
   if (id) {
     const docRef = doc(db, collectionName, id);
-    await setDoc(docRef, data);
+    await setDoc(docRef, sanitizedData);
     return id;
   } else {
     const newDocRef = doc(collection(db, collectionName));
-    await setDoc(newDocRef, data);
+    await setDoc(newDocRef, sanitizedData);
     return newDocRef.id;
   }
 };
 
 export const updateDocument = async (collectionName: string, id: string, data: any) => {
+  const sanitizedData = sanitizeData(data);
   const docRef = doc(db, collectionName, id);
-  await updateDoc(docRef, data);
+  await updateDoc(docRef, sanitizedData);
 };
 
 export const deleteDocument = async (collectionName: string, id: string) => {

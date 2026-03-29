@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { ImprovementManagementModule } from './components/ImprovementManagementModule';
 // Version: 1.0.1 - Consolidated structure
 import { 
   LayoutDashboard, 
@@ -32,7 +33,8 @@ import {
   Pencil,
   Info,
   Eye,
-  ClipboardList
+  ClipboardList,
+  Lightbulb
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
@@ -99,6 +101,7 @@ import { FailureAnalysisModule } from './components/FailureAnalysisModule';
 import { DatabaseModule } from './components/DatabaseModule';
 import { ServiceManagementModule } from './components/ServiceManagementModule';
 import { ServiceDemand } from './types';
+import { EngineeringProject } from './types';
 
 // ... (inside App component)
 
@@ -2845,6 +2848,9 @@ export default function App() {
   const [bditssData, setBditssData] = useState<any[]>([]);
   const [dinamicaData, setDinamicaData] = useState<any[]>([]);
   const [failureAnalysisData, setFailureAnalysisData] = useState<any[]>([]);
+  const handleFailureAnalysisDataUpdate = useCallback((data: any[]) => {
+    setFailureAnalysisData(data);
+  }, []);
   const [filters, setFilters] = useState({
     year: new Date().getFullYear().toString(),
     month: (new Date().getMonth() + 1).toString(),
@@ -2879,6 +2885,32 @@ export default function App() {
   const [chartData, setChartData] = useState<any[]>(mockChartData);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [serviceDemands, setServiceDemands] = useState<ServiceDemand[]>([]);
+  const [engineeringProjects, setEngineeringProjects] = useState<EngineeringProject[]>([]);
+
+  const handleSaveImprovementProject = async (project: Partial<EngineeringProject>) => {
+    try {
+      if (project.id) {
+        await updateDocument('engineering-projects', project.id, project);
+        showToast('Projeto atualizado com sucesso!');
+      } else {
+        await createDocument('engineering-projects', { ...project, createdAt: new Date().toISOString() });
+        showToast('Projeto criado com sucesso!');
+      }
+    } catch (error) {
+      console.error('Error saving improvement project:', error);
+      showToast('Erro ao salvar projeto', 'error');
+    }
+  };
+
+  const handleDeleteImprovementProject = async (projectId: string) => {
+    try {
+      await deleteDocument('engineering-projects', projectId);
+      showToast('Projeto excluído com sucesso!');
+    } catch (error) {
+      console.error('Error deleting improvement project:', error);
+      showToast('Erro ao excluir projeto', 'error');
+    }
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -3605,24 +3637,55 @@ export default function App() {
     }
   };
 
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard' },
-    { id: 'assets', label: 'Ativos', icon: Box, permission: 'assets' },
-    { id: 'wos', label: 'Ordens de Serviço', icon: Wrench, permission: 'workOrders' },
-    { id: 'preventive', label: 'Preventivas', icon: Calendar, permission: 'preventive' },
-    { id: 'service-management', label: 'Gestão de Serviços', icon: ClipboardList, permission: 'serviceManagement' },
-    { id: 'failure-analysis', label: 'Análise de Falhas', icon: AlertCircle, permission: 'failureAnalysis' },
-    { id: 'database', label: 'Banco de Dados', icon: Database, permission: 'database' },
-    { id: 'employees', label: 'Funcionários', icon: UserPlus, permission: 'employees' },
-    { id: 'users', label: 'Usuários', icon: ShieldCheck, permission: 'users' },
-    { id: 'profile', label: 'Meu Perfil', icon: UserIcon },
-    { id: 'settings', label: 'Configurações', icon: Settings },
-  ].filter(item => {
-    if (userProfile?.email === 'lucas.lds36@gmail.com') return true;
-    if (item.id === 'profile' || item.id === 'settings') return true;
-    if (!userProfile?.permissions) return isAdmin || item.id !== 'users';
-    return userProfile.permissions[item.permission as keyof UserPermissions];
-  });
+  const menuGroups = [
+    {
+      title: 'Visão Geral',
+      items: [
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard' },
+      ]
+    },
+    {
+      title: 'Operacional',
+      items: [
+        { id: 'assets', label: 'Ativos', icon: Box, permission: 'assets' },
+        { id: 'wos', label: 'Ordens de Serviço', icon: Wrench, permission: 'workOrders' },
+        { id: 'preventive', label: 'Preventivas', icon: Calendar, permission: 'preventive' },
+      ]
+    },
+    {
+      title: 'Gestão & Análise',
+      items: [
+        { id: 'service-management', label: 'Gestão de Serviços', icon: ClipboardList, permission: 'serviceManagement' },
+        { id: 'improvement-management', label: 'Gestão de Melhorias', icon: Lightbulb, permission: 'serviceManagement' },
+        { id: 'failure-analysis', label: 'Análise de Falhas', icon: AlertCircle, permission: 'failureAnalysis' },
+      ]
+    },
+    {
+      title: 'Administração',
+      items: [
+        { id: 'database', label: 'Banco de Dados', icon: Database, permission: 'database' },
+        { id: 'employees', label: 'Funcionários', icon: UserPlus, permission: 'employees' },
+        { id: 'users', label: 'Usuários', icon: ShieldCheck, permission: 'users' },
+      ]
+    },
+    {
+      title: 'Sistema',
+      items: [
+        { id: 'profile', label: 'Meu Perfil', icon: UserIcon },
+        { id: 'settings', label: 'Configurações', icon: Settings },
+      ]
+    }
+  ].map(group => ({
+    ...group,
+    items: group.items.filter(item => {
+      if (userProfile?.email === 'lucas.lds36@gmail.com') return true;
+      if (item.id === 'profile' || item.id === 'settings') return true;
+      if (!userProfile?.permissions) return isAdmin || item.id !== 'users';
+      return userProfile.permissions[item.permission as keyof UserPermissions];
+    })
+  })).filter(group => group.items.length > 0);
+
+  const menuItems = menuGroups.flatMap(g => g.items);
 
   const handleSaveServiceDemand = async (demand: Partial<ServiceDemand>) => {
     try {
@@ -3758,27 +3821,36 @@ export default function App() {
             </button>
           </div>
 
-          <nav className="flex-1 px-4 space-y-1">
-            {menuItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={cn(
-                  "w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 group",
-                  activeTab === item.id 
-                    ? "bg-blue-50 text-blue-600" 
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                )}
-              >
-                <item.icon className={cn(
-                  "w-5 h-5 transition-colors",
-                  activeTab === item.id ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
-                )} />
-                <span className="font-medium">{item.label}</span>
-                {activeTab === item.id && (
-                  <motion.div layoutId="active-pill" className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600" />
-                )}
-              </button>
+          <nav className="flex-1 px-4 space-y-6 overflow-y-auto custom-scrollbar pb-6">
+            {menuGroups.map((group) => (
+              <div key={group.title} className="space-y-2">
+                <h3 className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  {group.title}
+                </h3>
+                <div className="space-y-1">
+                  {group.items.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveTab(item.id)}
+                      className={cn(
+                        "w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl transition-all duration-200 group",
+                        activeTab === item.id 
+                          ? "bg-blue-50 text-blue-600 shadow-sm shadow-blue-100/50" 
+                          : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                      )}
+                    >
+                      <item.icon className={cn(
+                        "w-5 h-5 transition-colors",
+                        activeTab === item.id ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
+                      )} />
+                      <span className="font-medium text-sm">{item.label}</span>
+                      {activeTab === item.id && (
+                        <motion.div layoutId="active-pill" className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </nav>
 
@@ -4233,7 +4305,7 @@ export default function App() {
                     showToast={showToast} 
                     handleFileUpload={handleFileUpload} 
                     data={failureAnalysisData}
-                    onDataUpdate={(data) => setFailureAnalysisData(data)}
+                    onDataUpdate={handleFailureAnalysisDataUpdate}
                     loading={loading}
                   />
                 )}
@@ -4246,6 +4318,14 @@ export default function App() {
                     onSave={handleSaveServiceDemand}
                     onUpdateStatus={handleUpdateServiceDemandStatus}
                     onAddScopeChange={handleAddServiceDemandScopeChange}
+                    showToast={showToast}
+                  />
+                )}
+                {activeTab === 'improvement-management' && (
+                  <ImprovementManagementModule 
+                    userProfile={userProfile}
+                    onSave={handleSaveImprovementProject}
+                    onDelete={handleDeleteImprovementProject}
                     showToast={showToast}
                   />
                 )}

@@ -148,6 +148,82 @@ service cloud.firestore {
     // Match Rules
     // ===============================================================
 
+    function isValidEngineeringProject(data) {
+      return hasOnlyAllowedFields(['id', 'title', 'assetId', 'assetName', 'description', 'objective', 'indicator', 'responsible', 'status', 'startDate', 'testStartDate', 'plannedTestDays', 'testStatus', 'result', 'lessonsLearned', 'standardize', 'createdAt', 'updatedAt', 'tasks', 'adjustments', 'indicators', 'comments', 'statusHistory']) &&
+             data.title is string && data.title.size() > 0 &&
+             data.assetId is string &&
+             data.assetName is string &&
+             data.description is string &&
+             data.status in ['Planejado', 'Em execução', 'Em teste', 'Validado', 'Cancelado'] &&
+             (data.startDate is string || !('startDate' in data)) &&
+             (data.testStartDate is string || !('testStartDate' in data)) &&
+             (data.plannedTestDays is number || !('plannedTestDays' in data)) &&
+             (data.testStatus in ['Não iniciado', 'Em teste', 'Aprovado', 'Reprovado'] || !('testStatus' in data)) &&
+             (data.result in ['Sucesso', 'Parcial', 'Falha'] || !('result' in data)) &&
+             (data.lessonsLearned is string || !('lessonsLearned' in data)) &&
+             (data.standardize is bool || !('standardize' in data)) &&
+             data.createdAt is string &&
+             data.updatedAt is string &&
+             (data.id is string || !('id' in data)) &&
+             (!('tasks' in data) || data.tasks is list) &&
+             (!('adjustments' in data) || data.adjustments is list) &&
+             (!('indicators' in data) || data.indicators is list) &&
+             (!('comments' in data) || data.comments is list) &&
+             (!('statusHistory' in data) || data.statusHistory is list);
+    }
+
+    function isValidEngineeringTask(data) {
+      return hasOnlyAllowedFields(['id', 'name', 'responsible', 'plannedDate', 'completedDate', 'status', 'type', 'requiresMaterial', 'investmentValue']) &&
+             data.name is string && data.name.size() > 0 &&
+             data.responsible is string &&
+             data.plannedDate is string &&
+             data.status in ['Pendente', 'Em andamento', 'Concluído'] &&
+             data.type in ['Interno', 'Externo'] &&
+             data.requiresMaterial is bool &&
+             (data.investmentValue is number || !('investmentValue' in data));
+    }
+
+    function isValidEngineeringAdjustment(data) {
+      return hasOnlyAllowedFields(['id', 'date', 'description', 'responsible']) &&
+             data.date is string &&
+             data.description is string &&
+             data.responsible is string;
+    }
+
+    function isValidEngineeringIndicator(data) {
+      return hasOnlyAllowedFields(['id', 'name', 'before', 'after', 'variation']) &&
+             data.name is string &&
+             data.before is number &&
+             data.after is number &&
+             data.variation is number;
+    }
+
+    // ===============================================================
+    // Match Rules
+    // ===============================================================
+
+    match /engineering-projects/{projectId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && isValidEngineeringProject(request.resource.data);
+      allow delete: if isAdmin();
+
+      match /tasks/{taskId} {
+        allow read: if isAuthenticated();
+        allow create, update: if isAuthenticated() && isValidEngineeringTask(request.resource.data);
+        allow delete: if isAdmin();
+      }
+      match /adjustments/{adjustmentId} {
+        allow read: if isAuthenticated();
+        allow create, update: if isAuthenticated() && isValidEngineeringAdjustment(request.resource.data);
+        allow delete: if isAdmin();
+      }
+      match /indicators/{indicatorId} {
+        allow read: if isAuthenticated();
+        allow create, update: if isAuthenticated() && isValidEngineeringIndicator(request.resource.data);
+        allow delete: if isAdmin();
+      }
+    }
+
     match /users/{userId}/databaseEntries/{key} {
       allow read: if isOwner(userId);
       allow create, update: if isOwner(userId) && isValidDatabaseEntry(request.resource.data);
