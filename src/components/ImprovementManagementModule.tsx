@@ -78,17 +78,31 @@ export const ImprovementManagementModule = ({
   };
 
   const startTest = async (project: EngineeringProject) => {
-    await updateDoc(doc(db, 'engineering-projects', project.id), {
-      testStartDate: new Date().toISOString(),
-      testStatus: 'Em teste'
-    });
+    try {
+      await updateDoc(doc(db, 'engineering-projects', project.id), {
+        testStartDate: new Date().toISOString(),
+        testStatus: 'Em teste',
+        updatedAt: new Date().toISOString()
+      });
+      showToast('Teste iniciado com sucesso!', 'success');
+    } catch (error) {
+      console.error('Error starting test:', error);
+      showToast('Erro ao iniciar teste', 'error');
+    }
   };
 
   const finishTest = async (project: EngineeringProject, result: 'Sucesso' | 'Parcial' | 'Falha') => {
-    await updateDoc(doc(db, 'engineering-projects', project.id), {
-      testStatus: result === 'Sucesso' ? 'Aprovado' : 'Reprovado',
-      result: result
-    });
+    try {
+      await updateDoc(doc(db, 'engineering-projects', project.id), {
+        testStatus: result === 'Sucesso' ? 'Aprovado' : 'Reprovado',
+        result: result,
+        updatedAt: new Date().toISOString()
+      });
+      showToast('Teste finalizado com sucesso!', 'success');
+    } catch (error) {
+      console.error('Error finishing test:', error);
+      showToast('Erro ao finalizar teste', 'error');
+    }
   };
 
   const [activeSubModal, setActiveSubModal] = useState<{type: 'task' | 'adjustment' | 'indicator' | 'comment', mode: 'create' | 'edit', data?: any} | null>(null);
@@ -383,13 +397,18 @@ export const ImprovementManagementModule = ({
             </label>
             <button 
               onClick={async () => {
-                await updateDoc(doc(db, 'engineering-projects', selectedProject.id), {
-                  result: selectedProject.result || '',
-                  lessonsLearned: selectedProject.lessonsLearned || '',
-                  standardize: selectedProject.standardize || false,
-                  updatedAt: new Date().toISOString()
-                });
-                alert('Encerramento salvo com sucesso!');
+                try {
+                  await updateDoc(doc(db, 'engineering-projects', selectedProject.id), {
+                    result: selectedProject.result || '',
+                    lessonsLearned: selectedProject.lessonsLearned || '',
+                    standardize: selectedProject.standardize || false,
+                    updatedAt: new Date().toISOString()
+                  });
+                  showToast('Encerramento salvo com sucesso!', 'success');
+                } catch (error) {
+                  console.error('Error saving closure:', error);
+                  showToast('Erro ao salvar encerramento', 'error');
+                }
               }}
               className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold"
             >
