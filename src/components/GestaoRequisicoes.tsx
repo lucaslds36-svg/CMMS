@@ -300,13 +300,16 @@ export const GestaoRequisicoes = ({ userProfile }: { userProfile: UserProfile | 
     e.preventDefault();
     
     // Check for duplicate code
-    const isDuplicate = requisitions.some(
-      req => req.code.trim().toLowerCase() === newReq.code.trim().toLowerCase() && req.id !== editingId
-    );
-    
-    if (isDuplicate) {
-      setFormError('Já existe uma requisição com este número.');
-      return;
+    const newCode = (newReq.code || '').trim().toLowerCase();
+    if (newCode) {
+      const isDuplicate = requisitions.some(
+        req => (req.code || '').trim().toLowerCase() === newCode && req.id !== editingId
+      );
+      
+      if (isDuplicate) {
+        setFormError('Já existe uma requisição com este número.');
+        return;
+      }
     }
     
     setFormError(null);
