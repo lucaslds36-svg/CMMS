@@ -65,6 +65,21 @@ const ConfirmModal = ({
   );
 };
 
+const mockChartData = [
+  { month: 'Jan', manutencao: 2.87, metaManutencao: 4.00, mecanica: 1.41, metaMecanica: 2.40, eletrica: 1.46, metaEletrica: 1.60 },
+  { month: 'Fev', manutencao: 3.83, metaManutencao: 4.00, mecanica: 2.43, metaMecanica: 2.40, eletrica: 1.40, metaEletrica: 1.60 },
+  { month: 'Mar', manutencao: 3.19, metaManutencao: 4.00, mecanica: 1.79, metaMecanica: 2.40, eletrica: 1.40, metaEletrica: 1.60 },
+  { month: 'Abr', metaManutencao: 4.00, metaMecanica: 2.40, metaEletrica: 1.60 },
+  { month: 'Mai', metaManutencao: 4.00, metaMecanica: 2.40, metaEletrica: 1.60 },
+  { month: 'Jun', metaManutencao: 4.00, metaMecanica: 2.40, metaEletrica: 1.60 },
+  { month: 'Jul', metaManutencao: 4.00, metaMecanica: 2.40, metaEletrica: 1.60 },
+  { month: 'Ago', metaManutencao: 4.00, metaMecanica: 2.40, metaEletrica: 1.60 },
+  { month: 'Set', metaManutencao: 4.00, metaMecanica: 2.40, metaEletrica: 1.60 },
+  { month: 'Out', metaManutencao: 4.00, metaMecanica: 2.40, metaEletrica: 1.60 },
+  { month: 'Nov', metaManutencao: 4.00, metaMecanica: 2.40, metaEletrica: 1.60 },
+  { month: 'Dez', metaManutencao: 4.00, metaMecanica: 2.40, metaEletrica: 1.60 },
+];
+
 export const Dashboard = ({ 
   assets, 
   wos, 
@@ -75,8 +90,7 @@ export const Dashboard = ({
   handleFileUpload,
   filters,
   setFilters,
-  isProcessingFile,
-  chartData
+  isProcessingFile
 }: { 
   assets: Asset[], 
   wos: WorkOrder[], 
@@ -87,8 +101,7 @@ export const Dashboard = ({
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void,
   filters: { year: string, month: string, viewType: 'Acumulada' | 'Diária' },
   setFilters: React.Dispatch<React.SetStateAction<{ year: string, month: string, viewType: 'Acumulada' | 'Diária' }>>,
-  isProcessingFile?: boolean,
-  chartData: any[]
+  isProcessingFile?: boolean
 }) => {
   const [loading, setLoading] = useState(false);
 
@@ -445,6 +458,213 @@ export const Dashboard = ({
 
     return result;
   }, [bditssData, dinamicaData, filters]);
+
+  // Calculate chart data based on bditssData
+  const chartData = useMemo(() => {
+    if (!Array.isArray(bditssData) || bditssData.length === 0) return mockChartData;
+
+    // 1. Identify header row and headers in BD
+    let headerRowIdx = 0;
+    let headers: any[] = [];
+    
+    for (let i = 0; i < Math.min(bditssData.length, 20); i++) {
+      const row = bditssData[i];
+      if (Array.isArray(row)) {
+        const hasAno = row.some(h => String(h).toUpperCase().includes('ANO'));
+        const hasMes = row.some(h => {
+          const s = String(h).toUpperCase();
+          return s.includes('MÊS') || s.includes('MES') || s === 'MS';
+        });
+        const hasGrupo = row.some(h => {
+          const s = String(h).toUpperCase();
+          return s.includes('GRUPO') || s.includes('PROCESSO') || s.includes('TAG');
+        });
+        
+        if ((hasAno && hasMes) || (hasAno && hasGrupo) || (hasMes && hasGrupo)) {
+          headerRowIdx = i;
+          headers = row;
+          break;
+        }
+      }
+    }
+
+    if (headers.length === 0) {
+      headers = Array.isArray(bditssData[0]) ? bditssData[0] : [];
+    }
+
+    const findIdx = (keywords: string[]) => headers.findIndex((h: any) => {
+      const s = String(h || '').toUpperCase();
+      return keywords.some(k => s.includes(k.toUpperCase()));
+    });
+
+    const horasIdx = findIdx(['HORA', 'PARADA', 'DURAÇÃO', 'DURACAO', 'TEMPO', 'MANUT. MECÂNICO', 'MANUT. MECANICO']);
+    const mecHoursIdx = findIdx(['MANUT. MECÂNICO', 'MANUT. MECANICO']);
+    const eleHoursIdx = findIdx(['MANUT. ELÉTRICA', 'MANUT. ELETRICA']);
+    const anoIdx = findIdx(['ANO', 'YEAR']);
+    const mesIdx = findIdx(['MÊS', 'MES', 'MONTH', 'MS']);
+    const dataIdx = findIdx(['DATA', 'DATE', 'DIA', 'DAY']);
+    const progHoursIdx = findIdx(['HORA PROG', 'HORAS PROG', 'HR PROG', 'HRS PROG', 'PROGRAMAÇÃO', 'PROGRAMACAO']);
+    const setorIdx = findIdx(['SETOR', 'ÁREA', 'AREA', 'DISCIPLINA']);
+    
+    const indispMecMensalIdx = findIdx(['INDISP. MENSAL MÊ', 'INDISP. MENSAL ME', 'INDISP. MENSAL MC.']);
+    const indispEleMensalIdx = findIdx(['INDISP. MENSAL ELE', 'INDISP. MENSAL ELET.']);
+    const indispTotIdx = findIdx(['INDISP. TOT.']);
+
+    if (anoIdx === -1 || mesIdx === -1) {
+      console.warn('Required headers (ANO, MES) not found for chart data. Found headers:', headers);
+      return mockChartData;
+    }
+
+    // Get global metas from PDG if available (usually a row with "TOTAL BMB" or similar)
+    let globalMetaMec = 2.40;
+    let globalMetaEle = 1.60;
+    let globalMetaTotal = 4.00;
+
+    if (Array.isArray(dinamicaData) && dinamicaData.length > 0) {
+      let pdgHeaderRowIdx = 0;
+      let pdgHeaders: any[] = [];
+      
+      for (let i = 0; i < Math.min(dinamicaData.length, 20); i++) {
+        const row = dinamicaData[i];
+        if (Array.isArray(row)) {
+          const hasProcesso = row.some(h => String(h).toUpperCase().includes('PROCESSO'));
+          const hasMeta = row.some(h => String(h).toUpperCase().includes('META') || String(h).toUpperCase().includes('25') || String(h).toUpperCase().includes('26'));
+          if (hasProcesso && hasMeta) {
+            pdgHeaderRowIdx = i;
+            pdgHeaders = row;
+            break;
+          }
+        }
+      }
+      
+      if (pdgHeaders.length === 0) pdgHeaders = Array.isArray(dinamicaData[0]) ? dinamicaData[0] : [];
+
+      const pdgGrupoIdx = pdgHeaders.findIndex((h: any) => {
+        const s = String(h).toUpperCase();
+        return s.includes('PROCESSO') || s.includes('GRUPO');
+      });
+      const pdgMetaMecIdx = pdgHeaders.findIndex((h: any) => String(h).toUpperCase().includes('MEC') && String(h).toUpperCase().includes('META') && !String(h).toUpperCase().includes('DIAR'));
+      const pdgMetaEleIdx = pdgHeaders.findIndex((h: any) => String(h).toUpperCase().includes('ELE') && String(h).toUpperCase().includes('META') && !String(h).toUpperCase().includes('DIAR'));
+      
+      const totalRow = dinamicaData.slice(pdgHeaderRowIdx + 1).find(row => Array.isArray(row) && String(row[pdgGrupoIdx]).toUpperCase().includes('TOTAL'));
+      if (totalRow) {
+        globalMetaMec = parsePercent(totalRow[pdgMetaMecIdx]) || 2.40;
+        globalMetaEle = parsePercent(totalRow[pdgMetaEleIdx]) || 1.60;
+        globalMetaTotal = globalMetaMec + globalMetaEle;
+      }
+    }
+
+    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const fullMonthNames = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
+
+    const dataByMonth = monthNames.map((name, idx) => {
+      const monthNum = idx + 1;
+      const monthFullName = fullMonthNames[idx];
+      
+      const monthRows = bditssData.slice(headerRowIdx + 1).filter(row => {
+        if (!Array.isArray(row)) return false;
+        const rowYear = String(row[anoIdx] || '').trim();
+        const rowMonth = String(row[mesIdx] || '').trim();
+        
+        const matchYear = rowYear === filters.year;
+        const rowMonthNum = getMonthNumber(rowMonth);
+        const matchMonth = rowMonthNum !== null && rowMonthNum === monthNum;
+        
+        return matchYear && matchMonth;
+      });
+
+      if (monthRows.length === 0) {
+        return {
+          month: name,
+          metaManutencao: globalMetaTotal,
+          metaMecanica: globalMetaMec,
+          metaEletrica: globalMetaEle
+        };
+      }
+
+      let mecVal = 0;
+      let eleVal = 0;
+      let totalVal = 0;
+
+      // Prioritize manual calculation if HORAS PROG and maintenance hours are found
+      const hasManualColumns = (mecHoursIdx !== -1 && eleHoursIdx !== -1 || (setorIdx !== -1 && horasIdx !== -1)) && progHoursIdx !== -1;
+
+      if (hasManualColumns) {
+        let mecHours = 0;
+        let eleHours = 0;
+        let totalProgHours = 0;
+        const daysProcessed = new Set();
+
+        monthRows.forEach(row => {
+          const dayKey = dataIdx !== -1 ? String(row[dataIdx]) : Math.random().toString();
+          
+          if (mecHoursIdx !== -1 && eleHoursIdx !== -1) {
+            mecHours += parseFloat(String(row[mecHoursIdx] || '0').replace(',', '.'));
+            eleHours += parseFloat(String(row[eleHoursIdx] || '0').replace(',', '.'));
+          } else {
+            const setor = String(row[setorIdx] || '').toUpperCase();
+            const hours = parseFloat(String(row[horasIdx] || '0').replace(',', '.'));
+            if (setor.includes('MEC')) mecHours += hours;
+            if (setor.includes('ELE')) eleHours += hours;
+          }
+          
+          if (progHoursIdx !== -1) {
+            const progVal = parseFloat(String(row[progHoursIdx] || '0').replace(',', '.'));
+            if (!daysProcessed.has(dayKey)) {
+              totalProgHours += progVal;
+              daysProcessed.add(dayKey);
+            }
+          }
+        });
+
+        const divisor = totalProgHours > 0 ? totalProgHours : 1;
+        mecVal = (mecHours / divisor) * 100;
+        eleVal = (eleHours / divisor) * 100;
+        totalVal = mecVal + eleVal;
+      } else if (indispMecMensalIdx !== -1 && indispEleMensalIdx !== -1) {
+        // Use monthly pre-calculated values
+        const lastRow = monthRows[monthRows.length - 1];
+        if (lastRow) {
+          mecVal = parsePercent(lastRow[indispMecMensalIdx]) || 0;
+          eleVal = parsePercent(lastRow[indispEleMensalIdx]) || 0;
+          totalVal = indispTotIdx !== -1 ? (parsePercent(lastRow[indispTotIdx]) || (mecVal + eleVal)) : (mecVal + eleVal);
+        }
+      } else {
+        let mecHours = 0;
+        let eleHours = 0;
+        
+        monthRows.forEach(row => {
+          if (mecHoursIdx !== -1 && eleHoursIdx !== -1) {
+            mecHours += parseFloat(String(row[mecHoursIdx] || '0').replace(',', '.'));
+            eleHours += parseFloat(String(row[eleHoursIdx] || '0').replace(',', '.'));
+          } else {
+            const setor = String(row[setorIdx] || '').toUpperCase();
+            const hours = parseFloat(String(row[horasIdx] || '0').replace(',', '.'));
+            if (setor.includes('MEC')) mecHours += hours;
+            if (setor.includes('ELE')) eleHours += hours;
+          }
+        });
+
+        const daysInMonth = new Date(parseInt(filters.year), monthNum, 0).getDate();
+        const totalHours = daysInMonth * 24;
+        mecVal = (mecHours / totalHours) * 100;
+        eleVal = (eleHours / totalHours) * 100;
+        totalVal = mecVal + eleVal;
+      }
+
+      return {
+        month: name,
+        manutencao: totalVal,
+        metaManutencao: globalMetaTotal,
+        mecanica: mecVal,
+        metaMecanica: globalMetaMec,
+        eletrica: eleVal,
+        metaEletrica: globalMetaEle
+      };
+    });
+
+    return dataByMonth;
+  }, [bditssData, dinamicaData, filters.year]);
 
 
   return (

@@ -39,24 +39,7 @@ import {
   Lightbulb
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  ReferenceLine,
-  PieChart, 
-  Pie, 
-  Cell,
-  LineChart,
-  Line,
-  ComposedChart,
-  Legend,
-  LabelList
-} from 'recharts';
+import { getMonthNumber } from './utils/chartUtils';
 import { 
   format, 
   startOfMonth, 
