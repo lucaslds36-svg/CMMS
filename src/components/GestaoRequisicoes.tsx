@@ -36,6 +36,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
 import { Requisition, UserProfile } from '../types';
 import { subscribeToCollection, createDocument, deleteDocument, updateDocument } from '../firebase';
+import { RequisicoesTable } from './RequisicoesTable';
 
 const cn = (...inputs: any[]) => inputs.filter(Boolean).join(' ');
 
@@ -590,7 +591,13 @@ export const GestaoRequisicoes = ({ userProfile, showToast }: { userProfile: Use
             </div>
           )}
 
-          <div className="overflow-x-auto">
+          <RequisicoesTable 
+            requisitions={filteredRequisitions}
+            onEdit={handleEditClick}
+            onDelete={handleDelete}
+            onUpdateStatus={handleUpdateStatus}
+          />
+          <div className="hidden">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/50">
@@ -715,14 +722,6 @@ export const GestaoRequisicoes = ({ userProfile, showToast }: { userProfile: Use
                 ))}
               </tbody>
             </table>
-            {filteredRequisitions.length === 0 && (
-              <div className="p-20 text-center">
-                <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Search className="w-10 h-10 text-slate-200" />
-                </div>
-                <p className="text-slate-400 font-medium">Nenhuma requisição encontrada.</p>
-              </div>
-            )}
           </div>
         </div>
       </div>
