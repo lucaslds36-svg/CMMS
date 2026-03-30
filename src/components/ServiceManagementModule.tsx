@@ -18,7 +18,8 @@ import {
   Box,
   Eye,
   Trash2,
-  FileText
+  FileText,
+  Wrench
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, parseISO, differenceInDays, isAfter, isBefore, addDays, startOfMonth, eachDayOfInterval, isToday } from 'date-fns';
@@ -316,11 +317,17 @@ export const ServiceManagementModule = ({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Gestão de Serviços</h2>
-          <p className="text-slate-500 text-sm">Acompanhamento de demandas e ordens de serviço</p>
+      <div className="flex items-center space-x-3 mb-6">
+        <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-200">
+          <Wrench className="w-8 h-8" />
         </div>
+        <div>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Gestão de Serviços</h1>
+          <p className="text-slate-500 font-medium">Acompanhamento de demandas e ordens de serviço</p>
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-4">
         <div className="flex items-center gap-2">
           <div className="bg-white p-1 rounded-xl border border-slate-100 flex">
             <button 
@@ -870,7 +877,7 @@ export const ServiceManagementModule = ({
                         Histórico de Status
                       </label>
                       <div className="space-y-3">
-                        {editingDemand.statusHistory.map((h, i) => (
+                        {Array.isArray(editingDemand.statusHistory) && editingDemand.statusHistory.map((h, i) => (
                           <div key={h.id} className="flex gap-3">
                             <div className="flex flex-col items-center">
                               <div className={cn(
@@ -918,7 +925,7 @@ export const ServiceManagementModule = ({
                         </button>
                       </div>
                       <div className="space-y-3">
-                        {editingDemand.scopeChanges.length > 0 ? (
+                        {Array.isArray(editingDemand.scopeChanges) && editingDemand.scopeChanges.length > 0 ? (
                           editingDemand.scopeChanges.map((s) => (
                             <div key={s.id} className="p-3 bg-slate-50 rounded-xl">
                               <p className="text-sm text-slate-700 mb-1">{s.description}</p>

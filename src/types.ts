@@ -140,6 +140,22 @@ export interface MaterialRequisition {
   deliveryDate: string;
 }
 
+export interface Requisition {
+  id: string;
+  code: string;
+  item: string;
+  itemCode: string;
+  description: string;
+  supplier: string;
+  category: string;
+  requestDate: string; // ISO string
+  deliveryDate: string; // ISO string
+  leadTime: number;
+  daysRemaining: number;
+  status: 'ATRASADO' | 'EM DIA' | 'AGUARDANDO' | 'TOTAL' | 'PARCIAL';
+  createdAt: string;
+}
+
 export interface ServiceDemand {
   id: string;
   openedAt: string;

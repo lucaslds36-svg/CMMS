@@ -1,5 +1,5 @@
 {
-  "name": "Real-Time Data Dashboard",
-  "description": "Dashboard em tempo real que sincroniza dados de arquivos Excel via Firebase Firestore, permitindo análise instantânea de indicadores.",
+  "name": "Gestão de Manutenção Pro",
+  "description": "Sistema Full Stack para gestão de requisições de materiais, com dashboard de BI, importação em massa e alertas de atraso.",
   "requestFramePermissions": []
 }

@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   PieChart, Pie, Cell, LabelList 
 } from 'recharts';
-import { Upload, FileSpreadsheet, Filter, X, Eye, Clock, User, Settings, Info, Download, Printer } from 'lucide-react';
+import { Upload, FileSpreadsheet, Filter, X, Eye, Clock, User, Settings, Info, Download, Printer, BarChart3 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
@@ -510,9 +510,18 @@ export const FailureAnalysisModule = ({
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center space-x-3 mb-6">
+        <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-200">
+          <BarChart3 className="w-8 h-8" />
+        </div>
+        <div>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Análise de Falhas (BI)</h1>
+          <p className="text-slate-500 font-medium">Dashboards dinâmicos e indicadores de performance</p>
+        </div>
+      </div>
+
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
         <div className="flex-1">
-          <h3 className="text-xl font-bold text-slate-900">Análise de Falhas (BI)</h3>
           {rawData.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-3">
               <div className="bg-orange-50 border border-orange-100 px-3 py-1.5 rounded-xl flex items-center space-x-2">

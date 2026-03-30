@@ -38,6 +38,27 @@
         "closedAt": { "type": "string" }
       },
       "required": ["id", "openedAt", "requesterUid", "description", "area", "executorType", "responsibleId", "priority", "estimatedDeliveryDate", "status"]
+    },
+    "Requisition": {
+      "title": "Requisition",
+      "description": "Represents a material requisition.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "item": { "type": "string" },
+        "itemCode": { "type": "string" },
+        "description": { "type": "string" },
+        "supplier": { "type": "string" },
+        "category": { "type": "string" },
+        "requestDate": { "type": "string" },
+        "deliveryDate": { "type": "string" },
+        "leadTime": { "type": "integer" },
+        "daysRemaining": { "type": "integer" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "code", "item", "supplier", "requestDate", "deliveryDate", "status"]
     }
   },
   "firestore": {
@@ -48,6 +69,10 @@
     "serviceDemands/{id}": {
       "schema": "ServiceDemand",
       "description": "Stores service demands."
+    },
+    "requisitions/{id}": {
+      "schema": "Requisition",
+      "description": "Stores material requisitions."
     }
   }
 }

@@ -100,6 +100,7 @@ import { onAuthStateChanged, type User } from 'firebase/auth';
 import { FailureAnalysisModule } from './components/FailureAnalysisModule';
 import { DatabaseModule } from './components/DatabaseModule';
 import { ServiceManagementModule } from './components/ServiceManagementModule';
+import { GestaoRequisicoes } from './components/GestaoRequisicoes';
 import { ServiceDemand } from './types';
 import { EngineeringProject } from './types';
 
@@ -3663,6 +3664,7 @@ export default function App() {
         { id: 'wos', label: 'Ordens de Serviço', icon: Wrench, permission: 'workOrders' },
         { id: 'preventive', label: 'Preventivas', icon: Calendar, permission: 'preventive' },
         { id: 'service-management', label: 'Gestão de Serviços', icon: ClipboardList, permission: 'serviceManagement' },
+        { id: 'gestao-requisicoes', label: 'Gestão de Requisições', icon: ClipboardList, permission: 'serviceManagement' },
       ]
     },
     {
@@ -3722,7 +3724,7 @@ export default function App() {
             date: new Date().toISOString(),
             user: userProfile?.displayName || 'Usuário'
           };
-          mergedDemand.statusHistory = [...(existingDemand.statusHistory || []), historyEntry];
+          mergedDemand.statusHistory = [...(Array.isArray(existingDemand.statusHistory) ? existingDemand.statusHistory : []), historyEntry];
           if (demand.status === 'Concluído') {
             mergedDemand.closedAt = new Date().toISOString();
           }
@@ -3788,7 +3790,7 @@ export default function App() {
 
       const updateData: any = {
         status,
-        statusHistory: [...demand.statusHistory, historyEntry]
+        statusHistory: [...(Array.isArray(demand.statusHistory) ? demand.statusHistory : []), historyEntry]
       };
 
       if (status === 'Concluído') {
@@ -3815,7 +3817,7 @@ export default function App() {
         user: userProfile?.displayName || 'Usuário'
       };
 
-      const updatedScopeChanges = [...demand.scopeChanges, scopeEntry];
+      const updatedScopeChanges = [...(Array.isArray(demand.scopeChanges) ? demand.scopeChanges : []), scopeEntry];
       
       // Filter to only include allowed fields
       const allowedFields = ['scopeChanges'];
@@ -4371,6 +4373,9 @@ export default function App() {
                     onAddScopeChange={handleAddServiceDemandScopeChange}
                     showToast={showToast}
                   />
+                )}
+                {activeTab === 'gestao-requisicoes' && (
+                  <GestaoRequisicoes userProfile={userProfile} />
                 )}
                 {activeTab === 'improvement-management' && (
                   <ImprovementManagementModule 

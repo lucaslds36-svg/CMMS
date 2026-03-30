@@ -211,17 +211,17 @@ export const DatabaseModule: React.FC<DatabaseModuleProps> = ({ onDataImported, 
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-4 sm:p-8 rounded-3xl border border-slate-100 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-4 mb-8">
-          <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
-            <Database className="w-6 h-6" />
-          </div>
-          <div>
-            <h3 className="text-xl font-bold text-slate-900">Banco de Dados Local</h3>
-            <p className="text-slate-500 text-sm">Importe arquivos .xlsx ou .xlsb para alimentar o sistema</p>
-          </div>
+      <div className="flex items-center space-x-3 mb-6">
+        <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-200">
+          <Database className="w-8 h-8" />
         </div>
+        <div>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Banco de Dados Local</h1>
+          <p className="text-slate-500 font-medium">Importe arquivos .xlsx ou .xlsb para alimentar o sistema</p>
+        </div>
+      </div>
 
+      <div className="bg-white p-4 sm:p-8 rounded-3xl border border-slate-100 shadow-sm">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
           <div className="p-4 sm:p-6 bg-slate-50 rounded-2xl border border-slate-100">
             <div className="text-slate-500 text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-2">Registros BD</div>
