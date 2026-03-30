@@ -1117,10 +1117,7 @@ const GreenArrow = () => (
                           </svg>
                         </div>
 
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                 </div>
               </div>
             ))}
           </div>
