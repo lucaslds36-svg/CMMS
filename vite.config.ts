@@ -11,17 +11,6 @@ export default defineConfig(({mode}) => {
       target: 'esnext',
       minify: 'esbuild',
       cssMinify: true,
-      rollupOptions: {
-        output: {
-          manualChunks: {
-            'vendor-react': ['react', 'react-dom'],
-            'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore'],
-            'vendor-charts': ['recharts'],
-            'vendor-utils': ['xlsx', 'date-fns', 'clsx', 'tailwind-merge'],
-            'vendor-motion': ['motion'],
-          },
-        },
-      },
       chunkSizeWarningLimit: 1000,
     },
     define: {

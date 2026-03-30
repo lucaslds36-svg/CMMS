@@ -54,7 +54,7 @@ const CATEGORIES = [
   'Outros'
 ];
 
-export const GestaoRequisicoes = ({ userProfile }: { userProfile: UserProfile | null }) => {
+export const GestaoRequisicoes = ({ userProfile, showToast }: { userProfile: UserProfile | null, showToast: (msg: string, type?: 'success' | 'error') => void }) => {
   const [requisitions, setRequisitions] = useState<Requisition[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -856,7 +856,24 @@ export const GestaoRequisicoes = ({ userProfile }: { userProfile: UserProfile | 
                           className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 transition-all"
                           placeholder="Ex: 3001135505"
                           value={newReq.code}
-                          onChange={e => setNewReq({...newReq, code: e.target.value})}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setNewReq({...newReq, code: val});
+                            const newCode = val.trim().toLowerCase();
+                            if (newCode) {
+                              const isDuplicate = requisitions.some(
+                                req => (req.code || '').trim().toLowerCase() === newCode && req.id !== editingId
+                              );
+                              if (isDuplicate) {
+                                setFormError('Já existe uma requisição com este número.');
+                                showToast('Atenção: Já existe uma requisição com este número!', 'error');
+                              } else {
+                                setFormError(null);
+                              }
+                            } else {
+                              setFormError(null);
+                            }
+                          }}
                         />
                       </div>
                     </div>

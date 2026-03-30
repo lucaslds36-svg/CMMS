@@ -4375,7 +4375,7 @@ export default function App() {
                   />
                 )}
                 {activeTab === 'gestao-requisicoes' && (
-                  <GestaoRequisicoes userProfile={userProfile} />
+                  <GestaoRequisicoes userProfile={userProfile} showToast={showToast} />
                 )}
                 {activeTab === 'improvement-management' && (
                   <ImprovementManagementModule 

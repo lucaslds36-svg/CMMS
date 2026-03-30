@@ -118,6 +118,19 @@ export const ServiceManagementModule = ({
 
     try {
       const responsible = employees.find(emp => emp.ID === formData.responsibleId);
+      
+      if (formData.needsMaterial && formData.materialRequisition?.requisitionNumber) {
+        const newReqNumber = formData.materialRequisition.requisitionNumber.trim().toLowerCase();
+        const isDuplicate = demands.some(
+          d => d.materialRequisition?.requisitionNumber?.trim().toLowerCase() === newReqNumber && d.id !== editingDemand?.id
+        );
+        
+        if (isDuplicate) {
+          showToast('Já existe uma requisição com este número.', 'error');
+          return;
+        }
+      }
+
       const demandData: Partial<ServiceDemand> = {
         ...formData,
         requesterUid: userProfile.uid,
