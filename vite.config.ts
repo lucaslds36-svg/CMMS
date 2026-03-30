@@ -9,9 +9,10 @@ export default defineConfig(({mode}) => {
     plugins: [react(), tailwindcss()],
     build: {
       target: 'esnext',
-      minify: 'esbuild',
-      cssMinify: true,
-      chunkSizeWarningLimit: 1000,
+      minify: false,
+      sourcemap: false,
+      cssMinify: false,
+      chunkSizeWarningLimit: 2000,
       rollupOptions: {
         output: {
           manualChunks: {
