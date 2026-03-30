@@ -14,7 +14,9 @@ export default defineConfig(({mode}) => {
       chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: {
-          manualChunks: undefined,
+          manualChunks: {
+            vendor: ['react', 'react-dom', 'firebase/app', 'firebase/firestore', 'firebase/auth'],
+          },
         },
       },
     },
