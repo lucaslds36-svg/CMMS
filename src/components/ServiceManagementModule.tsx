@@ -17,11 +17,14 @@ import {
   MoreVertical,
   Box,
   Eye,
-  Trash2
+  Trash2,
+  FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, parseISO, differenceInDays, isAfter, isBefore, addDays, startOfMonth, eachDayOfInterval, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import type { ServiceDemand, Employee, UserProfile, MaterialRequisition, ServiceDemandScopeChange, ServiceDemandStatusChange } from '../types';
 
 const safeParseISO = (dateStr: string | undefined | null) => {
@@ -44,6 +47,7 @@ interface ServiceManagementModuleProps {
   employees: Employee[];
   userProfile: UserProfile | null;
   onSave: (demand: Partial<ServiceDemand>) => Promise<void>;
+  onDelete: (demandId: string) => Promise<void>;
   onUpdateStatus: (demandId: string, status: ServiceDemand['status']) => Promise<void>;
   onAddScopeChange: (demandId: string, description: string) => Promise<void>;
   showToast: (msg: string, type?: 'success' | 'error') => void;
@@ -54,6 +58,7 @@ export const ServiceManagementModule = ({
   employees,
   userProfile,
   onSave,
+  onDelete,
   onUpdateStatus,
   onAddScopeChange,
   showToast
@@ -117,12 +122,12 @@ export const ServiceManagementModule = ({
         requesterUid: userProfile.uid,
         requesterName: userProfile.displayName || 'Usuário',
         responsibleName: responsible?.Name || '',
-        status: 'Em Aberto',
+        status: 'Não Iniciado',
         openedAt: new Date().toISOString(),
         scopeChanges: [],
         statusHistory: [{
           id: Math.random().toString(36).substr(2, 9),
-          status: 'Em Aberto',
+          status: 'Não Iniciado',
           date: new Date().toISOString(),
           user: userProfile.displayName || 'Usuário'
         }]
@@ -181,6 +186,71 @@ export const ServiceManagementModule = ({
   };
 
   const [viewMode, setViewMode] = useState<'table' | 'gantt'>('table');
+
+  const handleGenerateReport = async () => {
+    const sortedDemands = [...filteredDemands].sort((a, b) => {
+      const dateA = safeParseISO(a.estimatedDeliveryDate);
+      const dateB = safeParseISO(b.estimatedDeliveryDate);
+      return dateA.getTime() - dateB.getTime();
+    });
+
+    const doc = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    // Header
+    doc.setFillColor(30, 41, 59);
+    doc.rect(0, 0, pageWidth, 40, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.text('Relatório de Gestão de Serviços', 15, 20);
+    
+    doc.setFontSize(10);
+    doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 15, 30);
+    
+    // Table Headers
+    let y = 50;
+    doc.setFillColor(241, 245, 249);
+    doc.rect(10, y - 5, pageWidth - 20, 10, 'F');
+    
+    doc.setTextColor(51, 65, 85);
+    doc.setFontSize(9);
+    doc.text('ID', 15, y);
+    doc.text('Descrição', 35, y);
+    doc.text('Vencimento', 110, y);
+    doc.text('Responsável', 140, y);
+    doc.text('Status', 180, y);
+    
+    y += 10;
+    
+    sortedDemands.forEach((demand) => {
+      if (y > 270) {
+        doc.addPage();
+        y = 20;
+      }
+      
+      doc.setTextColor(51, 65, 85);
+      doc.setFontSize(8);
+      doc.text(`#${demand.id.replace('SD-', '')}`, 15, y);
+      
+      const desc = demand.description.length > 45 ? demand.description.substring(0, 42) + '...' : demand.description;
+      doc.text(desc, 35, y);
+      
+      doc.text(format(safeParseISO(demand.estimatedDeliveryDate), 'dd/MM/yyyy'), 110, y);
+      
+      const resp = (demand.responsibleName || '').length > 20 ? (demand.responsibleName || '').substring(0, 17) + '...' : (demand.responsibleName || '');
+      doc.text(resp, 140, y);
+      
+      doc.text(demand.status, 180, y);
+      
+      y += 8;
+      doc.setDrawColor(241, 245, 249);
+      doc.line(10, y - 4, pageWidth - 10, y - 4);
+    });
+    
+    doc.save(`relatorio-servicos-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    showToast('Relatório gerado com sucesso!');
+  };
 
   const GanttView = () => {
     const today = new Date();
@@ -272,6 +342,13 @@ export const ServiceManagementModule = ({
               Gantt
             </button>
           </div>
+          <button 
+            onClick={handleGenerateReport}
+            className="flex items-center justify-center space-x-2 px-6 py-3 bg-slate-100 text-slate-700 rounded-2xl font-bold hover:bg-slate-200 transition-all border border-slate-200"
+          >
+            <FileText className="w-5 h-5" />
+            <span>Relatório</span>
+          </button>
           <button 
             onClick={() => setShowModal(true)}
             className="flex items-center justify-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200"
@@ -413,7 +490,7 @@ export const ServiceManagementModule = ({
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={() => {/* Implement delete logic */}}
+                          onClick={() => onDelete(demand.id)}
                           className="p-1.5 bg-rose-600 text-white rounded hover:bg-rose-700 transition-all"
                           title="Excluir"
                         >
@@ -860,25 +937,23 @@ export const ServiceManagementModule = ({
               </div>
               <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
                 <button 
-                  onClick={() => setEditingDemand(null)}
+                  onClick={() => { setEditingDemand(null); setIsEditing(false); }}
                   className="px-6 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-all"
                 >
                   Fechar
                 </button>
-                <button 
-                  onClick={async () => {
-                    await onSave({ 
-                      id: editingDemand.id, 
-                      startDate: editingDemand.startDate, 
-                      closedAt: editingDemand.closedAt,
-                      estimatedDeliveryDate: editingDemand.estimatedDeliveryDate
-                    });
-                    setEditingDemand(null);
-                  }}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all"
-                >
-                  Salvar Alterações
-                </button>
+                {isEditing && (
+                  <button 
+                    onClick={async () => {
+                      await onSave(editingDemand);
+                      setEditingDemand(null);
+                      setIsEditing(false);
+                    }}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all"
+                  >
+                    Salvar Alterações
+                  </button>
+                )}
               </div>
             </motion.div>
           </div>

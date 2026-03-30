@@ -3,9 +3,11 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   PieChart, Pie, Cell, LabelList 
 } from 'recharts';
-import { Upload, FileSpreadsheet, Filter, X, Eye, Clock, User, Settings, Info } from 'lucide-react';
+import { Upload, FileSpreadsheet, Filter, X, Eye, Clock, User, Settings, Info, Download, Printer } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { motion, AnimatePresence } from 'motion/react';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 
 export const FailureAnalysisModule = ({ 
   showToast, 
@@ -266,6 +268,108 @@ export const FailureAnalysisModule = ({
     });
   };
 
+  const handlePrintReport = async () => {
+    if (filteredData.length === 0) {
+      if (showToast) showToast('Não há dados para imprimir.', 'error');
+      return;
+    }
+
+    if (showToast) showToast('Gerando relatório...', 'success');
+
+    try {
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = doc.internal.pageSize.getWidth();
+      
+      // Header
+      doc.setFontSize(18);
+      doc.setTextColor(30, 58, 138); // blue-900
+      doc.text('Relatório de Análise de Falhas', pageWidth / 2, 20, { align: 'center' });
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139); // slate-500
+      doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, pageWidth / 2, 28, { align: 'center' });
+      
+      // Filters summary
+      doc.setFontSize(12);
+      doc.setTextColor(51, 65, 85); // slate-700
+      doc.text('Filtros Aplicados:', 15, 40);
+      
+      doc.setFontSize(9);
+      let filterY = 46;
+      const activeFilters = Object.entries(filters).filter(([_, v]) => v !== '');
+      if (activeFilters.length === 0) {
+        doc.text('Nenhum filtro aplicado (Todos os dados)', 20, filterY);
+        filterY += 6;
+      } else {
+        activeFilters.forEach(([k, v]) => {
+          doc.text(`${k}: ${v}`, 20, filterY);
+          filterY += 5;
+        });
+      }
+      
+      // Stats
+      doc.setFontSize(12);
+      doc.setTextColor(51, 65, 85);
+      doc.text('Resumo:', 15, filterY + 5);
+      doc.setFontSize(10);
+      doc.text(`Total de Horas: ${totalHoras}h`, 20, filterY + 12);
+      doc.text(`Total de Registros: ${filteredData.length}`, 20, filterY + 18);
+      
+      // Table Header
+      let tableY = filterY + 30;
+      doc.setFillColor(241, 245, 249); // slate-100
+      doc.rect(15, tableY - 5, pageWidth - 30, 8, 'F');
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Data', 17, tableY);
+      doc.text('Máquina', 35, tableY);
+      doc.text('Causa', 70, tableY);
+      doc.text('Horas', 105, tableY);
+      doc.text('Descrição', 120, tableY);
+      
+      // Table Rows
+      doc.setFont('helvetica', 'normal');
+      let currentY = tableY + 8;
+      const rowsToPrint = filteredData.slice(0, 40); // Limit to first 40 for the report
+      
+      rowsToPrint.forEach((row, index) => {
+        if (currentY > 280) {
+          doc.addPage();
+          currentY = 20;
+          // Re-draw header on new page if needed
+        }
+        
+        const date = formatDate(row['Data'] || row['Dia']);
+        const machine = String(row['Máquina'] || row['Maquina'] || '-').substring(0, 15);
+        const cause = String(row['Causa'] || '-').substring(0, 15);
+        const hours = `${parseHours(row[horasCol]).toFixed(2)}h`;
+        const desc = String(row['Descrição'] || row['Descricao'] || '-').substring(0, 45);
+        
+        doc.text(date, 17, currentY);
+        doc.text(machine, 35, currentY);
+        doc.text(cause, 70, currentY);
+        doc.text(hours, 105, currentY);
+        doc.text(desc, 120, currentY);
+        
+        doc.setDrawColor(241, 245, 249);
+        doc.line(15, currentY + 2, pageWidth - 15, currentY + 2);
+        currentY += 7;
+      });
+      
+      if (filteredData.length > 40) {
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'italic');
+        doc.text(`* Exibindo apenas os primeiros 40 de ${filteredData.length} registros filtrados.`, 15, currentY + 5);
+      }
+      
+      doc.save(`Relatorio_Falhas_${new Date().getTime()}.pdf`);
+      if (showToast) showToast('Relatório gerado com sucesso!', 'success');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      if (showToast) showToast('Erro ao gerar relatório.', 'error');
+    }
+  };
+
   // Pre-calculate column mappings for filters to improve performance
   const filterColMapping = useMemo(() => {
     const mapping: Record<string, string> = {};
@@ -459,6 +563,14 @@ export const FailureAnalysisModule = ({
                 <Filter className="w-4 h-4" />
                 <span>Filtros Dinâmicos</span>
               </div>
+            <div className="flex items-center space-x-4">
+              <button 
+                onClick={handlePrintReport}
+                className="text-xs text-blue-600 hover:text-blue-700 flex items-center space-x-1 font-bold bg-blue-50 px-3 py-1.5 rounded-lg transition-all"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Imprimir Relatório</span>
+              </button>
               <button 
                 onClick={clearFilters}
                 className="text-xs text-slate-500 hover:text-blue-600 flex items-center space-x-1"
@@ -466,6 +578,7 @@ export const FailureAnalysisModule = ({
                 <X className="w-3 h-3" />
                 <span>Limpar Filtros</span>
               </button>
+            </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               <div className="flex flex-col col-span-1 sm:col-span-2">

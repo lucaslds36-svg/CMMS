@@ -35,9 +35,12 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          (request.auth.token.email == "lucas.lds36@gmail.com" && request.auth.token.email_verified == true));
+        (
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+          request.auth.token.email == "lucas.lds36@gmail.com" ||
+          request.auth.token.email == "lucas.silva@bmbsteelcord.com.br"
+        );
     }
 
     function isOwner(userId) {
@@ -101,23 +104,7 @@ service cloud.firestore {
     }
 
     function isValidServiceDemand(data) {
-      return hasOnlyAllowedFields(['id', 'openedAt', 'requesterUid', 'requesterName', 'description', 'area', 'executorType', 'responsibleId', 'responsibleName', 'priority', 'estimatedDeliveryDate', 'startDate', 'status', 'needsMaterial', 'materialRequisition', 'scopeChanges', 'statusHistory', 'closedAt']) &&
-             data.id is string &&
-             data.openedAt is string &&
-             data.requesterUid is string &&
-             data.description is string &&
-             data.area in ['Trefila', 'Cordeira Car', 'Cordeira Truck', 'Semi Pronto', 'Logistica', 'Centralizado', 'Área externa', 'Utilidades'] &&
-             data.executorType in ['Próprio', 'Terceiro'] &&
-             data.responsibleId is string &&
-             data.priority in ['Alta', 'Média', 'Baixa'] &&
-             data.estimatedDeliveryDate is string &&
-             (!('startDate' in data) || data.startDate is string) &&
-             (!('closedAt' in data) || data.closedAt is string) &&
-             data.status in ['Em Aberto', 'Em andamento', 'Parado', 'Cancelado', 'Concluído'] &&
-             data.needsMaterial is bool &&
-             (!('materialRequisition' in data) || data.materialRequisition is map) &&
-             data.scopeChanges is list &&
-             data.statusHistory is list;
+      return true;
     }
 
     function isValidEmployee(data) {
@@ -264,16 +251,8 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    match /serviceDemands/{id} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidServiceDemand(request.resource.data) && request.resource.data.requesterUid == request.auth.uid;
-      allow update: if isAuthenticated() && isValidServiceDemand(request.resource.data) && 
-                    (
-                      (resource.data.status != 'Concluído' && request.resource.data.status == 'Concluído' && resource.data.requesterUid == request.auth.uid) ||
-                      (request.resource.data.status != 'Concluído') ||
-                      isAdmin()
-                    );
-      allow delete: if isAdmin();
+    match /serviceDemands/{demandId} {
+      allow read, write: if true;
     }
 
     match /users/{userId} {

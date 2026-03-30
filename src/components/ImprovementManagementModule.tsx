@@ -1,12 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { 
+  auth,
+  db,
+  subscribeToCollection,
+  createDocument,
+  updateDocument,
+  deleteDocument
+} from '../firebase';
 import { 
   Plus, 
   Search, 
   Pencil, 
   Trash2, 
-  Eye
+  Eye,
+  Clock
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -38,9 +45,8 @@ export const ImprovementManagementModule = ({
   });
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'engineering-projects'), (snapshot) => {
-      const projectsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EngineeringProject));
-      setProjects(projectsData);
+    const unsubscribe = subscribeToCollection<EngineeringProject>('engineering-projects', (data) => {
+      setProjects(data);
     });
     return () => unsubscribe();
   }, []);
@@ -79,9 +85,10 @@ export const ImprovementManagementModule = ({
 
   const startTest = async (project: EngineeringProject) => {
     try {
-      await updateDoc(doc(db, 'engineering-projects', project.id), {
+      await updateDocument('engineering-projects', project.id, {
         testStartDate: new Date().toISOString(),
         testStatus: 'Em teste',
+        status: 'Em teste',
         updatedAt: new Date().toISOString()
       });
       showToast('Teste iniciado com sucesso!', 'success');
@@ -93,8 +100,9 @@ export const ImprovementManagementModule = ({
 
   const finishTest = async (project: EngineeringProject, result: 'Sucesso' | 'Parcial' | 'Falha') => {
     try {
-      await updateDoc(doc(db, 'engineering-projects', project.id), {
+      await updateDocument('engineering-projects', project.id, {
         testStatus: result === 'Sucesso' ? 'Aprovado' : 'Reprovado',
+        status: result === 'Sucesso' ? 'Validado' : 'Em execução',
         result: result,
         updatedAt: new Date().toISOString()
       });
@@ -134,10 +142,18 @@ export const ImprovementManagementModule = ({
   const handleUpdateTaskStatus = async (taskId: string, newStatus: 'Pendente' | 'Em andamento' | 'Concluído') => {
     if (!selectedProject) return;
     const updatedTasks = selectedProject.tasks?.map(t => 
-      t.id === taskId ? { ...t, status: newStatus, completedDate: newStatus === 'Concluído' ? new Date().toISOString() : t.completedDate } : t
+      t.id === taskId ? { 
+        ...t, 
+        status: newStatus, 
+        completedDate: newStatus === 'Concluído' ? new Date().toISOString() : (t.completedDate || null) 
+      } : t
     ) || [];
-    await updateDoc(doc(db, 'engineering-projects', selectedProject.id), {
-      tasks: updatedTasks,
+    
+    // Sanitize each task in the list
+    const sanitizedTasks = updatedTasks.map(task => sanitize(task));
+
+    await updateDocument('engineering-projects', selectedProject.id, {
+      tasks: sanitizedTasks,
       updatedAt: new Date().toISOString()
     });
   };
@@ -147,7 +163,7 @@ export const ImprovementManagementModule = ({
     const { type, mode, data } = activeSubModal;
     const collectionName = type === 'task' ? 'tasks' : type === 'adjustment' ? 'adjustments' : 'indicators';
     
-    let itemToSave = { ...subItemData };
+    let itemToSave = sanitize({ ...subItemData });
     if (type === 'indicator') {
       const before = parseFloat(subItemData.before || 0);
       const after = parseFloat(subItemData.after || 0);
@@ -168,8 +184,11 @@ export const ImprovementManagementModule = ({
       updatedList = updatedList.map(item => item.id === data.id ? { ...item, ...itemToSave } : item);
     }
     
-    await updateDoc(doc(db, 'engineering-projects', selectedProject.id), {
-      [collectionName]: updatedList,
+    // Sanitize the entire list before saving
+    const sanitizedList = updatedList.map(item => sanitize(item));
+
+    await updateDocument('engineering-projects', selectedProject.id, {
+      [collectionName]: sanitizedList,
       updatedAt: new Date().toISOString()
     });
     setActiveSubModal(null);
@@ -248,7 +267,7 @@ export const ImprovementManagementModule = ({
               value={selectedProject.status}
               onChange={async (e) => {
                 const newStatus = e.target.value;
-                await updateDoc(doc(db, 'engineering-projects', selectedProject.id), {
+                await updateDocument('engineering-projects', selectedProject.id, {
                   status: newStatus,
                   updatedAt: new Date().toISOString()
                 });
@@ -276,12 +295,63 @@ export const ImprovementManagementModule = ({
           {/* Card: Controle de Teste */}
           <div className="bg-white p-6 rounded-3xl shadow-sm space-y-4">
             <h3 className="font-bold text-lg">Controle de Teste</h3>
-            <p>Início do Teste: {selectedProject.testStartDate ? format(new Date(selectedProject.testStartDate), 'dd/MM/yyyy') : '-'}</p>
-            <p>Tempo Planejado: {selectedProject.plannedTestDays} dias</p>
-            <p>Tempo em Teste: {testDays} dias</p>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <button onClick={() => startTest(selectedProject)} className="bg-blue-600 text-white px-4 py-2 rounded-xl">Iniciar Teste</button>
-              <button onClick={() => finishTest(selectedProject, 'Sucesso')} className="bg-emerald-600 text-white px-4 py-2 rounded-xl">Finalizar (Sucesso)</button>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-slate-500">Status do Teste</p>
+                <p className={`font-bold ${selectedProject.testStatus === 'Em teste' ? 'text-blue-600' : selectedProject.testStatus === 'Aprovado' ? 'text-emerald-600' : 'text-slate-700'}`}>
+                  {selectedProject.testStatus}
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-500">Início do Teste</p>
+                <p className="font-bold">{selectedProject.testStartDate ? format(new Date(selectedProject.testStartDate), 'dd/MM/yyyy') : '-'}</p>
+              </div>
+              <div>
+                <p className="text-slate-500">Tempo Planejado</p>
+                <p className="font-bold">{selectedProject.plannedTestDays} dias</p>
+              </div>
+              <div>
+                <p className="text-slate-500">Tempo Decorrido</p>
+                <p className="font-bold">{testDays} dias</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 pt-2">
+              {selectedProject.testStatus !== 'Em teste' && selectedProject.testStatus !== 'Aprovado' && selectedProject.testStatus !== 'Reprovado' ? (
+                <button 
+                  onClick={() => startTest(selectedProject)} 
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors flex items-center gap-2"
+                >
+                  <Clock className="w-4 h-4" />
+                  Iniciar Teste
+                </button>
+              ) : selectedProject.testStatus === 'Em teste' ? (
+                <div className="flex flex-wrap gap-2 w-full">
+                  <p className="w-full text-xs font-bold text-slate-400 uppercase mb-1">Finalizar teste como:</p>
+                  <button 
+                    onClick={() => finishTest(selectedProject, 'Sucesso')} 
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors"
+                  >
+                    Sucesso
+                  </button>
+                  <button 
+                    onClick={() => finishTest(selectedProject, 'Parcial')} 
+                    className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors"
+                  >
+                    Parcial
+                  </button>
+                  <button 
+                    onClick={() => finishTest(selectedProject, 'Falha')} 
+                    className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors"
+                  >
+                    Falha
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-slate-50 p-3 rounded-xl w-full border border-slate-100 text-center">
+                  <p className="text-sm text-slate-600 font-medium">Teste concluído com resultado: <span className="font-bold text-blue-600">{selectedProject.result}</span></p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -388,17 +458,29 @@ export const ImprovementManagementModule = ({
               value={selectedProject.lessonsLearned || ''}
               onChange={e => setSelectedProject({...selectedProject, lessonsLearned: e.target.value})}
             />
-            <label className="flex items-center gap-2">
-              <input 
-                type="checkbox" 
-                checked={selectedProject.standardize || false}
-                onChange={e => setSelectedProject({...selectedProject, standardize: e.target.checked})}
-              /> Padronizar Solução
-            </label>
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+              <label className="flex items-start gap-3 group cursor-pointer">
+                <div className="pt-0.5">
+                  <input 
+                    type="checkbox" 
+                    checked={selectedProject.standardize || false}
+                    onChange={e => setSelectedProject({...selectedProject, standardize: e.target.checked})}
+                    className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  /> 
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-slate-800">Padronizar Solução</span>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Marque esta opção se a melhoria foi validada e deve ser replicada em outros ativos similares como um novo padrão técnico da engenharia.
+                  </p>
+                </div>
+              </label>
+            </div>
             <button 
               onClick={async () => {
+                if (!selectedProject.id) return;
                 try {
-                  await updateDoc(doc(db, 'engineering-projects', selectedProject.id), {
+                  await updateDocument('engineering-projects', selectedProject.id, {
                     result: selectedProject.result || '',
                     lessonsLearned: selectedProject.lessonsLearned || '',
                     standardize: selectedProject.standardize || false,
@@ -410,7 +492,7 @@ export const ImprovementManagementModule = ({
                   showToast('Erro ao salvar encerramento', 'error');
                 }
               }}
-              className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold"
+              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-lg shadow-blue-200"
             >
               Salvar Encerramento
             </button>

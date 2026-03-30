@@ -88,22 +88,32 @@ const sanitizeData = (data: any) => {
 };
 
 export const createDocument = async (collectionName: string, data: any, id?: string) => {
-  const sanitizedData = sanitizeData(data);
-  if (id) {
-    const docRef = doc(db, collectionName, id);
-    await setDoc(docRef, sanitizedData);
-    return id;
-  } else {
-    const newDocRef = doc(collection(db, collectionName));
-    await setDoc(newDocRef, sanitizedData);
-    return newDocRef.id;
+  const path = id ? `${collectionName}/${id}` : collectionName;
+  try {
+    const sanitizedData = sanitizeData(data);
+    if (id) {
+      const docRef = doc(db, collectionName, id);
+      await setDoc(docRef, sanitizedData);
+      return id;
+    } else {
+      const newDocRef = doc(collection(db, collectionName));
+      await setDoc(newDocRef, sanitizedData);
+      return newDocRef.id;
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
   }
 };
 
 export const updateDocument = async (collectionName: string, id: string, data: any) => {
-  const sanitizedData = sanitizeData(data);
-  const docRef = doc(db, collectionName, id);
-  await updateDoc(docRef, sanitizedData);
+  const path = `${collectionName}/${id}`;
+  try {
+    const sanitizedData = sanitizeData(data);
+    const docRef = doc(db, collectionName, id);
+    await updateDoc(docRef, sanitizedData);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
 };
 
 export const deleteDocument = async (collectionName: string, id: string) => {

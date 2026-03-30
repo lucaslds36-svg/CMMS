@@ -128,6 +128,28 @@ const getMonthNumber = (val: any) => {
   return null;
 };
 
+const parsePercent = (val: any) => {
+  if (val === undefined || val === null || val === '-' || val === '') return null;
+  
+  const isString = typeof val === 'string';
+  const hasPercent = isString && val.includes('%');
+  let num: number;
+
+  if (typeof val === 'number') {
+    num = val;
+  } else {
+    num = parseFloat(String(val).replace('%', '').replace(',', '.'));
+  }
+
+  // Heurística: se o valor for < 0.1 e não tiver o símbolo '%', provavelmente é um decimal do Excel (ex: 0,024 = 2,4%)
+  // Usamos 0.1 como limite para evitar transformar 0.5 (que pode ser 0.5%) em 50 (que seria 50%)
+  if (!hasPercent && !isNaN(num) && num > 0 && num < 0.1) {
+    num = num * 100;
+  }
+  
+  return isNaN(num) ? null : num;
+};
+
 // --- Components ---
 
 const ConfirmModal = ({ 
@@ -207,8 +229,13 @@ const mockChartData = [
 const CustomDataLabel = (props: any) => {
   const { x, y, value, index, data, metaKey } = props;
   if (value == null || value === 0) return null;
+  
+  // Use parsePercent for consistent behavior
+  const valNum = parsePercent(value) || 0;
   const meta = data[index][metaKey];
-  const isOverMeta = value > meta;
+  const metaNum = parsePercent(meta) || 0;
+  
+  const isOverMeta = valNum > metaNum;
   const bgColor = isOverMeta ? '#f87171' : '#86efac'; 
   const textColor = isOverMeta ? '#ffffff' : '#064e3b'; 
 
@@ -216,7 +243,7 @@ const CustomDataLabel = (props: any) => {
     <g transform={`translate(${x},${y - 22})`}>
       <rect x={-24} y={-14} width={48} height={22} fill={bgColor} rx={4} />
       <text x={0} y={0} fill={textColor} fontSize={12} fontWeight="bold" textAnchor="middle" dominantBaseline="middle">
-        {value.toFixed(2).replace('.', ',') + '%'}
+        {valNum.toFixed(2).replace('.', ',') + '%'}
       </text>
     </g>
   );
@@ -270,23 +297,9 @@ const Dashboard = ({
 }) => {
   const [loading, setLoading] = useState(false);
 
-  const parsePercent = (val: any) => {
-    if (val === undefined || val === null || val === '-' || val === '') return null;
-    let num: number;
-    if (typeof val === 'number') {
-      num = val;
-      // If the number is small (e.g., 0.0208), it's likely a decimal representation of a percentage from Excel
-      if (num > 0 && num < 1) return num * 100;
-    } else {
-      num = parseFloat(String(val).replace('%', '').replace(',', '.'));
-    }
-    return isNaN(num) ? null : num;
-  };
-
   const formatPercent = (val: string | number | null) => {
-    if (val === undefined || val === null || val === '-' || val === '') return '-';
-    let num = typeof val === 'number' ? val : parseFloat(String(val).replace('%', '').replace(',', '.'));
-    if (isNaN(num)) return '-';
+    const num = parsePercent(val);
+    if (num === null) return '-';
     return num.toFixed(2).replace('.', ',') + '%';
   };
 
@@ -296,7 +309,7 @@ const Dashboard = ({
     
     if (a === null || m === null) return 'bg-slate-300';
     if (a <= m) return 'bg-emerald-500';
-    if (a <= m * 1.1) return 'bg-amber-400';
+    if (a <= m * 1.05) return 'bg-amber-400';
     return 'bg-red-500';
   };
 
@@ -2929,7 +2942,7 @@ export default function App() {
       let bdData: any[] = [];
       if (bdSheetName) {
         const bdSheet = workbook.Sheets[bdSheetName];
-        bdData = XLSX.utils.sheet_to_json(bdSheet, { header: 1 });
+        bdData = XLSX.utils.sheet_to_json(bdSheet, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
         console.log(`BD sheet found: "${bdSheetName}" with ${bdData.length} rows.`);
         setBditssData(bdData);
         localStorage.setItem('bdData', JSON.stringify(bdData));
@@ -2944,7 +2957,7 @@ export default function App() {
       let pdgData: any[] = [];
       if (pdgSheetName) {
         const pdgSheet = workbook.Sheets[pdgSheetName];
-        pdgData = XLSX.utils.sheet_to_json(pdgSheet, { header: 1 });
+        pdgData = XLSX.utils.sheet_to_json(pdgSheet, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
         console.log(`PDG sheet found: "${pdgSheetName}" with ${pdgData.length} rows.`);
         setDinamicaData(pdgData);
         localStorage.setItem('dinamicaData', JSON.stringify(pdgData));
@@ -3701,6 +3714,20 @@ export default function App() {
         // Merge existing demand with partial updates
         const mergedDemand = { ...existingDemand, ...demand };
         
+        // Handle status change history
+        if (demand.status && demand.status !== existingDemand.status) {
+          const historyEntry = {
+            id: Math.random().toString(36).substr(2, 9),
+            status: demand.status,
+            date: new Date().toISOString(),
+            user: userProfile?.displayName || 'Usuário'
+          };
+          mergedDemand.statusHistory = [...(existingDemand.statusHistory || []), historyEntry];
+          if (demand.status === 'Concluído') {
+            mergedDemand.closedAt = new Date().toISOString();
+          }
+        }
+        
         // Filter to only include allowed fields
         const allowedFields = ['id', 'openedAt', 'requesterUid', 'requesterName', 'description', 'area', 'executorType', 'responsibleId', 'responsibleName', 'priority', 'estimatedDeliveryDate', 'startDate', 'executorName', 'status', 'needsMaterial', 'materialRequisition', 'scopeChanges', 'statusHistory', 'closedAt'];
         const updatedDemand: any = {};
@@ -3727,6 +3754,24 @@ export default function App() {
       console.error('Error saving service demand:', error);
       showToast('Erro ao salvar demanda', 'error');
     }
+  };
+
+  const handleDeleteServiceDemand = async (id: string) => {
+    setConfirmState({
+      show: true,
+      title: 'Excluir Demanda',
+      message: 'Deseja realmente excluir esta demanda?',
+      onConfirm: async () => {
+        try {
+          await deleteDocument('serviceDemands', id);
+          showToast('Demanda excluída com sucesso!');
+        } catch (error) {
+          console.error('Error deleting service demand:', error);
+          showToast('Erro ao excluir demanda', 'error');
+        }
+        setConfirmState(prev => ({ ...prev, show: false }));
+      }
+    });
   };
 
   const handleUpdateServiceDemandStatus = async (demandId: string, status: ServiceDemand['status']) => {
@@ -4321,6 +4366,7 @@ export default function App() {
                     employees={employees}
                     userProfile={userProfile}
                     onSave={handleSaveServiceDemand}
+                    onDelete={handleDeleteServiceDemand}
                     onUpdateStatus={handleUpdateServiceDemandStatus}
                     onAddScopeChange={handleAddServiceDemandScopeChange}
                     showToast={showToast}
