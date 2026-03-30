@@ -12,6 +12,11 @@ export default defineConfig(({mode}) => {
       minify: 'esbuild',
       cssMinify: true,
       chunkSizeWarningLimit: 1000,
+      rollupOptions: {
+        output: {
+          manualChunks: undefined,
+        },
+      },
     },
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
