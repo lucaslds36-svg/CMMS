@@ -122,6 +122,12 @@ export const FailureAnalysisModule = ({
     // If it's a number (Excel serial date)
     if (typeof dateVal === 'number') {
       const date = new Date((dateVal - 25569) * 86400 * 1000);
+      
+      // Correcting for Excel's 1900 leap year bug
+      if (dateVal < 61) {
+        date.setDate(date.getDate() + 1);
+      }
+      
       // Adjust for timezone offset to keep the same day
       date.setMinutes(date.getMinutes() + date.getTimezoneOffset());
       return date.toLocaleDateString('pt-BR');
@@ -158,9 +164,18 @@ export const FailureAnalysisModule = ({
     let date: Date | null = null;
     
     if (typeof val === 'number') {
-      // Excel serial date
-      date = new Date((val - 25569) * 86400 * 1000);
+      // Excel serial date: 1900-01-01 is 1. 
+      // JavaScript Date(0) is 1970-01-01.
+      // Excel treats 1900 as a leap year (incorrectly), so we need to adjust for that.
+      const date = new Date((val - 25569) * 86400 * 1000);
+      
+      // Correcting for Excel's 1900 leap year bug if the date is before 1900-03-01
+      if (val < 61) {
+        date.setDate(date.getDate() + 1);
+      }
+      
       date.setMinutes(date.getMinutes() + date.getTimezoneOffset());
+      return date;
     } else if (typeof val === 'string') {
       if (/^\d{4}-\d{2}-\d{2}/.test(val)) {
         const [y, m, d] = val.split(/[-T ]/).map(Number);
