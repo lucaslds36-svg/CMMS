@@ -228,13 +228,13 @@ service cloud.firestore {
       }
     }
 
-    match /users/{userId}/databaseEntries/{key} {
-      allow read: if isOwner(userId);
+    match /users/{userId}/database/{key} {
+      allow read: if isOwner(userId) || isAdmin();
       allow create, update: if isOwner(userId) && isValidDatabaseEntry(request.resource.data);
     }
 
-    match /globalData/{key=**} {
-      allow read: if isAuthenticated() || isAdmin();
+    match /globalData/{key} {
+      allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
 

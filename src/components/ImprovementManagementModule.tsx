@@ -445,7 +445,7 @@ export const ImprovementManagementModule = ({
             <select 
               className="w-full p-3 border rounded-xl"
               value={selectedProject.result || ''}
-              onChange={e => setSelectedProject({...selectedProject, result: e.target.value})}
+              onChange={e => setSelectedProject({...selectedProject, result: e.target.value as any})}
             >
               <option value="">Selecione o Resultado</option>
               <option value="Sucesso">Sucesso</option>

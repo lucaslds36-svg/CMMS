@@ -1,13 +1,32 @@
 import React from 'react';
 
 export const getMonthNumber = (val: any) => {
+  if (val === null || val === undefined) return null;
+  
+  // If it's already a number
+  if (typeof val === 'number') {
+    if (val >= 1 && val <= 12) return val;
+    return null;
+  }
+  
   const s = String(val).trim().toUpperCase();
+  
+  // If it's a numeric string
+  if (/^\d+$/.test(s)) {
+    const num = parseInt(s);
+    if (num >= 1 && num <= 12) return num;
+    return null;
+  }
+
   const fullMonths = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
   const shortMonths = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+  
   const idx = fullMonths.indexOf(s);
   if (idx !== -1) return idx + 1;
+  
   const shortIdx = shortMonths.indexOf(s);
   if (shortIdx !== -1) return shortIdx + 1;
+  
   return null;
 };
 

@@ -23,9 +23,34 @@ export const DatabaseModule: React.FC<DatabaseModuleProps> = ({ onDataImported, 
   }, []);
 
   const loadStats = () => {
-    const bd = JSON.parse(localStorage.getItem('bdData') || '[]');
-    const pdg = JSON.parse(localStorage.getItem('dinamicaData') || '[]');
-    const bditss = JSON.parse(localStorage.getItem('bditssData') || '[]');
+    let bd = [];
+    let pdg = [];
+    let bditss = [];
+    
+    try {
+      const bdStr = localStorage.getItem('bdData');
+      bd = bdStr && bdStr !== "undefined" ? JSON.parse(bdStr) : [];
+    } catch (e) {
+      console.error("Failed to parse bdData", e);
+      localStorage.removeItem('bdData');
+    }
+
+    try {
+      const pdgStr = localStorage.getItem('dinamicaData');
+      pdg = pdgStr && pdgStr !== "undefined" ? JSON.parse(pdgStr) : [];
+    } catch (e) {
+      console.error("Failed to parse dinamicaData", e);
+      localStorage.removeItem('dinamicaData');
+    }
+
+    try {
+      const bditssStr = localStorage.getItem('bditssData');
+      bditss = bditssStr && bditssStr !== "undefined" ? JSON.parse(bditssStr) : [];
+    } catch (e) {
+      console.error("Failed to parse bditssData", e);
+      localStorage.removeItem('bditssData');
+    }
+    
     const lastUpdate = localStorage.getItem('lastDatabaseUpdate') || 'Nunca';
 
     setStats({
@@ -120,7 +145,7 @@ export const DatabaseModule: React.FC<DatabaseModuleProps> = ({ onDataImported, 
         if (isAdmin) {
           console.log("Saving bdData to global Firestore...");
           try {
-            await saveGlobalData('bdData', bdJson);
+            await saveGlobalData('bdData', bdData);
             console.log("bdData saved successfully.");
           } catch (e) {
             console.error("Failed to save bdData to Firestore:", e);
@@ -133,7 +158,7 @@ export const DatabaseModule: React.FC<DatabaseModuleProps> = ({ onDataImported, 
         if (isAdmin) {
           console.log("Saving dinamicaData to global Firestore...");
           try {
-            await saveGlobalData('dinamicaData', pdgJson);
+            await saveGlobalData('dinamicaData', pdgData);
             console.log("dinamicaData saved successfully.");
           } catch (e) {
             console.error("Failed to save dinamicaData to Firestore:", e);
@@ -146,7 +171,7 @@ export const DatabaseModule: React.FC<DatabaseModuleProps> = ({ onDataImported, 
         if (isAdmin) {
           console.log("Saving bditssData to global Firestore...");
           try {
-            await saveGlobalData('bditssData', bditssJson);
+            await saveGlobalData('bditssData', bditssData);
             console.log("bditssData saved successfully.");
           } catch (e) {
             console.error("Failed to save bditssData to Firestore:", e);

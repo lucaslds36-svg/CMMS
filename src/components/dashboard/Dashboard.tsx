@@ -6,65 +6,6 @@ import { Asset, WorkOrder } from '../../types';
 import { parsePercent, getMonthNumber, CustomDataLabel, CustomMetaLabel, GreenArrow } from '../../utils/chartUtils';
 import { cn } from '../../lib/utils';
 
-const ConfirmModal = ({ 
-  show, 
-  title, 
-  message, 
-  onConfirm, 
-  onCancel 
-}: { 
-  show: boolean, 
-  title: string, 
-  message: string, 
-  onConfirm: () => void, 
-  onCancel: () => void 
-}) => {
-  return (
-    <AnimatePresence>
-      {show && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onCancel}
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-          />
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden"
-          >
-            <div className="p-8 text-center">
-              <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                <AlertTriangle className="w-8 h-8" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">{title}</h3>
-              <p className="text-slate-500 text-sm mb-8">{message}</p>
-              
-              <div className="flex space-x-3">
-                <button 
-                  onClick={onCancel}
-                  className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  onClick={onConfirm}
-                  className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-all shadow-lg shadow-rose-200"
-                >
-                  Confirmar
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
-  );
-};
-
 const mockChartData = [
   { month: 'Jan', manutencao: 2.87, metaManutencao: 4.00, mecanica: 1.41, metaMecanica: 2.40, eletrica: 1.46, metaEletrica: 1.60 },
   { month: 'Fev', manutencao: 3.83, metaManutencao: 4.00, mecanica: 2.43, metaMecanica: 2.40, eletrica: 1.40, metaEletrica: 1.60 },
@@ -171,10 +112,10 @@ export const Dashboard = ({
     const mesIdx = findIdx(['MÊS', 'MES', 'MONTH', 'MS']);
     const progHoursIdx = findIdx(['HORA PROG.', 'HORA PROG', 'HORAS PROG', 'HR PROG', 'HRS PROG', 'PROGRAMAÇÃO', 'PROGRAMACAO']);
     
-    const indispMecDiarIdx = findIdx(['INDISP. MÊC. DIAR', 'INDISP. MEC. DIAR', 'INDSIP. MC. DIRIA']);
-    const indispEleDiarIdx = findIdx(['INDISP. ELÉT. DIÁR', 'INDISP. ELE. DIAR', 'INDSIP. ELT. DIRIA']);
-    const indispMecMensalIdx = findIdx(['INDISP. MENSAL MÊ', 'INDISP. MENSAL ME', 'INDISP. MENSAL MC.']);
-    const indispEleMensalIdx = findIdx(['INDISP. MENSAL ELE', 'INDISP. MENSAL ELET.']);
+    const indispMecDiarIdx = findIdx(['INDISP. MÊC. DIAR', 'INDISP. MEC. DIAR', 'INDSIP. MC. DIRIA', 'INDISP. DIÁRIA MEC', 'INDISP. DIARIA MEC', 'INDISP. DIÁRIA MC.']);
+    const indispEleDiarIdx = findIdx(['INDISP. ELÉT. DIÁR', 'INDISP. ELE. DIAR', 'INDSIP. ELT. DIRIA', 'INDISP. DIÁRIA ELE', 'INDISP. DIARIA ELE', 'INDISP. DIÁRIA ELET.']);
+    const indispMecMensalIdx = findIdx(['INDISP. MENSAL MÊ', 'INDISP. MENSAL ME', 'INDISP. MENSAL MC.', 'INDISP. MENSAL MEC']);
+    const indispEleMensalIdx = findIdx(['INDISP. MENSAL ELE', 'INDISP. MENSAL ELET.', 'INDISP. MENSAL ELETR']);
     
     if (grupoIdx === -1) {
       console.warn('Header "GRUPO" (or equivalent) not found in BDITSS data. Found headers:', headers);
@@ -198,8 +139,12 @@ export const Dashboard = ({
       } else {
         const rowMonthNum = getMonthNumber(rowMonth);
         const filterMonthNum = parseInt(filters.month);
-        if (rowMonthNum !== null && rowMonthNum === filterMonthNum) {
-          matchMonth = true;
+        if (rowMonthNum !== null) {
+          if (isAcum) {
+            matchMonth = rowMonthNum <= filterMonthNum;
+          } else {
+            matchMonth = rowMonthNum === filterMonthNum;
+          }
         }
       }
       
@@ -297,7 +242,10 @@ export const Dashboard = ({
     }
 
     uniqueGroups.forEach(groupName => {
-      const groupRows = finalBD.filter(row => String(row[grupoIdx] || '').trim() === groupName);
+      const groupRows = finalBD.filter(row => {
+        const val = String(row[grupoIdx] || '').trim().toUpperCase();
+        return val === groupName.toUpperCase();
+      });
       const areaName = groupAreaMap[groupName] || 'OUTROS';
       
       if (groupRows.length === 0) return;
@@ -305,20 +253,25 @@ export const Dashboard = ({
       let mecHours = 0;
       let eleHours = 0;
       let totalProgHours = 0;
+      const daysProcessed = new Set();
       
-      if (mecHoursIdx !== -1 && eleHoursIdx !== -1) {
-        groupRows.forEach(row => {
+      groupRows.forEach(row => {
+        // Sum maintenance hours from all rows
+        if (mecHoursIdx !== -1 && eleHoursIdx !== -1) {
           mecHours += parseFloat(String(row[mecHoursIdx] || '0').replace(',', '.'));
           eleHours += parseFloat(String(row[eleHoursIdx] || '0').replace(',', '.'));
-        });
-      }
+        }
 
-      if (progHoursIdx !== -1) {
-        groupRows.forEach(row => {
-          const progVal = parseFloat(String(row[progHoursIdx] || '0').replace(',', '.'));
-          totalProgHours += progVal;
-        });
-      }
+        // Sum scheduled hours only once per day per machine
+        if (progHoursIdx !== -1) {
+          const dayKey = dataIdx !== -1 ? String(row[dataIdx]) : Math.random().toString();
+          if (!daysProcessed.has(dayKey)) {
+            const progVal = parseFloat(String(row[progHoursIdx] || '0').replace(',', '.'));
+            totalProgHours += progVal;
+            daysProcessed.add(dayKey);
+          }
+        }
+      });
 
       let mecVal = 0;
       let eleVal = 0;
@@ -335,19 +288,21 @@ export const Dashboard = ({
             eleVal = parsePercent(lastRow[indispEleMensalIdx]) || 0;
           }
         } else if (!isAcum && indispMecDiarIdx !== -1 && indispEleDiarIdx !== -1) {
-          let count = 0;
-          groupRows.forEach(row => {
-            mecVal += parsePercent(row[indispMecDiarIdx]) || 0;
-            eleVal += parsePercent(row[indispEleDiarIdx]) || 0;
-            count++;
-          });
-          if (count > 0) {
-            mecVal /= count;
-            eleVal /= count;
+          const lastRow = groupRows[groupRows.length - 1];
+          if (lastRow) {
+            mecVal = parsePercent(lastRow[indispMecDiarIdx]) || 0;
+            eleVal = parsePercent(lastRow[indispEleDiarIdx]) || 0;
           }
         } else {
-          const daysInMonth = new Date(parseInt(filters.year), parseInt(filters.month), 0).getDate();
-          const divisor = isAcum ? (daysInMonth * 24) : 24;
+          let divisor = 24;
+          if (isAcum) {
+            const filterMonthNum = parseInt(filters.month || '1');
+            let totalDays = 0;
+            for (let m = 1; m <= filterMonthNum; m++) {
+              totalDays += new Date(parseInt(filters.year), m, 0).getDate();
+            }
+            divisor = totalDays * 24;
+          }
           mecVal = (mecHours / divisor) * 100;
           eleVal = (eleHours / divisor) * 100;
         }
@@ -494,20 +449,26 @@ export const Dashboard = ({
 
     const findIdx = (keywords: string[]) => headers.findIndex((h: any) => {
       const s = String(h || '').toUpperCase();
-      return keywords.some(k => s.includes(k.toUpperCase()));
+      return keywords.some(k => {
+        const key = k.toUpperCase();
+        return s === key || s.includes(' ' + key) || s.includes(key + ' ') || s.includes(key);
+      });
     });
 
+    const grupoIdx = findIdx(['GRUPO', 'PROCESSO', 'EQUIPAMENTO', 'MÁQUINA', 'MAQUINA', 'TAG', 'ASSET']);
     const horasIdx = findIdx(['HORA', 'PARADA', 'DURAÇÃO', 'DURACAO', 'TEMPO', 'MANUT. MECÂNICO', 'MANUT. MECANICO']);
-    const mecHoursIdx = findIdx(['MANUT. MECÂNICO', 'MANUT. MECANICO']);
-    const eleHoursIdx = findIdx(['MANUT. ELÉTRICA', 'MANUT. ELETRICA']);
+    const mecHoursIdx = findIdx(['MANUT. MECÂNICA', 'MANUT. MECANICA', 'MECÂNICA', 'MECANICA', 'MANUT. MECÂNICO']);
+    const eleHoursIdx = findIdx(['MANUT. ELÉTRICA', 'MANUT. ELETRICA', 'ELÉTRICA', 'ELETRICA', 'MANUT. ELÉTRICO']);
     const anoIdx = findIdx(['ANO', 'YEAR']);
     const mesIdx = findIdx(['MÊS', 'MES', 'MONTH', 'MS']);
     const dataIdx = findIdx(['DATA', 'DATE', 'DIA', 'DAY']);
     const progHoursIdx = findIdx(['HORA PROG', 'HORAS PROG', 'HR PROG', 'HRS PROG', 'PROGRAMAÇÃO', 'PROGRAMACAO']);
     const setorIdx = findIdx(['SETOR', 'ÁREA', 'AREA', 'DISCIPLINA']);
     
-    const indispMecMensalIdx = findIdx(['INDISP. MENSAL MÊ', 'INDISP. MENSAL ME', 'INDISP. MENSAL MC.']);
-    const indispEleMensalIdx = findIdx(['INDISP. MENSAL ELE', 'INDISP. MENSAL ELET.']);
+    const indispMecMensalIdx = findIdx(['INDISP. MENSAL MÊ', 'INDISP. MENSAL ME', 'INDISP. MENSAL MC.', 'INDISP. MENSAL MEC']);
+    const indispEleMensalIdx = findIdx(['INDISP. MENSAL ELE', 'INDISP. MENSAL ELET.', 'INDISP. MENSAL ELETR']);
+    const indispMecDiarIdx = findIdx(['INDISP. DIÁRIA MEC', 'INDISP. DIARIA MEC', 'INDISP. DIÁRIA MC.']);
+    const indispEleDiarIdx = findIdx(['INDISP. DIÁRIA ELE', 'INDISP. DIARIA ELE', 'INDISP. DIÁRIA ELET.']);
     const indispTotIdx = findIdx(['INDISP. TOT.']);
 
     if (anoIdx === -1 || mesIdx === -1) {
@@ -568,7 +529,16 @@ export const Dashboard = ({
         
         const matchYear = rowYear === filters.year;
         const rowMonthNum = getMonthNumber(rowMonth);
-        const matchMonth = rowMonthNum !== null && rowMonthNum === monthNum;
+        const isAcum = filters.viewType === 'Acumulada';
+        
+        let matchMonth = false;
+        if (rowMonthNum !== null) {
+          if (isAcum) {
+            matchMonth = rowMonthNum <= monthNum;
+          } else {
+            matchMonth = rowMonthNum === monthNum;
+          }
+        }
         
         return matchYear && matchMonth;
       });
@@ -596,7 +566,7 @@ export const Dashboard = ({
         const daysProcessed = new Set();
 
         monthRows.forEach(row => {
-          const dayKey = dataIdx !== -1 ? String(row[dataIdx]) : Math.random().toString();
+          const dayKey = (dataIdx !== -1 ? String(row[dataIdx]) : '') + '_' + (grupoIdx !== -1 ? String(row[grupoIdx]) : '');
           
           if (mecHoursIdx !== -1 && eleHoursIdx !== -1) {
             mecHours += parseFloat(String(row[mecHoursIdx] || '0').replace(',', '.'));
@@ -617,7 +587,22 @@ export const Dashboard = ({
           }
         });
 
-        const divisor = totalProgHours > 0 ? totalProgHours : 1;
+        const isAcum = filters.viewType === 'Acumulada';
+        let divisor = 1;
+        if (totalProgHours > 0) {
+          divisor = totalProgHours;
+        } else {
+          if (isAcum) {
+            let totalDays = 0;
+            for (let m = 1; m <= monthNum; m++) {
+              totalDays += new Date(parseInt(filters.year), m, 0).getDate();
+            }
+            divisor = totalDays * 24;
+          } else {
+            const daysInMonth = new Date(parseInt(filters.year), monthNum, 0).getDate();
+            divisor = daysInMonth * 24;
+          }
+        }
         mecVal = (mecHours / divisor) * 100;
         eleVal = (eleHours / divisor) * 100;
         totalVal = mecVal + eleVal;
@@ -645,8 +630,18 @@ export const Dashboard = ({
           }
         });
 
-        const daysInMonth = new Date(parseInt(filters.year), monthNum, 0).getDate();
-        const totalHours = daysInMonth * 24;
+        const isAcum = filters.viewType === 'Acumulada';
+        let totalHours = 1;
+        if (isAcum) {
+          let totalDays = 0;
+          for (let m = 1; m <= monthNum; m++) {
+            totalDays += new Date(parseInt(filters.year), m, 0).getDate();
+          }
+          totalHours = totalDays * 24;
+        } else {
+          const daysInMonth = new Date(parseInt(filters.year), monthNum, 0).getDate();
+          totalHours = daysInMonth * 24;
+        }
         mecVal = (mecHours / totalHours) * 100;
         eleVal = (eleHours / totalHours) * 100;
         totalVal = mecVal + eleVal;
