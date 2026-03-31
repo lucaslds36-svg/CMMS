@@ -159,7 +159,7 @@ export const FailureAnalysisModule = ({
     const val = row[dataCol];
     if (!val) return null;
 
-    console.log("FailureAnalysisModule: Attempting to parse date:", val);
+    console.log("FailureAnalysisModule: Attempting to parse date:", val, "Type:", typeof val);
 
     let date: Date | null = null;
     
@@ -703,7 +703,7 @@ export const FailureAnalysisModule = ({
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
               <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Grupo (Tipo)</h4>
               <div className="h-96">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <BarChart 
                     layout="vertical"
                     data={grupoData}
@@ -731,7 +731,7 @@ export const FailureAnalysisModule = ({
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
               <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Setor (Elétrico vs Mecânico)</h4>
               <div className="h-96">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <PieChart>
                     <Pie
                       data={setorData}
@@ -781,7 +781,7 @@ export const FailureAnalysisModule = ({
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
               <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Máquina</h4>
               <div className="h-96">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <BarChart 
                     layout="vertical"
                     data={maquinaData}
@@ -813,7 +813,7 @@ export const FailureAnalysisModule = ({
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
               <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Parte</h4>
               <div className="h-96">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <BarChart 
                     layout="vertical"
                     data={parteData}
@@ -845,7 +845,7 @@ export const FailureAnalysisModule = ({
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm lg:col-span-2">
               <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Causa</h4>
               <div className="h-96">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <BarChart 
                     layout="vertical"
                     data={causaData}

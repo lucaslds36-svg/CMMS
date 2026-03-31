@@ -305,12 +305,22 @@ const Dashboard = ({
   };
 
   const getStatusColor = (atual: any, meta: any) => {
-    const a = parsePercent(atual);
-    const m = parsePercent(meta);
+    let a = parsePercent(atual);
+    let m = parsePercent(meta);
+    
+    // Debugging for specific machines
+    console.log("getStatusColor:", { atual, meta, a, m });
+    
+    // If meta is a decimal < 1, it might be a percentage that wasn't scaled.
+    if (a !== null && m !== null && m < 1 && m > 0) {
+        m = m * 100;
+    }
     
     if (a === null || m === null) return 'bg-slate-300';
-    if (a <= m) return 'bg-emerald-500';
-    if (a <= m * 1.05) return 'bg-amber-400';
+    
+    // New logic: <= 80% green, > 80% and <= 100% yellow, > 100% red
+    if (a <= m * 0.80) return 'bg-emerald-500';
+    if (a <= m) return 'bg-amber-400';
     return 'bg-red-500';
   };
 
