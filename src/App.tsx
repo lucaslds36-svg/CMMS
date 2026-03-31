@@ -3027,7 +3027,13 @@ export default function App() {
         // Read as array of arrays first to find header
         const bditssRaw: any[] = XLSX.utils.sheet_to_json(bditssSheet, { header: 1 });
         
+        console.log("BDITSS raw data length:", bditssRaw.length);
+        if (bditssRaw.length > 0) {
+          console.log("First row of BDITSS:", bditssRaw[0]);
+        }
+
         let headerRowIdx = 0;
+        let foundHeader = false;
         for (let i = 0; i < Math.min(bditssRaw.length, 30); i++) {
           const row = bditssRaw[i];
           if (Array.isArray(row)) {
@@ -3037,17 +3043,24 @@ export default function App() {
               return s.includes('HORA') || s.includes('MAQUINA') || s.includes('MÁQUINA') || s.includes('GRUPO') || s.includes('SETOR') || s.includes('CAUSA') || s.includes('DESCRIÇÃO');
             }).length;
             
+            console.log(`Row ${i} matches:`, matches);
             if (matches >= 2) {
               headerRowIdx = i;
+              foundHeader = true;
               break;
             }
           }
         }
         
+        console.log("Header row index found:", headerRowIdx, "Found header:", foundHeader);
+        
         // Convert to objects using the found header row
         // Use raw: true to get the actual numbers (like 0.49) directly from Excel
         const bditssData = XLSX.utils.sheet_to_json(bditssSheet, { range: headerRowIdx, raw: true });
         
+        console.log(`BDITSS sheet found: "${bditssSheetName}" at row ${headerRowIdx + 1} with ${bditssData.length} rows before filtering.`);
+        console.log("First row of parsed BDITSS data:", bditssData.length > 0 ? bditssData[0] : "Empty");
+
         // Filter out rows that are clearly empty or just summary footers
         cleanBditssData = bditssData.filter((row: any) => {
           const values = Object.values(row);
@@ -3056,6 +3069,8 @@ export default function App() {
           const isSummaryRow = values.some(v => String(v).toUpperCase() === 'TOTAL GERAL') && values.length < 5;
           return !isEmptyRow && !isSummaryRow;
         });
+
+        console.log(`BDITSS sheet found: "${bditssSheetName}" at row ${headerRowIdx + 1} with ${cleanBditssData.length} rows after filtering.`);
 
         console.log(`BDITSS sheet found: "${bditssSheetName}" at row ${headerRowIdx + 1} with ${cleanBditssData.length} rows.`);
         const bditssJson = JSON.stringify(cleanBditssData);

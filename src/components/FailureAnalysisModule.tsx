@@ -86,6 +86,7 @@ export const FailureAnalysisModule = ({
   };
 
   useEffect(() => {
+    console.log("FailureAnalysisModule: Received data length:", Array.isArray(data) ? data.length : 0);
     if (Array.isArray(data) && data.length > 0) {
       // Fallback: if data is array of arrays (header: 1), convert to objects
       if (Array.isArray(data[0])) {
@@ -152,6 +153,8 @@ export const FailureAnalysisModule = ({
     const val = row[dataCol];
     if (!val) return null;
 
+    console.log("FailureAnalysisModule: Attempting to parse date:", val);
+
     let date: Date | null = null;
     
     if (typeof val === 'number') {
@@ -193,6 +196,7 @@ export const FailureAnalysisModule = ({
       return new Date(date.getFullYear(), date.getMonth(), date.getDate());
     }
     
+    console.log("FailureAnalysisModule: Failed to parse date for row:", row);
     return null;
   };
 
@@ -508,6 +512,18 @@ export const FailureAnalysisModule = ({
   const causaData = useMemo(() => aggregateData(causaCol, horasCol).slice(0, 10), [filteredData, horasCol, causaCol]);
   const setorData = useMemo(() => aggregateData(setorCol, horasCol).slice(0, 10), [filteredData, horasCol, setorCol]);
 
+  const lastUpdateDate = useMemo(() => {
+    if (!Array.isArray(rawData) || rawData.length === 0) return null;
+    let maxDate: Date | null = null;
+    rawData.forEach(row => {
+      const date = parseToDate(row);
+      if (date && (!maxDate || date > maxDate)) {
+        maxDate = date;
+      }
+    });
+    return maxDate;
+  }, [rawData]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
@@ -527,6 +543,13 @@ export const FailureAnalysisModule = ({
                 <div>
                   <p className="text-[9px] font-bold text-blue-400 uppercase leading-none">Total de Registros</p>
                   <p className="text-lg font-black text-blue-600">{filteredData.length}</p>
+                </div>
+              </div>
+              <div className="bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-xl flex items-center space-x-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <div>
+                  <p className="text-[9px] font-bold text-emerald-400 uppercase leading-none">Dados Atualizados Até</p>
+                  <p className="text-lg font-black text-emerald-600">{lastUpdateDate ? formatDate(lastUpdateDate) : '-'}</p>
                 </div>
               </div>
             </div>
