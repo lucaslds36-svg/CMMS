@@ -18,8 +18,7 @@ import {
   Box,
   Eye,
   Trash2,
-  FileText,
-  Wrench
+  FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, parseISO, differenceInDays, isAfter, isBefore, addDays, startOfMonth, eachDayOfInterval, isToday } from 'date-fns';
@@ -48,7 +47,6 @@ interface ServiceManagementModuleProps {
   employees: Employee[];
   userProfile: UserProfile | null;
   onSave: (demand: Partial<ServiceDemand>) => Promise<void>;
-  onDelete: (demandId: string) => Promise<void>;
   onUpdateStatus: (demandId: string, status: ServiceDemand['status']) => Promise<void>;
   onAddScopeChange: (demandId: string, description: string) => Promise<void>;
   showToast: (msg: string, type?: 'success' | 'error') => void;
@@ -59,7 +57,6 @@ export const ServiceManagementModule = ({
   employees,
   userProfile,
   onSave,
-  onDelete,
   onUpdateStatus,
   onAddScopeChange,
   showToast
@@ -118,19 +115,6 @@ export const ServiceManagementModule = ({
 
     try {
       const responsible = employees.find(emp => emp.ID === formData.responsibleId);
-      
-      if (formData.needsMaterial && formData.materialRequisition?.requisitionNumber) {
-        const newReqNumber = formData.materialRequisition.requisitionNumber.trim().toLowerCase();
-        const isDuplicate = demands.some(
-          d => d.materialRequisition?.requisitionNumber?.trim().toLowerCase() === newReqNumber && d.id !== editingDemand?.id
-        );
-        
-        if (isDuplicate) {
-          showToast('Já existe uma requisição com este número.', 'error');
-          return;
-        }
-      }
-
       const demandData: Partial<ServiceDemand> = {
         ...formData,
         requesterUid: userProfile.uid,
@@ -330,17 +314,11 @@ export const ServiceManagementModule = ({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center space-x-3 mb-6">
-        <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-200">
-          <Wrench className="w-8 h-8" />
-        </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Gestão de Serviços</h1>
-          <p className="text-slate-500 font-medium">Acompanhamento de demandas e ordens de serviço</p>
+          <h2 className="text-2xl font-bold text-slate-900">Gestão de Serviços</h2>
+          <p className="text-slate-500 text-sm">Acompanhamento de demandas e ordens de serviço</p>
         </div>
-      </div>
-
-      <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-4">
         <div className="flex items-center gap-2">
           <div className="bg-white p-1 rounded-xl border border-slate-100 flex">
             <button 
@@ -446,7 +424,7 @@ export const ServiceManagementModule = ({
               <tr className="bg-slate-50 border-b border-slate-200">
                 <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">OS</th>
                 <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Título</th>
-                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Ativo</th>
+                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Responsável</th>
                 <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Técnico</th>
                 <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Status</th>
                 <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Prioridade</th>
@@ -510,7 +488,7 @@ export const ServiceManagementModule = ({
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={() => onDelete(demand.id)}
+                          onClick={() => {/* Implement delete logic */}}
                           className="p-1.5 bg-rose-600 text-white rounded hover:bg-rose-700 transition-all"
                           title="Excluir"
                         >
@@ -890,7 +868,7 @@ export const ServiceManagementModule = ({
                         Histórico de Status
                       </label>
                       <div className="space-y-3">
-                        {Array.isArray(editingDemand.statusHistory) && editingDemand.statusHistory.map((h, i) => (
+                        {editingDemand.statusHistory.map((h, i) => (
                           <div key={h.id} className="flex gap-3">
                             <div className="flex flex-col items-center">
                               <div className={cn(
@@ -938,7 +916,7 @@ export const ServiceManagementModule = ({
                         </button>
                       </div>
                       <div className="space-y-3">
-                        {Array.isArray(editingDemand.scopeChanges) && editingDemand.scopeChanges.length > 0 ? (
+                        {editingDemand.scopeChanges.length > 0 ? (
                           editingDemand.scopeChanges.map((s) => (
                             <div key={s.id} className="p-3 bg-slate-50 rounded-xl">
                               <p className="text-sm text-slate-700 mb-1">{s.description}</p>

@@ -1004,7 +1004,7 @@ const Dashboard = ({
           <div className="space-y-8">
             {/* Chart 1 */}
             <div className="bg-white p-6 rounded-sm border-[1.5px] border-orange-400 relative shadow-sm">
-              <h3 className="absolute -top-3 left-4 bg-white px-2 text-lg font-bold text-slate-800 uppercase tracking-tight">Evolução Indisponibilidade Manutenção BMB</h3>
+              <h3 className="absolute -top-3 left-4 bg-white px-2 text-lg font-bold text-slate-800 uppercase tracking-tight">Evolução Indisponibilidade Manutenção</h3>
               <GreenArrow />
               <div className="h-80 mt-4">
                 <ResponsiveContainer width="100%" height="100%">
@@ -1038,7 +1038,7 @@ const Dashboard = ({
             {/* Charts 2 and 3 */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div className="bg-white p-6 rounded-sm border-[1.5px] border-orange-400 relative shadow-sm">
-                <h3 className="absolute -top-3 left-4 bg-white px-2 text-lg font-bold text-slate-800 uppercase tracking-tight">Evolução Indisponibilidade Mecânica BMB</h3>
+                <h3 className="absolute -top-3 left-4 bg-white px-2 text-lg font-bold text-slate-800 uppercase tracking-tight">Evolução Indisponibilidade Mecânica</h3>
                 <GreenArrow />
                 <div className="h-72 mt-4">
                   <ResponsiveContainer width="100%" height="100%">
@@ -1070,7 +1070,7 @@ const Dashboard = ({
               </div>
 
               <div className="bg-white p-6 rounded-sm border-[1.5px] border-orange-400 relative shadow-sm">
-                <h3 className="absolute -top-3 left-4 bg-white px-2 text-lg font-bold text-slate-800 uppercase tracking-tight">Evolução Indisponibilidade Elétrica BMB</h3>
+                <h3 className="absolute -top-3 left-4 bg-white px-2 text-lg font-bold text-slate-800 uppercase tracking-tight">Evolução Indisponibilidade Elétrica</h3>
                 <GreenArrow />
                 <div className="h-72 mt-4">
                   <ResponsiveContainer width="100%" height="100%">
@@ -1409,7 +1409,7 @@ const WorkOrderList = ({
                       <>
                         <button 
                           onClick={() => {
-                            setCompletingWO(wo.ID);
+                            setCompletingWO(wo);
                             setCompletedAt(new Date().toISOString().split('T')[0]);
                           }}
                           className="p-1 text-emerald-500 hover:text-emerald-700 transition-colors"
@@ -1624,7 +1624,7 @@ const WorkOrderList = ({
                 </button>
                 <button 
                   onClick={() => {
-                    onUpdateStatus(completingWO, 'Concluída', completedAt);
+                    onUpdateStatus(completingWO?.ID || '', 'Concluída', completedAt);
                     setCompletingWO(null);
                   }}
                   className="px-4 py-2 text-sm font-medium text-white bg-emerald-500 hover:bg-emerald-600 rounded-xl transition-colors"
@@ -3148,7 +3148,7 @@ export default function App() {
     Manufacturer: '',
     Location: '',
     Plant: '',
-    Status: 'Ativo' as const,
+    Status: 'Ativo' as any,
     InstallDate: new Date().toISOString().split('T')[0]
   });
 
@@ -3572,7 +3572,7 @@ export default function App() {
             const allNextDues = Object.values(newAssetNextDues);
             const earliestNextDue = allNextDues.length > 0 ? allNextDues.sort()[0] : nextDue;
 
-            await updateDocument('preventive-plans', plan.id || plan.ID, {
+            await updateDocument('preventive-plans', plan.ID, {
               LastDone: completedDate,
               NextDue: earliestNextDue,
               AssetLastDones: newAssetLastDones,

@@ -13,8 +13,7 @@ import {
   Pencil, 
   Trash2, 
   Eye,
-  Clock,
-  Lightbulb
+  Clock
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -505,17 +504,8 @@ export const ImprovementManagementModule = ({
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <div className="flex items-center space-x-3 mb-6">
-        <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-200">
-          <Lightbulb className="w-8 h-8" />
-        </div>
-        <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Gestão de Melhorias</h1>
-          <p className="text-slate-500 font-medium">Controle e acompanhamento de projetos de engenharia</p>
-        </div>
-      </div>
-
-      <div className="flex flex-col sm:flex-row justify-end items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h2 className="text-2xl font-bold text-slate-900">Gestão de Melhorias</h2>
         <button 
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700"
           onClick={() => openModal(null, 'create')}
