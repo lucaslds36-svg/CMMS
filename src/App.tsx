@@ -93,10 +93,11 @@ import {
   saveDatabaseEntry,
   saveGlobalData,
   loadGlobalData,
-  getRedirectResult
+  subscribeToGlobalData
 } from './firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged, type User } from 'firebase/auth';
+import { getDocFromServer, doc as firestoreDoc } from 'firebase/firestore';
 import { FailureAnalysisModule } from './components/FailureAnalysisModule';
 import { DatabaseModule } from './components/DatabaseModule';
 import { ServiceManagementModule } from './components/ServiceManagementModule';
@@ -1284,7 +1285,7 @@ const WorkOrderList = ({
 }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('Todas');
-  const [completingWO, setCompletingWO] = useState<string | null>(null);
+  const [completingWO, setCompletingWO] = useState<WorkOrder | null>(null);
   const [viewingWO, setViewingWO] = useState<WorkOrder | null>(null);
   const [completedAt, setCompletedAt] = useState<string>(new Date().toISOString().split('T')[0]);
   
@@ -2870,6 +2871,30 @@ export default function App() {
     viewType: 'Acumulada' as 'Acumulada' | 'Diária'
   });
   const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [loadingGlobalData, setLoadingGlobalData] = useState(false);
+
+  // Test connection to Firestore
+  useEffect(() => {
+    const testConnection = async () => {
+      try {
+        // Try to fetch a non-existent document to test connectivity
+        // We use getDocFromServer to bypass any local cache
+        await getDocFromServer(firestoreDoc(db, 'globalData', 'connection_test'));
+        console.log("Firestore connection test successful.");
+      } catch (error) {
+        if (error instanceof Error) {
+          if (error.message.includes('the client is offline') || error.message.includes('unavailable')) {
+            console.error("Firestore connection failed: The client is offline or the backend is unreachable.");
+            showToast("Erro de conexão com o banco de dados. Verifique sua internet ou a configuração do Firebase.", "error");
+          } else {
+            // Document not found is a successful connection test
+            console.log("Firestore connection test complete (document not found).");
+          }
+        }
+      }
+    };
+    testConnection();
+  }, []);
 
   useEffect(() => {
     const bditss = localStorage.getItem('bditssData');
@@ -3104,16 +3129,6 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
 
-  useEffect(() => {
-    getRedirectResult(auth).then((result) => {
-      if (result) {
-        showToast('Login realizado com sucesso!');
-      }
-    }).catch((error) => {
-      console.error('Redirect result error:', error);
-      showToast('Erro ao finalizar login.', 'error');
-    });
-  }, []);
   const [userProfile, setUserProfileState] = useState<UserProfile | null>(null);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [authReady, setAuthReady] = useState(false);
@@ -3137,7 +3152,7 @@ export default function App() {
     InstallDate: new Date().toISOString().split('T')[0]
   });
 
-  const [newWO, setNewWO] = useState({
+  const [newWO, setNewWO] = useState<Partial<WorkOrder>>({
     AssetID: '',
     Description: '',
     Priority: 'Média' as const,
@@ -3204,67 +3219,9 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       if (user) {
-        // Load data from Firestore
-        console.log("Loading data for user:", user.uid);
-        
-        // Always load from global storage
-        let bd = null;
-        let dinamica = null;
-        let bditss = null;
-        
-        try {
-          bd = await loadGlobalData('bdData');
-          dinamica = await loadGlobalData('dinamicaData');
-          bditss = await loadGlobalData('bditssData');
-        } catch (e) {
-          console.error("Failed to load global data", e);
-        }
-        
-        console.log("Global data loading attempt complete:", { bd: !!bd, dinamica: !!dinamica, bditss: !!bditss });
-        
-        if (bd) {
-            try {
-                localStorage.setItem('bdData', bd);
-            } catch (e) {
-                console.error("Failed to save bdData to localStorage", e);
-            }
-            try {
-                const parsed = JSON.parse(bd);
-                setBditssData(parsed); // Assuming setBditssData is used for BD data
-                updateFiltersFromData(parsed);
-            } catch (e) {
-                console.error("Failed to parse bdData", e);
-            }
-        }
-        if (dinamica) {
-            try {
-                localStorage.setItem('dinamicaData', dinamica);
-            } catch (e) {
-                console.error("Failed to save dinamicaData to localStorage", e);
-            }
-            try {
-                setDinamicaData(JSON.parse(dinamica));
-            } catch (e) {
-                console.error("Failed to parse dinamicaData", e);
-            }
-        }
-        if (bditss) {
-            try {
-                localStorage.setItem('bditssData', bditss);
-            } catch (e) {
-                console.error("Failed to save bditssData to localStorage", e);
-            }
-            try {
-                setFailureAnalysisData(JSON.parse(bditss));
-                window.dispatchEvent(new Event('failureAnalysisDataUpdated'));
-            } catch (e) {
-                console.error("Failed to parse bditssData", e);
-            }
-        }
-
+        console.log("User authenticated:", user.uid);
         let profile = await getUserProfile(user.uid);
         if (!profile) {
-          // Default admin for the main user
           const role = user.email === 'lucas.lds36@gmail.com' ? 'admin' : 'user';
           const defaultPermissions = {
             dashboard: true,
@@ -3299,6 +3256,74 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Real-time Global Data Subscriptions
+  useEffect(() => {
+    if (!user) return;
+
+    setLoadingGlobalData(true);
+    console.log("Starting global data subscriptions...");
+
+    const unsubBd = subscribeToGlobalData('bdData', (data) => {
+      // bdData key in Firestore corresponds to the main dashboard base (BD sheet)
+      if (data) {
+        try {
+          localStorage.setItem('bdData', data);
+          const parsed = JSON.parse(data);
+          if (Array.isArray(parsed)) {
+            setBditssData(parsed); // bditssData state is used for the main BD sheet
+            updateFiltersFromData(parsed);
+          } else {
+            console.warn("Parsed bdData is not an array:", parsed);
+          }
+        } catch (e) {
+          console.error("Failed to parse bdData from Firestore", e);
+        }
+      }
+      setLoadingGlobalData(false);
+    });
+
+    const unsubDinamica = subscribeToGlobalData('dinamicaData', (data) => {
+      // dinamicaData key in Firestore corresponds to the goals (PDG sheet)
+      if (data) {
+        try {
+          localStorage.setItem('dinamicaData', data);
+          const parsed = JSON.parse(data);
+          if (Array.isArray(parsed)) {
+            setDinamicaData(parsed);
+          } else {
+            console.warn("Parsed dinamicaData is not an array:", parsed);
+          }
+        } catch (e) {
+          console.error("Failed to parse dinamicaData from Firestore", e);
+        }
+      }
+    });
+
+    const unsubBditss = subscribeToGlobalData('bditssData', (data) => {
+      // bditssData key in Firestore corresponds to the failure analysis base (BDITSS sheet)
+      if (data) {
+        try {
+          localStorage.setItem('bditssData', data);
+          const parsed = JSON.parse(data);
+          if (Array.isArray(parsed)) {
+            setFailureAnalysisData(parsed); // failureAnalysisData state is used for the BDITSS sheet
+            window.dispatchEvent(new Event('failureAnalysisDataUpdated'));
+          } else {
+            console.warn("Parsed bditssData is not an array:", parsed);
+          }
+        } catch (e) {
+          console.error("Failed to parse bditssData from Firestore", e);
+        }
+      }
+    });
+
+    return () => {
+      unsubBd();
+      unsubDinamica();
+      unsubBditss();
+    };
+  }, [user]);
 
   useEffect(() => {
     if (!isAdmin || !user) {
@@ -3971,6 +3996,12 @@ export default function App() {
             </h2>
           </div>
           <div className="flex items-center space-x-4">
+            {loadingGlobalData && (
+              <div className="flex items-center space-x-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] sm:text-xs font-bold animate-pulse">
+                <RefreshCw className="w-3 h-3 animate-spin" />
+                <span className="hidden sm:inline">Sincronizando...</span>
+              </div>
+            )}
             <button 
               onClick={async () => {
                 if (!user) {
