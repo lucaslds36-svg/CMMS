@@ -35,13 +35,9 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        (
-          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
-          request.auth.token.email == "lucas.lds36@gmail.com" ||
-          request.auth.token.email == "lucas.silva@bmbsteelcord.com.br" ||
-          request.auth.uid == "SV7WZF5ESmbg6rjRYuMtxhYubrA3"
-        );
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "lucas.lds36@gmail.com" && request.auth.token.email_verified == true));
     }
 
     function isOwner(userId) {
@@ -120,22 +116,6 @@ service cloud.firestore {
       return hasOnlyAllowedFields(['Grupo', 'Modelo', 'Dia', 'Mes', 'Ano', 'HoraProg', 'ManutMecanica', 'ManutEletrica', 'IndispMecDiaria', 'IndispEletDiaria', 'IndispMensalMec', 'IndispMensalElet', 'IndispTotal', 'id']) &&
              data.Grupo is string && data.Modelo is string &&
              data.Dia is string && data.Mes is string && data.Ano is string;
-    }
-
-    function isValidRequisition(data) {
-      return (!('id' in data) || data.id is string) &&
-             (!('code' in data) || data.code is string) &&
-             (!('item' in data) || data.item is string) &&
-             (!('itemCode' in data) || data.itemCode is string) &&
-             (!('description' in data) || data.description is string) &&
-             (!('supplier' in data) || data.supplier is string) &&
-             (!('category' in data) || data.category is string) &&
-             (!('requestDate' in data) || data.requestDate is string) &&
-             (!('deliveryDate' in data) || data.deliveryDate is string) &&
-             (!('leadTime' in data) || data.leadTime is number) &&
-             (!('daysRemaining' in data) || data.daysRemaining is number) &&
-             (!('status' in data) || data.status in ['ATRASADO', 'EM DIA', 'AGUARDANDO', 'ENTREGUE', 'PARCIAL', 'TOTAL']) &&
-             (!('createdAt' in data) || data.createdAt is string);
     }
 
     function isValidDatabaseEntry(data) {
@@ -228,8 +208,8 @@ service cloud.firestore {
       }
     }
 
-    match /users/{userId}/database/{key} {
-      allow read: if isOwner(userId) || isAdmin();
+    match /users/{userId}/databaseEntries/{key} {
+      allow read: if isOwner(userId);
       allow create, update: if isOwner(userId) && isValidDatabaseEntry(request.resource.data);
     }
 
@@ -268,13 +248,15 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    match /serviceDemands/{demandId} {
-      allow read, write: if true;
-    }
-
-    match /requisitions/{requisitionId} {
+    match /serviceDemands/{id} {
       allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated() && isValidRequisition(request.resource.data);
+      allow create: if isAuthenticated() && isValidServiceDemand(request.resource.data) && request.resource.data.requesterUid == request.auth.uid;
+      allow update: if isAuthenticated() && isValidServiceDemand(request.resource.data) && 
+                    (
+                      (resource.data.status != 'Concluído' && request.resource.data.status == 'Concluído' && resource.data.requesterUid == request.auth.uid) ||
+                      (request.resource.data.status != 'Concluído') ||
+                      isAdmin()
+                    );
       allow delete: if isAdmin();
     }
 
@@ -283,9 +265,7 @@ service cloud.firestore {
       
       // Users can create their own profile. Role must be 'user' unless they are the bootstrap admin.
       allow create: if isOwner(userId) && isValidUser(request.resource.data) &&
-                      (request.resource.data.role == 'user' || 
-                       request.auth.token.email == "lucas.lds36@gmail.com" ||
-                       request.auth.token.email == "lucas.silva@bmbsteelcord.com.br");
+                      (request.resource.data.role == 'user' || request.auth.token.email == "lucas.lds36@gmail.com");
       
       // Users can update their own profile but NOT their role.
       // Admins can update any user's role.
