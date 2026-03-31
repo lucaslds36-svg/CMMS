@@ -3822,7 +3822,7 @@ export default function App() {
 
       const updateData: any = {
         status,
-        statusHistory: [...demand.statusHistory, historyEntry]
+        statusHistory: [...(Array.isArray(demand.statusHistory) ? demand.statusHistory : []), historyEntry]
       };
 
       if (status === 'Concluído') {
@@ -3849,7 +3849,7 @@ export default function App() {
         user: userProfile?.displayName || 'Usuário'
       };
 
-      const updatedScopeChanges = [...demand.scopeChanges, scopeEntry];
+      const updatedScopeChanges = [...(Array.isArray(demand.scopeChanges) ? demand.scopeChanges : []), scopeEntry];
       
       // Filter to only include allowed fields
       const allowedFields = ['scopeChanges'];

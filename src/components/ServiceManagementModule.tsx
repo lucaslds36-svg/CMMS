@@ -868,14 +868,14 @@ export const ServiceManagementModule = ({
                         Histórico de Status
                       </label>
                       <div className="space-y-3">
-                        {editingDemand.statusHistory.map((h, i) => (
+                        {(Array.isArray(editingDemand.statusHistory) ? editingDemand.statusHistory : []).map((h, i) => (
                           <div key={h.id} className="flex gap-3">
                             <div className="flex flex-col items-center">
                               <div className={cn(
                                 "w-2 h-2 rounded-full mt-1.5",
                                 i === 0 ? "bg-blue-600" : "bg-slate-300"
                               )} />
-                              {i < editingDemand.statusHistory.length - 1 && <div className="w-0.5 flex-1 bg-slate-100 my-1" />}
+                              {i < (Array.isArray(editingDemand.statusHistory) ? editingDemand.statusHistory : []).length - 1 && <div className="w-0.5 flex-1 bg-slate-100 my-1" />}
                             </div>
                             <div>
                               <p className="text-sm font-bold text-slate-900">{h.status}</p>
@@ -916,8 +916,8 @@ export const ServiceManagementModule = ({
                         </button>
                       </div>
                       <div className="space-y-3">
-                        {editingDemand.scopeChanges.length > 0 ? (
-                          editingDemand.scopeChanges.map((s) => (
+                        {(Array.isArray(editingDemand.scopeChanges) ? editingDemand.scopeChanges : []).length > 0 ? (
+                          (Array.isArray(editingDemand.scopeChanges) ? editingDemand.scopeChanges : []).map((s) => (
                             <div key={s.id} className="p-3 bg-slate-50 rounded-xl">
                               <p className="text-sm text-slate-700 mb-1">{s.description}</p>
                               <p className="text-[10px] text-slate-400">
