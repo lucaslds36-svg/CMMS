@@ -311,11 +311,6 @@ const Dashboard = ({
     // Debugging for specific machines
     console.log("getStatusColor:", { atual, meta, a, m });
     
-    // If meta is a decimal < 1, it might be a percentage that wasn't scaled.
-    if (a !== null && m !== null && m < 1 && m > 0) {
-        m = m * 100;
-    }
-    
     if (a === null || m === null) return 'bg-slate-300';
     
     // New logic: <= 80% green, > 80% and <= 100% yellow, > 100% red
