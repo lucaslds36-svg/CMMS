@@ -20,7 +20,7 @@ import {
   Trash2,
   FileText
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { format, parseISO, differenceInDays, isAfter, isBefore, addDays, startOfMonth, eachDayOfInterval, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { jsPDF } from 'jspdf';

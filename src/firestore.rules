@@ -238,11 +238,7 @@ service cloud.firestore {
     }
 
     match /work-orders/{woId} {
-      allow read: if isAuthenticated();
-      // Allow update if authenticated and data is valid. 
-      // Also allow creation if authenticated and data is valid.
-      allow create, update: if isAuthenticated() && isValidWorkOrder(request.resource.data);
-      allow delete: if isAdmin();
+      allow read, write: if isAuthenticated();
     }
 
     match /preventive-plans/{planId} {

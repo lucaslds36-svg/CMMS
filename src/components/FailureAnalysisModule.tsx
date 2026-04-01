@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { Upload, FileSpreadsheet, Filter, X, Eye, Clock, User, Settings, Info, Download, Printer } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 

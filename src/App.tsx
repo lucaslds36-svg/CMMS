@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ImprovementManagementModule } from './components/ImprovementManagementModule';
 // Version: 1.0.1 - Consolidated structure
 import { 
@@ -78,7 +78,7 @@ import {
   isWithinInterval
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { jsPDF } from 'jspdf';
@@ -1384,8 +1384,25 @@ const Dashboard = ({
 };
 
 // --- Asset List Component ---
-const AssetList = ({ assets, onAdd, onEdit, onDelete }: { assets: Asset[], onAdd: () => void, onEdit: (asset: Asset) => void, onDelete: (id: string) => void }) => {
+const AssetList = ({ assets, onAdd, onEdit, onDelete, onImport }: { assets: Asset[], onAdd: () => void, onEdit: (asset: Asset) => void, onDelete: (id: string) => void, onImport: (assets: any[]) => void }) => {
   const [search, setSearch] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target?.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws);
+      onImport(data);
+    };
+    reader.readAsBinaryString(file);
+  };
   
   const filteredAssets = assets.filter(a => 
     (a.Tag || '').toLowerCase().includes(search.toLowerCase()) || 
@@ -1410,6 +1427,14 @@ const AssetList = ({ assets, onAdd, onEdit, onDelete }: { assets: Asset[], onAdd
             />
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-200 transition-colors"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Importar</span>
+            </button>
+            <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".xlsx, .xls" />
             <button className="flex-1 sm:flex-none p-2 bg-slate-50 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors flex items-center justify-center">
               <Filter className="w-4 h-4" />
             </button>
@@ -5006,6 +5031,22 @@ export default function App() {
                 {activeTab === 'assets' && (
                   <AssetList 
                     assets={assets} 
+                    onImport={async (importedAssets) => {
+                      for (const asset of importedAssets) {
+                        const id = `A${(assets.length + 1).toString().padStart(3, '0')}`;
+                        await createDocument('assets', {
+                          Tag: asset.Tag,
+                          Model: asset.Model,
+                          Description: asset.Description,
+                          Location: asset.Location,
+                          Plant: asset.Plant,
+                          Manufacturer: asset.Manufacturer,
+                          Status: asset.Status || 'Ativo',
+                          InstallDate: asset.InstallDate || new Date().toISOString(),
+                          ID: id
+                        }, id);
+                      }
+                    }}
                     onAdd={() => {
                       setEditingAsset(null);
                       setNewAsset({
