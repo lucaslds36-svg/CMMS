@@ -34,7 +34,10 @@ import {
   Info,
   Eye,
   ClipboardList,
-  Lightbulb
+  Lightbulb,
+  GanttChart,
+  FileText,
+  FileDown
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
@@ -67,12 +70,19 @@ import {
   addMonths, 
   subMonths,
   isToday,
-  parseISO
+  parseISO,
+  differenceInDays,
+  addDays,
+  startOfDay,
+  endOfDay,
+  isWithinInterval
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 import type { Asset, WorkOrder, PreventivePlan, UserProfile, Employee, UserPermissions } from './types';
 import { 
   auth, 
@@ -297,6 +307,56 @@ const Dashboard = ({
   isProcessingFile?: boolean
 }) => {
   const [loading, setLoading] = useState(false);
+  const [dashboardTab, setDashboardTab] = useState<'excel' | 'smart'>('smart');
+
+  const smartKPIs = useMemo(() => {
+    if (!wos || wos.length === 0) return null;
+
+    const now = new Date();
+    const startOfCurrentMonth = startOfMonth(now);
+    const endOfCurrentMonth = endOfMonth(now);
+
+    // Filter WOs for the current month
+    const monthWOs = wos.filter(wo => {
+      const woDate = new Date(wo.CreatedAt);
+      return woDate >= startOfCurrentMonth && woDate <= endOfCurrentMonth;
+    });
+
+    const correctiveWOs = monthWOs.filter(wo => wo.Type === 'Corretiva');
+    const totalFailures = correctiveWOs.length;
+    
+    // MTTR: Total Downtime / Number of Failures
+    const totalDowntime = correctiveWOs.reduce((acc, wo) => acc + (wo.Duration || 0), 0);
+    const mttr = totalFailures > 0 ? totalDowntime / totalFailures : 0;
+
+    // MTBF: Total Operating Time / Number of Failures
+    const daysInMonth = differenceInDays(endOfCurrentMonth, startOfCurrentMonth) + 1;
+    const totalHoursInMonth = daysInMonth * 24;
+    const totalOperatingTime = totalHoursInMonth - totalDowntime;
+    const mtbf = totalFailures > 0 ? totalOperatingTime / totalFailures : totalHoursInMonth;
+
+    // Availability: MTBF / (MTBF + MTTR)
+    const availability = (mtbf + mttr) > 0 ? (mtbf / (mtbf + mttr)) * 100 : 100;
+
+    // Reliability: e^(-t/MTBF) -> t = 24h
+    const reliability = mtbf > 0 ? Math.exp(-24 / mtbf) * 100 : 100;
+
+    // Backlog: Sum of estimated hours of open work orders
+    const openWOs = wos.filter(wo => wo.Status !== 'Concluída' && wo.Status !== 'Cancelada');
+    const backlogHours = openWOs.reduce((acc, wo) => acc + (wo.EstimatedTime || 0), 0);
+
+    // Maintenance Cost: Placeholder
+    const maintenanceCost = monthWOs.reduce((acc, wo) => acc + (wo.EstimatedTime || 0) * 50, 0);
+
+    return {
+      mtbf,
+      mttr,
+      availability,
+      reliability,
+      backlogHours,
+      maintenanceCost
+    };
+  }, [wos]);
 
   const formatPercent = (val: string | number | null) => {
     const num = parsePercent(val);
@@ -933,57 +993,205 @@ const Dashboard = ({
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
         <div className="flex flex-col">
-          <h2 className="text-xl font-bold text-slate-900">Indicadores de Indisponibilidade</h2>
-          <div className="flex items-center mt-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-            <Info className="w-3 h-3 mr-1" />
-            Cálculo: (Mecânica + Elétrica) / Horas Prog.
+          <h2 className="text-xl font-bold text-slate-900">
+            {dashboardTab === 'smart' ? 'Dashboard Inteligente' : 'Indicadores de Indisponibilidade'}
+          </h2>
+          <div className="flex items-center mt-2 space-x-2">
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl">
+              <button
+                onClick={() => setDashboardTab('smart')}
+                className={cn(
+                  "px-4 py-1.5 text-xs font-bold rounded-lg transition-all",
+                  dashboardTab === 'smart' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:bg-slate-200"
+                )}
+              >
+                KPIs Smart
+              </button>
+              <button
+                onClick={() => setDashboardTab('excel')}
+                className={cn(
+                  "px-4 py-1.5 text-xs font-bold rounded-lg transition-all",
+                  dashboardTab === 'excel' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:bg-slate-200"
+                )}
+              >
+                Excel
+              </button>
+            </div>
+            {dashboardTab === 'excel' && (
+              <div className="flex items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-4">
+                <Info className="w-3 h-3 mr-1" />
+                Cálculo: (Mecânica + Elétrica) / Horas Prog.
+              </div>
+            )}
           </div>
         </div>
         
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          {/* Filters */}
-          <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 p-1 shadow-inner w-full sm:w-auto">
-            <button 
-              onClick={() => setFilters({ ...filters, viewType: 'Acumulada' })}
-              className={cn(
-                "flex-1 sm:flex-none px-4 py-1.5 text-xs font-bold rounded-lg transition-all",
-                filters.viewType === 'Acumulada' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:bg-slate-100"
-              )}
-            >
-              Mensal
-            </button>
-            <button 
-              onClick={() => setFilters({ ...filters, viewType: 'Diária' })}
-              className={cn(
-                "flex-1 sm:flex-none px-4 py-1.5 text-xs font-bold rounded-lg transition-all",
-                filters.viewType === 'Diária' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:bg-slate-100"
-              )}
-            >
-              Diária
-            </button>
-          </div>
+        {dashboardTab === 'excel' && (
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            {/* Filters */}
+            <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 p-1 shadow-inner w-full sm:w-auto">
+              <button 
+                onClick={() => setFilters({ ...filters, viewType: 'Acumulada' })}
+                className={cn(
+                  "flex-1 sm:flex-none px-4 py-1.5 text-xs font-bold rounded-lg transition-all",
+                  filters.viewType === 'Acumulada' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:bg-slate-100"
+                )}
+              >
+                Mensal
+              </button>
+              <button 
+                onClick={() => setFilters({ ...filters, viewType: 'Diária' })}
+                className={cn(
+                  "px-4 py-1.5 text-xs font-bold rounded-lg transition-all",
+                  filters.viewType === 'Diária' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:bg-slate-100"
+                )}
+              >
+                Diária
+              </button>
+            </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <select 
-              value={filters.month}
-              onChange={(e) => setFilters({ ...filters, month: e.target.value })}
-              className="flex-1 sm:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
-            >
-              {months.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <select 
+                value={filters.month}
+                onChange={(e) => setFilters({ ...filters, month: e.target.value })}
+                className="flex-1 sm:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
+              >
+                {months.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
 
-            <select 
-              value={filters.year}
-              onChange={(e) => setFilters({ ...filters, year: e.target.value })}
-              className="flex-1 sm:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
-            >
-              {years.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
+              <select 
+                value={filters.year}
+                onChange={(e) => setFilters({ ...filters, year: e.target.value })}
+                className="flex-1 sm:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
+              >
+                {years.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {calculatedIndicators.length === 0 ? (
+      {dashboardTab === 'smart' ? (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-blue-50 rounded-xl text-blue-600">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">MTBF</span>
+              </div>
+              <h4 className="text-2xl font-bold text-slate-900">{smartKPIs?.mtbf.toFixed(1)}h</h4>
+              <p className="text-xs text-slate-500 mt-1">Tempo médio entre falhas</p>
+            </div>
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-amber-50 rounded-xl text-amber-600">
+                  <Wrench className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">MTTR</span>
+              </div>
+              <h4 className="text-2xl font-bold text-slate-900">{smartKPIs?.mttr.toFixed(1)}h</h4>
+              <p className="text-xs text-slate-500 mt-1">Tempo médio para reparo</p>
+            </div>
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600">
+                  <Activity className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Disponibilidade</span>
+              </div>
+              <h4 className="text-2xl font-bold text-slate-900">{smartKPIs?.availability.toFixed(1)}%</h4>
+              <p className="text-xs text-slate-500 mt-1">Tempo operacional total</p>
+            </div>
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-indigo-50 rounded-xl text-indigo-600">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Confiabilidade</span>
+              </div>
+              <h4 className="text-2xl font-bold text-slate-900">{smartKPIs?.reliability.toFixed(1)}%</h4>
+              <p className="text-xs text-slate-500 mt-1">Probabilidade de sucesso</p>
+            </div>
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-rose-50 rounded-xl text-rose-600">
+                  <ClipboardList className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Backlog</span>
+              </div>
+              <h4 className="text-2xl font-bold text-slate-900">{smartKPIs?.backlogHours.toFixed(1)}h</h4>
+              <p className="text-xs text-slate-500 mt-1">Carga de trabalho pendente</p>
+            </div>
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-slate-50 rounded-xl text-slate-600">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Custo Est.</span>
+              </div>
+              <h4 className="text-2xl font-bold text-slate-900">R$ {smartKPIs?.maintenanceCost.toLocaleString()}</h4>
+              <p className="text-xs text-slate-500 mt-1">Baseado em horas estimadas</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+              <h3 className="text-lg font-bold text-slate-900 mb-6">Status das Ordens de Serviço</h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Em Aberto', value: wos.filter(w => w.Status === 'Em Aberto').length },
+                        { name: 'Em Execução', value: wos.filter(w => w.Status === 'Em Execução').length },
+                        { name: 'Concluída', value: wos.filter(w => w.Status === 'Concluída').length },
+                        { name: 'Cancelada', value: wos.filter(w => w.Status === 'Cancelada').length },
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      <Cell fill="#94a3b8" />
+                      <Cell fill="#3b82f6" />
+                      <Cell fill="#10b981" />
+                      <Cell fill="#ef4444" />
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+              <h3 className="text-lg font-bold text-slate-900 mb-6">Tipos de Manutenção</h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={[
+                      { name: 'Preventiva', value: wos.filter(w => w.Type === 'Preventiva').length },
+                      { name: 'Corretiva', value: wos.filter(w => w.Type === 'Corretiva').length },
+                      { name: 'Preditiva', value: wos.filter(w => w.Type === 'Preditiva').length },
+                    ]}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {calculatedIndicators.length === 0 ? (
         <div className="bg-white p-12 rounded-2xl border border-slate-100 text-center shadow-sm">
           <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <FileSpreadsheet className="w-8 h-8 text-slate-400" />
@@ -1169,6 +1377,8 @@ const Dashboard = ({
           </div>
         </div>
       )}
+        </div>
+      )}
     </div>
   );
 };
@@ -1293,6 +1503,8 @@ const WorkOrderList = ({
   const [completingWO, setCompletingWO] = useState<WorkOrder | null>(null);
   const [viewingWO, setViewingWO] = useState<WorkOrder | null>(null);
   const [completedAt, setCompletedAt] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   
   const filteredWos = wos.filter(w => {
     const matchesSearch = (w.Description || '').toLowerCase().includes(search.toLowerCase()) || 
@@ -1304,6 +1516,13 @@ const WorkOrderList = ({
     
     return matchesSearch && matchesStatus;
   });
+
+  const totalPages = Math.ceil(filteredWos.length / itemsPerPage);
+  const paginatedWos = filteredWos.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter]);
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -1351,31 +1570,29 @@ const WorkOrderList = ({
           <thead>
             <tr className="bg-slate-50/50">
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">ID</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Nº Equip.</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Modelo</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Ativo</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Descrição</th>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Equipamento</th>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Tipo</th>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Natureza</th>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Atividade</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Prioridade</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Programação</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Início</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Fim</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Técnico</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredWos.map((wo, i) => (
+            {paginatedWos.map((wo, i) => (
               <tr key={i} className="hover:bg-slate-50/50 transition-colors">
                 <td className="px-6 py-4 text-sm font-medium text-slate-900">{wo.ID}</td>
-                <td className="px-6 py-4 text-sm font-bold text-blue-600">
-                  {assets.find(a => a.ID === wo.AssetID)?.Tag || '-'}
+                <td className="px-6 py-4">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-blue-600">{assets.find(a => a.ID === wo.AssetID)?.Tag || '-'}</span>
+                    <span className="text-[10px] text-slate-500 truncate max-w-[150px]">{assets.find(a => a.ID === wo.AssetID)?.Model || '-'}</span>
+                  </div>
                 </td>
-                <td className="px-6 py-4 text-sm text-slate-600">
-                  {assets.find(a => a.ID === wo.AssetID)?.Model || '-'}
-                </td>
-                <td className="px-6 py-4 text-sm text-slate-600">{wo.AssetID}</td>
-                <td className="px-6 py-4 text-sm text-slate-600 max-w-xs truncate">{wo.Description}</td>
+                <td className="px-6 py-4 text-sm text-slate-600">{wo.Type || '-'}</td>
+                <td className="px-6 py-4 text-sm text-slate-600">{wo.Nature || '-'}</td>
+                <td className="px-6 py-4 text-sm text-slate-600">{wo.ActivityType || '-'}</td>
                 <td className="px-6 py-4">
                   <span className={cn(
                     "px-2.5 py-1 rounded-full text-xs font-medium",
@@ -1398,16 +1615,7 @@ const WorkOrderList = ({
                     <span className="text-sm text-slate-600">{wo.Status}</span>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-sm text-slate-600">
-                  {wo.ScheduledDate ? new Date(wo.ScheduledDate).toLocaleDateString('pt-BR') : '-'}
-                </td>
-                <td className="px-6 py-4 text-sm text-slate-600">
-                  {wo.StartDate ? new Date(wo.StartDate).toLocaleDateString('pt-BR') : '-'}
-                </td>
-                <td className="px-6 py-4 text-sm text-slate-600">
-                  {wo.EndDate ? new Date(wo.EndDate).toLocaleDateString('pt-BR') : '-'}
-                </td>
-                <td className="px-6 py-4 text-sm text-slate-600">{wo.AssignedTo}</td>
+                <td className="px-6 py-4 text-sm text-slate-600">{wo.TechnicianID || wo.AssignedTo || '-'}</td>
                 <td className="px-6 py-4">
                   <div className="flex items-center space-x-2">
                     {wo.Status !== 'Concluída' && wo.Status !== 'Cancelada' && (
@@ -1458,6 +1666,31 @@ const WorkOrderList = ({
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <p className="text-xs text-slate-500 font-medium">
+          Mostrando {paginatedWos.length} de {filteredWos.length} ordens
+        </p>
+        <div className="flex items-center space-x-2">
+          <button 
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(prev => prev - 1)}
+            className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
+          >
+            <ChevronRight className="w-4 h-4 rotate-180" />
+          </button>
+          <span className="text-xs font-bold text-slate-600">
+            Página {currentPage} de {totalPages || 1}
+          </span>
+          <button 
+            disabled={currentPage === totalPages || totalPages === 0}
+            onClick={() => setCurrentPage(prev => prev + 1)}
+            className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       <AnimatePresence>
@@ -1893,12 +2126,16 @@ const EmployeeModule = ({
 };
 
 // --- Preventive Module Component ---
-export const calculateNextDue = (lastDone: string, frequency: string) => {
+export const calculateNextDue = (lastDone: string, frequency: string, freqType?: 'dias' | 'horas', freqValue?: number) => {
   const date = new Date(lastDone);
-  if (frequency === 'Mensal') date.setMonth(date.getMonth() + 1);
-  else if (frequency === 'Trimestral') date.setMonth(date.getMonth() + 3);
-  else if (frequency === 'Semestral') date.setMonth(date.getMonth() + 6);
-  else if (frequency === 'Anual') date.setFullYear(date.getFullYear() + 1);
+  if (freqType === 'dias' && freqValue) {
+    date.setDate(date.getDate() + freqValue);
+  } else {
+    if (frequency === 'Mensal') date.setMonth(date.getMonth() + 1);
+    else if (frequency === 'Trimestral') date.setMonth(date.getMonth() + 3);
+    else if (frequency === 'Semestral') date.setMonth(date.getMonth() + 6);
+    else if (frequency === 'Anual') date.setFullYear(date.getFullYear() + 1);
+  }
   return date.toISOString().split('T')[0];
 };
 
@@ -2006,6 +2243,8 @@ const PreventiveModule = ({
     AssetIDs: [] as string[],
     Task: '',
     Frequency: 'Mensal',
+    FrequencyType: 'dias' as 'dias' | 'horas',
+    FrequencyValue: 30,
     LastDone: new Date().toISOString().split('T')[0],
     Type: 'Preventiva' as 'Preventiva' | 'Inspeção' | 'Lubrificação' | 'Manutenção Programada',
     Criticality: 'Média' as 'Alta' | 'Média' | 'Baixa',
@@ -2074,14 +2313,21 @@ const PreventiveModule = ({
     
     newPlan.AssetIDs.forEach(assetId => {
       assetLastDones[assetId] = newPlan.LastDone;
-      assetNextDues[assetId] = calculateNextDue(newPlan.LastDone, newPlan.Frequency);
+      assetNextDues[assetId] = calculateNextDue(newPlan.LastDone, newPlan.Frequency, newPlan.FrequencyType, newPlan.FrequencyValue);
     });
 
+    const nextDue = calculateNextDue(newPlan.LastDone, newPlan.Frequency, newPlan.FrequencyType, newPlan.FrequencyValue);
     const planData = {
       ...newPlan,
       AssetLastDones: assetLastDones,
       AssetNextDues: assetNextDues,
-      NextDue: calculateNextDue(newPlan.LastDone, newPlan.Frequency)
+      NextDue: nextDue,
+      // Lowercase aliases for normalization
+      assetId: newPlan.AssetIDs[0] || '',
+      frequencyType: newPlan.FrequencyType,
+      frequencyValue: newPlan.FrequencyValue,
+      lastExecutionDate: newPlan.LastDone,
+      nextExecutionDate: nextDue
     };
 
     try {
@@ -2099,6 +2345,8 @@ const PreventiveModule = ({
         AssetIDs: [],
         Task: '',
         Frequency: 'Mensal',
+        FrequencyType: 'dias',
+        FrequencyValue: 30,
         LastDone: new Date().toISOString().split('T')[0],
         Type: 'Preventiva',
         Criticality: 'Média',
@@ -2143,12 +2391,25 @@ const PreventiveModule = ({
     }
 
     try {
+      let count = 0;
       const promises = planIds.flatMap(planId => {
         const plan = plans.find(p => p.ID === planId);
         const assetIds = selectedPlanAssets[planId];
         if (!plan || !assetIds) return [];
 
         return assetIds.map(async (assetId) => {
+          // Automatic Work Order Generation: Only if no open WO of same type exists
+          const hasOpenWO = wos.filter(wo => 
+            wo.AssetID === assetId && 
+            wo.Type === plan.Type && 
+            (wo.Status === 'Em Aberto' || wo.Status === 'Em Execução')
+          ).length > 0;
+
+          if (hasOpenWO) {
+            console.log(`Skipping WO generation for asset ${assetId} - already has an open ${plan.Type} WO`);
+            return;
+          }
+
           const woId = `OS-PREV-${Math.floor(Math.random() * 10000)}`;
           const scheduledDate = plan.AssetNextDues?.[assetId] || plan.NextDue || new Date().toISOString().split('T')[0];
           
@@ -2163,6 +2424,17 @@ const PreventiveModule = ({
             CreatedAt: new Date().toISOString().split('T')[0],
             ScheduledDate: scheduledDate,
             CompletedAt: '',
+            // Lowercase aliases and new fields
+            assetId: assetId,
+            planId: plan.ID || '',
+            technicianId: '',
+            type: plan.Type || 'Preventiva',
+            nature: 'Programada',
+            activityType: 'Inspeção', // Default for preventive
+            priority: plan.Criticality || 'Média',
+            startDate: scheduledDate,
+            endDate: '',
+            duration: plan.EstimatedTime || 0
           };
 
           if (plan.EstimatedTime !== undefined && plan.EstimatedTime !== null) {
@@ -2172,13 +2444,13 @@ const PreventiveModule = ({
             workOrder.Collaborators = Number(plan.Collaborators);
           }
 
+          count++;
           await createDocument('work-orders', workOrder, woId);
         });
       });
 
       await Promise.all(promises);
-      const totalOrders = Object.values(selectedPlanAssets).reduce((acc: number, curr: string[]) => acc + curr.length, 0);
-      showToast(`${totalOrders} Ordem(ns) de Serviço gerada(s) com sucesso!`);
+      showToast(`${count} Ordem(ns) de Serviço gerada(s) com sucesso!`);
       setShowGenerationModal(false);
       setSelectedPlanAssets({});
       onRefresh();
@@ -2248,6 +2520,8 @@ const PreventiveModule = ({
                           AssetIDs: plan.AssetIDs || [],
                           Task: plan.Task,
                           Frequency: plan.Frequency,
+                          FrequencyType: plan.FrequencyType || 'dias',
+                          FrequencyValue: plan.FrequencyValue || 30,
                           LastDone: plan.LastDone,
                           Type: plan.Type,
                           Criticality: plan.Criticality,
@@ -2648,20 +2922,32 @@ const PreventiveModule = ({
                     />
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Frequência</label>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Frequência (Tipo)</label>
                       <select 
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newPlan.Frequency}
-                        onChange={e => setNewPlan({...newPlan, Frequency: e.target.value})}
+                        value={newPlan.FrequencyType}
+                        onChange={e => setNewPlan({...newPlan, FrequencyType: e.target.value as any})}
                       >
-                        <option value="Mensal">Mensal</option>
-                        <option value="Trimestral">Trimestral</option>
-                        <option value="Semestral">Semestral</option>
-                        <option value="Anual">Anual</option>
+                        <option value="dias">Dias</option>
+                        <option value="horas">Horas (Horímetro)</option>
                       </select>
                     </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Valor da Frequência</label>
+                      <input 
+                        required
+                        type="number"
+                        min="1"
+                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                        value={newPlan.FrequencyValue}
+                        onChange={e => setNewPlan({...newPlan, FrequencyValue: parseInt(e.target.value)})}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Última Realização</label>
                       <input 
@@ -2678,7 +2964,7 @@ const PreventiveModule = ({
                         disabled
                         type="date"
                         className="w-full px-4 py-3 bg-slate-100 border-none rounded-xl text-sm text-slate-500 cursor-not-allowed"
-                        value={calculateNextDue(newPlan.LastDone, newPlan.Frequency)}
+                        value={calculateNextDue(newPlan.LastDone, newPlan.Frequency, newPlan.FrequencyType, newPlan.FrequencyValue)}
                       />
                     </div>
                   </div>
@@ -2856,6 +3142,309 @@ const PreventiveModule = ({
 };
 
 // --- Main App Component ---
+// --- Gantt Component ---
+const Gantt = ({ wos, assets, employees }: { wos: WorkOrder[], assets: Asset[], employees: Employee[] }) => {
+  const [viewMode, setViewMode] = useState<'technician' | 'asset'>('technician');
+  const [startDate, setStartDate] = useState(startOfWeek(new Date(), { locale: ptBR }));
+  const daysToShow = 14;
+  const days = Array.from({ length: daysToShow }, (_, i) => addDays(startDate, i));
+
+  const groupedWos = useMemo(() => {
+    const groups: Record<string, WorkOrder[]> = {};
+    wos.forEach(wo => {
+      const key = viewMode === 'technician' ? (wo.TechnicianID || wo.AssignedTo || 'Não Atribuído') : (wo.AssetID || 'Sem Ativo');
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(wo);
+    });
+    return groups;
+  }, [wos, viewMode]);
+
+  const getLabel = (key: string) => {
+    if (viewMode === 'technician') {
+      return employees.find(e => e.ID === key || e.Name === key)?.Name || key;
+    }
+    return assets.find(a => a.ID === key || a.Tag === key)?.Tag || key;
+  };
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col h-[calc(100vh-200px)]">
+      <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <div className="flex items-center space-x-4">
+          <h3 className="font-bold text-slate-900">Planejamento (Gantt)</h3>
+          <div className="flex bg-slate-200 p-1 rounded-lg">
+            <button 
+              onClick={() => setViewMode('technician')}
+              className={cn("px-3 py-1 text-xs font-medium rounded-md transition-all", viewMode === 'technician' ? "bg-white text-blue-600 shadow-sm" : "text-slate-600 hover:text-slate-900")}
+            >
+              Por Técnico
+            </button>
+            <button 
+              onClick={() => setViewMode('asset')}
+              className={cn("px-3 py-1 text-xs font-medium rounded-md transition-all", viewMode === 'asset' ? "bg-white text-blue-600 shadow-sm" : "text-slate-600 hover:text-slate-900")}
+            >
+              Por Ativo
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center space-x-2">
+          <button onClick={() => setStartDate(subMonths(startDate, 1))} className="p-2 hover:bg-slate-200 rounded-lg transition-colors"><ChevronRight className="w-4 h-4 rotate-180" /></button>
+          <span className="text-sm font-bold text-slate-700 min-w-[120px] text-center">{format(startDate, 'MMMM yyyy', { locale: ptBR })}</span>
+          <button onClick={() => setStartDate(addMonths(startDate, 1))} className="p-2 hover:bg-slate-200 rounded-lg transition-colors"><ChevronRight className="w-4 h-4" /></button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto">
+        <div className="min-w-max">
+          {/* Header */}
+          <div className="flex border-b border-slate-100 sticky top-0 bg-white z-10">
+            <div className="w-48 p-4 border-r border-slate-100 font-bold text-xs text-slate-500 uppercase">Recurso</div>
+            {days.map(day => (
+              <div key={day.toISOString()} className={cn("w-24 p-2 border-r border-slate-100 text-center flex flex-col items-center justify-center", isToday(day) && "bg-blue-50")}>
+                <span className="text-[10px] uppercase text-slate-400 font-bold">{format(day, 'EEE', { locale: ptBR })}</span>
+                <span className="text-sm font-bold text-slate-700">{format(day, 'dd')}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Rows */}
+          {Object.entries(groupedWos).map(([key, items]) => (
+            <div key={key} className="flex border-b border-slate-50 hover:bg-slate-50/30 transition-colors">
+              <div className="w-48 p-4 border-r border-slate-100 flex flex-col justify-center">
+                <span className="text-sm font-bold text-slate-800 truncate">{getLabel(key)}</span>
+                <span className="text-[10px] text-slate-400">{items.length} Ordens</span>
+              </div>
+              <div className="flex relative h-16">
+                {days.map(day => (
+                  <div key={day.toISOString()} className="w-24 border-r border-slate-50 h-full" />
+                ))}
+                {items.map(wo => {
+                  const start = wo.StartDate ? parseISO(wo.StartDate) : (wo.ScheduledDate ? parseISO(wo.ScheduledDate) : null);
+                  const durationDays = wo.Duration && wo.Duration > 0 ? wo.Duration : 1;
+                  const end = wo.EndDate ? parseISO(wo.EndDate) : (start ? addDays(start, durationDays) : null);
+                  
+                  if (!start || !end) return null;
+
+                  const startDiff = differenceInDays(startOfDay(start), startOfDay(startDate));
+                  const duration = Math.max(1, differenceInDays(startOfDay(end), startOfDay(start)));
+                  
+                  if (startDiff + duration < 0 || startDiff >= daysToShow) return null;
+
+                  const left = Math.max(0, startDiff) * 96;
+                  const width = Math.min(daysToShow - Math.max(0, startDiff), duration + Math.min(0, startDiff)) * 96;
+
+                  return (
+                    <motion.div 
+                      key={wo.ID}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className={cn(
+                        "absolute top-2 h-12 rounded-lg border shadow-sm p-2 flex flex-col justify-center overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all z-0",
+                        wo.Status === 'Concluída' ? "bg-emerald-50 border-emerald-200 text-emerald-700" :
+                        wo.Status === 'Em Execução' ? "bg-blue-50 border-blue-200 text-blue-700" :
+                        "bg-amber-50 border-amber-200 text-amber-700"
+                      )}
+                      style={{ left: `${left}px`, width: `${width}px` }}
+                      title={`${wo.ID}: ${wo.Description}`}
+                    >
+                      <span className="text-[10px] font-bold truncate">{wo.ID}</span>
+                      <span className="text-[9px] truncate opacity-80">{wo.Description}</span>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ReportsModule = ({ wos, assets, employees, plans }: { 
+  wos: WorkOrder[], 
+  assets: Asset[], 
+  employees: Employee[],
+  plans: PreventivePlan[]
+}) => {
+  const [reportType, setReportType] = useState<'wos' | 'assets' | 'preventive'>('wos');
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+
+  const exportToExcel = (data: any[], fileName: string) => {
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Relatório");
+    XLSX.writeFile(wb, `${fileName}.xlsx`);
+  };
+
+  const exportToPDF = (title: string, headers: string[][], data: any[][], fileName: string) => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text(title, 14, 22);
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Gerado em: ${new Date().toLocaleString()}`, 14, 30);
+    
+    (doc as any).autoTable({
+      head: headers,
+      body: data,
+      startY: 35,
+      theme: 'grid',
+      headStyles: { fillColor: [37, 99, 235] },
+      styles: { fontSize: 8 }
+    });
+    
+    doc.save(`${fileName}.pdf`);
+  };
+
+  const handleExport = (format: 'pdf' | 'excel') => {
+    if (reportType === 'wos') {
+      const filtered = wos.filter(wo => {
+        if (!dateRange.start || !dateRange.end) return true;
+        const date = wo.CreatedAt || '';
+        return date >= dateRange.start && date <= dateRange.end;
+      });
+
+      const data = filtered.map(wo => ({
+        ID: wo.ID,
+        Equipamento: assets.find(a => a.ID === wo.AssetID)?.Tag || wo.AssetID,
+        Descrição: wo.Description,
+        Tipo: wo.Type,
+        Status: wo.Status,
+        Prioridade: wo.Priority,
+        Técnico: wo.AssignedTo,
+        Data: wo.CreatedAt
+      }));
+
+      if (format === 'excel') {
+        exportToExcel(data, 'Relatorio_Ordens_Servico');
+      } else {
+        const headers = [['ID', 'Equipamento', 'Descrição', 'Tipo', 'Status', 'Prioridade', 'Data']];
+        const pdfData = data.map(d => [d.ID, d.Equipamento, d.Descrição, d.Tipo, d.Status, d.Prioridade, d.Data]);
+        exportToPDF('Relatório de Ordens de Serviço', headers, pdfData, 'Relatorio_Ordens_Servico');
+      }
+    } else if (reportType === 'assets') {
+      const data = assets.map(a => ({
+        Tag: a.Tag,
+        Descrição: a.Description,
+        Modelo: a.Model,
+        Localização: a.Location,
+        Planta: a.Plant,
+        Status: a.Status
+      }));
+
+      if (format === 'excel') {
+        exportToExcel(data, 'Relatorio_Ativos');
+      } else {
+        const headers = [['Tag', 'Descrição', 'Modelo', 'Localização', 'Planta', 'Status']];
+        const pdfData = data.map(d => [d.Tag, d.Descrição, d.Modelo, d.Localização, d.Planta, d.Status]);
+        exportToPDF('Relatório de Ativos', headers, pdfData, 'Relatorio_Ativos');
+      }
+    } else if (reportType === 'preventive') {
+      const data = plans.map(p => ({
+        ID: p.ID,
+        Tarefa: p.Task,
+        Tipo: p.Type,
+        Frequência: `${p.FrequencyValue} ${p.FrequencyType}`,
+        Próxima: p.NextDue,
+        Criticidade: p.Criticality
+      }));
+
+      if (format === 'excel') {
+        exportToExcel(data, 'Relatorio_Planos_Preventivos');
+      } else {
+        const headers = [['ID', 'Tarefa', 'Tipo', 'Frequência', 'Próxima', 'Criticidade']];
+        const pdfData = data.map(d => [d.ID, d.Tarefa, d.Tipo, d.Frequência, d.Próxima, d.Criticidade]);
+        exportToPDF('Relatório de Planos Preventivos', headers, pdfData, 'Relatorio_Planos_Preventivos');
+      }
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900">Relatórios Customizados</h3>
+          <p className="text-sm text-slate-500">Gere e exporte dados do sistema</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+          <h4 className="font-medium text-slate-900 flex items-center gap-2">
+            <FileText className="w-4 h-4 text-blue-600" />
+            Configurações do Relatório
+          </h4>
+          
+          <div className="space-y-3">
+            <label className="block text-xs font-medium text-slate-500 uppercase">Tipo de Relatório</label>
+            <select 
+              value={reportType}
+              onChange={e => setReportType(e.target.value as any)}
+              className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="wos">Ordens de Serviço</option>
+              <option value="assets">Inventário de Ativos</option>
+              <option value="preventive">Planos Preventivos</option>
+            </select>
+          </div>
+
+          {reportType === 'wos' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-slate-500 uppercase">Início</label>
+                <input 
+                  type="date" 
+                  value={dateRange.start}
+                  onChange={e => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                  className="w-full px-3 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-slate-500 uppercase">Fim</label>
+                <input 
+                  type="date" 
+                  value={dateRange.end}
+                  onChange={e => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                  className="w-full px-3 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="pt-4 flex flex-col gap-2">
+            <button 
+              onClick={() => handleExport('excel')}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Exportar Excel
+            </button>
+            <button 
+              onClick={() => handleExport('pdf')}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-medium hover:bg-rose-700 transition-colors"
+            >
+              <FileDown className="w-4 h-4" />
+              Exportar PDF
+            </button>
+          </div>
+        </div>
+
+        <div className="md:col-span-2 bg-slate-50 p-8 rounded-2xl border border-dashed border-slate-200 flex flex-col items-center justify-center text-center space-y-4">
+          <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-slate-400">
+            <FileText className="w-8 h-8" />
+          </div>
+          <div>
+            <h5 className="font-medium text-slate-900">Pré-visualização Indisponível</h5>
+            <p className="text-sm text-slate-500 max-w-xs mx-auto">
+              Selecione as configurações ao lado e clique em exportar para gerar o arquivo final.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -3177,11 +3766,16 @@ export default function App() {
     Description: '',
     Priority: 'Média' as const,
     AssignedTo: '',
+    TechnicianID: '',
+    Type: 'Corretiva',
+    Nature: 'Programada',
+    ActivityType: 'Reparo',
     ScheduledDate: new Date().toISOString().split('T')[0],
     StartDate: '',
     EndDate: '',
     EstimatedTime: 0,
-    Collaborators: 0
+    Collaborators: 0,
+    Cause: ''
   });
 
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
@@ -3471,13 +4065,42 @@ export default function App() {
   const handleCreateWorkOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const woData = {
+        ...newWO,
+        assetId: newWO.AssetID,
+        planId: newWO.PlanID || '',
+        technicianId: newWO.TechnicianID || '',
+        type: newWO.Type,
+        nature: newWO.Nature,
+        activityType: newWO.ActivityType,
+        priority: newWO.Priority,
+        startDate: newWO.StartDate || '',
+        endDate: newWO.EndDate || '',
+        duration: newWO.Duration || 0
+      };
+
       if (editingWO) {
-        await updateDocument('work-orders', editingWO.ID, newWO);
+        await updateDocument('work-orders', editingWO.ID, woData);
         showToast('Ordem de Serviço atualizada com sucesso!');
       } else {
+        // Intelligent Automatic Closure: Close old open WOs of same type for this asset
+        const existingOpenWOs = wos.filter(wo => 
+          wo.AssetID === newWO.AssetID && 
+          wo.Type === newWO.Type && 
+          (wo.Status === 'Em Aberto' || wo.Status === 'Em Execução')
+        );
+
+        for (const oldWO of existingOpenWOs) {
+          await updateDocument('work-orders', oldWO.ID, { 
+            Status: 'Concluída', 
+            CompletedAt: new Date().toISOString().split('T')[0],
+            Cause: 'Fechamento automático por nova O.S. do mesmo tipo'
+          });
+        }
+
         const id = `WO${(wos.length + 1).toString().padStart(3, '0')}`;
         const woToCreate = {
-          ...newWO,
+          ...woData,
           ID: id,
           Status: 'Em Aberto' as const,
           CreatedAt: new Date().toISOString().split('T')[0],
@@ -3494,9 +4117,18 @@ export default function App() {
         Description: '',
         Priority: 'Média',
         AssignedTo: '',
+        TechnicianID: '',
+        Type: 'Corretiva',
+        Nature: 'Programada',
+        ActivityType: 'Reparo',
         ScheduledDate: new Date().toISOString().split('T')[0],
+        StartDate: '',
+        EndDate: '',
         EstimatedTime: 0,
-        Collaborators: 0
+        Collaborators: 0,
+        Duration: 0,
+        PlanID: '',
+        Cause: ''
       });
     } catch (error) {
       console.error('Error saving work order:', error);
@@ -3526,11 +4158,18 @@ export default function App() {
       Description: wo.Description,
       Priority: wo.Priority,
       AssignedTo: wo.AssignedTo,
+      TechnicianID: wo.TechnicianID || '',
+      Type: wo.Type || 'Corretiva',
+      Nature: wo.Nature || 'Programada',
+      ActivityType: wo.ActivityType || 'Reparo',
       ScheduledDate: wo.ScheduledDate || new Date().toISOString().split('T')[0],
       StartDate: wo.StartDate || '',
       EndDate: wo.EndDate || '',
       EstimatedTime: wo.EstimatedTime || 0,
-      Collaborators: wo.Collaborators || 0
+      Collaborators: wo.Collaborators || 0,
+      Duration: wo.Duration || 0,
+      PlanID: wo.PlanID || '',
+      Cause: wo.Cause || ''
     });
     setShowWOModal(true);
   };
@@ -3598,7 +4237,9 @@ export default function App() {
               AssetLastDones: newAssetLastDones,
               AssetNextDues: newAssetNextDues,
               EstimatedTime: plan.EstimatedTime !== undefined ? Number(plan.EstimatedTime) : 1,
-              Collaborators: plan.Collaborators !== undefined ? Number(plan.Collaborators) : 1
+              Collaborators: plan.Collaborators !== undefined ? Number(plan.Collaborators) : 1,
+              lastExecutionDate: completedDate,
+              nextExecutionDate: earliestNextDue
             });
           }
         }
@@ -3734,6 +4375,7 @@ export default function App() {
       items: [
         { id: 'wos', label: 'Ordens de Serviço', icon: Wrench, permission: 'workOrders' },
         { id: 'preventive', label: 'Preventivas', icon: Calendar, permission: 'preventive' },
+        { id: 'gantt', label: 'Planejamento (Gantt)', icon: GanttChart, permission: 'workOrders' },
         { id: 'service-management', label: 'Gestão de Serviços', icon: ClipboardList, permission: 'serviceManagement' },
       ]
     },
@@ -3756,6 +4398,7 @@ export default function App() {
       items: [
         { id: 'database', label: 'Banco de Dados', icon: Database, permission: 'database' },
         { id: 'users', label: 'Usuários', icon: ShieldCheck, permission: 'users' },
+        { id: 'reports', label: 'Relatórios', icon: FileText, permission: 'database' },
       ]
     },
     {
@@ -4392,6 +5035,18 @@ export default function App() {
                         Description: '',
                         Priority: 'Média',
                         AssignedTo: '',
+                        TechnicianID: '',
+                        Type: 'Corretiva',
+                        Nature: 'Programada',
+                        ActivityType: 'Reparo',
+                        ScheduledDate: new Date().toISOString().split('T')[0],
+                        StartDate: '',
+                        EndDate: '',
+                        EstimatedTime: 0,
+                        Collaborators: 0,
+                        Duration: 0,
+                        PlanID: '',
+                        Cause: ''
                       });
                       setShowWOModal(true);
                     }} 
@@ -4408,6 +5063,13 @@ export default function App() {
                     onRefresh={() => {}} // Handled by real-time
                     onDelete={handleDeletePreventive}
                     showToast={showToast}
+                  />
+                )}
+                {activeTab === 'gantt' && (
+                  <Gantt 
+                    wos={wos}
+                    assets={assets}
+                    employees={employees}
                   />
                 )}
                 {activeTab === 'failure-analysis' && (
@@ -4462,6 +5124,14 @@ export default function App() {
                     onRefresh={() => {}} // Handled by real-time
                     onDelete={handleDeleteEmployee}
                     showToast={showToast}
+                  />
+                )}
+                {activeTab === 'reports' && (
+                  <ReportsModule 
+                    wos={wos}
+                    assets={assets}
+                    employees={employees}
+                    plans={plans}
                   />
                 )}
                 {activeTab === 'profile' && userProfile && (
@@ -4781,7 +5451,7 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden"
+              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl max-h-[90vh] overflow-y-auto"
             >
               <div className="p-8">
                 <div className="flex items-center justify-between mb-6">
@@ -4823,44 +5493,50 @@ export default function App() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Data de Geração</label>
-                      <input 
-                        type="date"
-                        disabled
-                        className="w-full px-4 py-3 bg-slate-100 border-none rounded-xl text-sm text-slate-500"
-                        value={editingWO ? editingWO.CreatedAt : new Date().toISOString().split('T')[0]}
-                      />
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Tipo de Manutenção</label>
+                      <select 
+                        required
+                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                        value={newWO.Type}
+                        onChange={e => setNewWO({...newWO, Type: e.target.value as any})}
+                      >
+                        <option value="">Selecione o tipo</option>
+                        <option value="Preventiva">Preventiva</option>
+                        <option value="Corretiva">Corretiva</option>
+                        <option value="Preditiva">Preditiva</option>
+                      </select>
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Programação</label>
-                        <input 
-                          type="date"
-                          required
-                          className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                          value={newWO.ScheduledDate}
-                          onChange={e => setNewWO({...newWO, ScheduledDate: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Início</label>
-                        <input 
-                          type="date"
-                          className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                          value={newWO.StartDate}
-                          onChange={e => setNewWO({...newWO, StartDate: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Fim</label>
-                        <input 
-                          type="date"
-                          className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                          value={newWO.EndDate}
-                          onChange={e => setNewWO({...newWO, EndDate: e.target.value})}
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Natureza</label>
+                      <select 
+                        required
+                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                        value={newWO.Nature}
+                        onChange={e => setNewWO({...newWO, Nature: e.target.value as any})}
+                      >
+                        <option value="">Selecione a natureza</option>
+                        <option value="Emergencial">Emergencial</option>
+                        <option value="Programada">Programada</option>
+                        <option value="Oportunidade">Oportunidade</option>
+                      </select>
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Tipo de Atividade</label>
+                    <select 
+                      required
+                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                      value={newWO.ActivityType}
+                      onChange={e => setNewWO({...newWO, ActivityType: e.target.value as any})}
+                    >
+                      <option value="">Selecione a atividade</option>
+                      <option value="Lubrificação">Lubrificação</option>
+                      <option value="Inspeção">Inspeção</option>
+                      <option value="Ajuste">Ajuste</option>
+                      <option value="Reparo">Reparo</option>
+                      <option value="Substituição">Substituição</option>
+                    </select>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -4878,24 +5554,83 @@ export default function App() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Técnico</label>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Técnico Responsável</label>
                       <select 
                         required
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newWO.AssignedTo}
-                        onChange={e => setNewWO({...newWO, AssignedTo: e.target.value})}
+                        value={newWO.TechnicianID}
+                        onChange={e => {
+                          const emp = employees.find(emp => emp.ID === e.target.value);
+                          setNewWO({
+                            ...newWO, 
+                            TechnicianID: e.target.value,
+                            AssignedTo: emp ? emp.Name : e.target.value
+                          });
+                        }}
                       >
                         <option value="">Selecione um técnico</option>
                         {employees.filter(emp => emp.Status === 'Ativo').map(emp => (
-                          <option key={emp.ID} value={emp.Name}>{emp.Name} ({emp.Function})</option>
+                          <option key={emp.ID} value={emp.ID}>{emp.Name} ({emp.Function})</option>
                         ))}
-                        {/* Fallback if no active employees or for manual entry if needed */}
-                        {!employees.some(emp => emp.Status === 'Ativo') && (
-                          <option value="Técnico Externo">Técnico Externo</option>
-                        )}
                       </select>
                     </div>
                   </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Data de Geração</label>
+                      <input 
+                        type="date"
+                        disabled
+                        className="w-full px-4 py-3 bg-slate-100 border-none rounded-xl text-sm text-slate-500"
+                        value={editingWO ? editingWO.CreatedAt : new Date().toISOString().split('T')[0]}
+                      />
+                    </div>
+                    <div className="flex flex-col justify-end">
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Programação</label>
+                      <input 
+                        type="date"
+                        required
+                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                        value={newWO.ScheduledDate}
+                        onChange={e => setNewWO({...newWO, ScheduledDate: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Início Real</label>
+                      <input 
+                        type="date"
+                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                        value={newWO.StartDate}
+                        onChange={e => setNewWO({...newWO, StartDate: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Fim Real</label>
+                      <input 
+                        type="date"
+                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                        value={newWO.EndDate}
+                        onChange={e => setNewWO({...newWO, EndDate: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
+                  {newWO.Type === 'Corretiva' && (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Causa da Falha</label>
+                      <textarea 
+                        required
+                        placeholder="Descreva a causa da falha..."
+                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                        value={newWO.Cause}
+                        onChange={e => setNewWO({...newWO, Cause: e.target.value})}
+                      />
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -4910,6 +5645,20 @@ export default function App() {
                       />
                     </div>
                     <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Duração Real (h)</label>
+                      <input 
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                        value={newWO.Duration || ''}
+                        onChange={e => setNewWO({...newWO, Duration: parseFloat(e.target.value)})}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Nº Colaboradores</label>
                       <input 
                         type="number"
@@ -4917,6 +5666,16 @@ export default function App() {
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
                         value={newWO.Collaborators}
                         onChange={e => setNewWO({...newWO, Collaborators: parseInt(e.target.value)})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">ID do Plano (Opcional)</label>
+                      <input 
+                        type="text"
+                        placeholder="Ex: PLAN-123"
+                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                        value={newWO.PlanID || ''}
+                        onChange={e => setNewWO({...newWO, PlanID: e.target.value})}
                       />
                     </div>
                   </div>

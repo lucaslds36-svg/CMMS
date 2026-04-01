@@ -73,22 +73,33 @@ service cloud.firestore {
     }
 
     function isValidWorkOrder(data) {
-      return hasOnlyAllowedFields(['ID', 'AssetID', 'PlanID', 'Description', 'Priority', 'Status', 'AssignedTo', 'CreatedAt', 'CompletedAt', 'ScheduledDate', 'EstimatedTime', 'Collaborators', 'id']) &&
+      return hasOnlyAllowedFields(['ID', 'AssetID', 'PlanID', 'TechnicianID', 'Description', 'Priority', 'Type', 'Nature', 'ActivityType', 'Status', 'AssignedTo', 'CreatedAt', 'CompletedAt', 'ScheduledDate', 'StartDate', 'EndDate', 'EstimatedTime', 'Collaborators', 'Duration', 'Cause', 'id']) &&
              data.ID is string && data.AssetID is string &&
              (data.PlanID is string || !('PlanID' in data)) &&
+             (data.TechnicianID is string || !('TechnicianID' in data)) &&
              data.Priority in ['Baixa', 'Média', 'Alta', 'Crítica'] &&
+             (data.Type in ['Preventiva', 'Corretiva', 'Preditiva'] || !('Type' in data)) &&
+             (data.Nature in ['Emergencial', 'Programada', 'Oportunidade'] || !('Nature' in data)) &&
+             (data.ActivityType in ['Lubrificação', 'Inspeção', 'Ajuste', 'Reparo', 'Substituição'] || !('ActivityType' in data)) &&
              data.Status in ['Em Aberto', 'Em Execução', 'Concluída', 'Cancelada'] &&
              (data.ScheduledDate is string || !('ScheduledDate' in data)) &&
+             (data.StartDate is string || !('StartDate' in data)) &&
+             (data.EndDate is string || !('EndDate' in data)) &&
              (data.EstimatedTime is number || !('EstimatedTime' in data)) &&
-             (data.Collaborators is number || !('Collaborators' in data));
+             (data.Collaborators is number || !('Collaborators' in data)) &&
+             (data.Duration is number || !('Duration' in data)) &&
+             (data.Cause is string || !('Cause' in data));
     }
 
     function isValidPreventivePlan(data) {
-      return hasOnlyAllowedFields(['ID', 'AssetIDs', 'AssetLastDones', 'AssetNextDues', 'Task', 'Frequency', 'LastDone', 'NextDue', 'Type', 'Criticality', 'AssetType', 'Location', 'Plant', 'EstimatedTime', 'Collaborators', 'id']) &&
+      return hasOnlyAllowedFields(['ID', 'AssetID', 'AssetIDs', 'AssetLastDones', 'AssetNextDues', 'Task', 'Frequency', 'FrequencyType', 'FrequencyValue', 'LastDone', 'NextDue', 'Type', 'Criticality', 'AssetType', 'Location', 'Plant', 'EstimatedTime', 'Collaborators', 'id']) &&
              data.ID is string && data.AssetIDs is list &&
+             (data.AssetID is string || !('AssetID' in data)) &&
              (data.AssetLastDones is map || !('AssetLastDones' in data)) &&
              (data.AssetNextDues is map || !('AssetNextDues' in data)) &&
              data.Type in ['Preventiva', 'Inspeção', 'Lubrificação', 'Manutenção Programada'] &&
+             (data.FrequencyType in ['dias', 'horas'] || !('FrequencyType' in data)) &&
+             (data.FrequencyValue is number || !('FrequencyValue' in data)) &&
              data.Criticality in ['Alta', 'Média', 'Baixa'] &&
              data.EstimatedTime is number && data.Collaborators is number;
     }
@@ -103,7 +114,7 @@ service cloud.firestore {
     }
 
     function isValidServiceDemand(data) {
-      return isAuthenticated();
+      return true;
     }
 
     function isValidEmployee(data) {
@@ -251,10 +262,7 @@ service cloud.firestore {
     }
 
     match /serviceDemands/{id} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidServiceDemand(request.resource.data) && request.resource.data.requesterUid == request.auth.uid;
-      allow update: if isAuthenticated();
-      allow delete: if isAdmin();
+      allow read, write: if isAuthenticated();
     }
 
     match /users/{userId} {

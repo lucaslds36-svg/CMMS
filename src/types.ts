@@ -13,29 +13,53 @@ export interface Asset {
 export interface WorkOrder {
   ID: string;
   AssetID: string;
+  assetId?: string;
   PlanID?: string;
+  planId?: string;
+  TechnicianID?: string;
+  technicianId?: string;
   Description: string;
   Priority: 'Baixa' | 'Média' | 'Alta' | 'Crítica';
+  priority?: 'Baixa' | 'Média' | 'Alta' | 'Crítica';
+  Type?: 'Preventiva' | 'Corretiva' | 'Preditiva';
+  type?: 'Preventiva' | 'Corretiva' | 'Preditiva';
+  Nature?: 'Emergencial' | 'Programada' | 'Oportunidade';
+  nature?: 'Emergencial' | 'Programada' | 'Oportunidade';
+  ActivityType?: 'Lubrificação' | 'Inspeção' | 'Ajuste' | 'Reparo' | 'Substituição';
+  activityType?: 'Lubrificação' | 'Inspeção' | 'Ajuste' | 'Reparo' | 'Substituição';
   Status: 'Em Aberto' | 'Em Execução' | 'Concluída' | 'Cancelada';
   AssignedTo: string;
   CreatedAt: string;
   ScheduledDate: string;
   StartDate?: string;
+  startDate?: string;
   EndDate?: string;
+  endDate?: string;
   CompletedAt: string;
   EstimatedTime?: number;
   Collaborators?: number;
+  Duration?: number;
+  duration?: number;
+  Cause?: string;
 }
 
 export interface PreventivePlan {
   ID: string;
+  AssetID?: string; // Single asset ID for simpler relationship
+  assetId?: string;
   AssetIDs: string[];
   AssetLastDones?: Record<string, string>;
   AssetNextDues?: Record<string, string>;
   Task: string;
   Frequency: string;
+  FrequencyType?: 'dias' | 'horas';
+  frequencyType?: 'dias' | 'horas';
+  FrequencyValue?: number;
+  frequencyValue?: number;
   LastDone: string;
   NextDue: string;
+  lastExecutionDate?: string;
+  nextExecutionDate?: string;
   Type: 'Preventiva' | 'Inspeção' | 'Lubrificação' | 'Manutenção Programada';
   Criticality: 'Alta' | 'Média' | 'Baixa';
   AssetType: string;
