@@ -3794,7 +3794,7 @@ export default function App() {
             date: new Date().toISOString(),
             user: userProfile?.displayName || 'Usuário'
           };
-          mergedDemand.statusHistory = [...(existingDemand.statusHistory || []), historyEntry];
+          mergedDemand.statusHistory = [...(Array.isArray(existingDemand.statusHistory) ? existingDemand.statusHistory : []), historyEntry];
           if (demand.status === 'Concluído') {
             mergedDemand.closedAt = new Date().toISOString();
           }

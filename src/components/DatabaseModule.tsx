@@ -145,7 +145,7 @@ export const DatabaseModule: React.FC<DatabaseModuleProps> = ({ onDataImported, 
         if (isAdmin) {
           console.log("Saving bdData to global Firestore...");
           try {
-            await saveGlobalData('bdData', bdData);
+            await saveGlobalData('bdData', bdJson);
             console.log("bdData saved successfully.");
           } catch (e) {
             console.error("Failed to save bdData to Firestore:", e);
@@ -158,7 +158,7 @@ export const DatabaseModule: React.FC<DatabaseModuleProps> = ({ onDataImported, 
         if (isAdmin) {
           console.log("Saving dinamicaData to global Firestore...");
           try {
-            await saveGlobalData('dinamicaData', pdgData);
+            await saveGlobalData('dinamicaData', pdgJson);
             console.log("dinamicaData saved successfully.");
           } catch (e) {
             console.error("Failed to save dinamicaData to Firestore:", e);
@@ -171,7 +171,7 @@ export const DatabaseModule: React.FC<DatabaseModuleProps> = ({ onDataImported, 
         if (isAdmin) {
           console.log("Saving bditssData to global Firestore...");
           try {
-            await saveGlobalData('bditssData', bditssData);
+            await saveGlobalData('bditssData', bditssJson);
             console.log("bditssData saved successfully.");
           } catch (e) {
             console.error("Failed to save bditssData to Firestore:", e);

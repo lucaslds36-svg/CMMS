@@ -35,9 +35,11 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          (request.auth.token.email == "lucas.lds36@gmail.com" && request.auth.token.email_verified == true));
+        (
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin') ||
+          (request.auth.token.email == "lucas.lds36@gmail.com" && request.auth.token.email_verified == true)
+        );
     }
 
     function isOwner(userId) {
@@ -101,7 +103,7 @@ service cloud.firestore {
     }
 
     function isValidServiceDemand(data) {
-      return true;
+      return isAuthenticated();
     }
 
     function isValidEmployee(data) {
@@ -251,12 +253,7 @@ service cloud.firestore {
     match /serviceDemands/{id} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidServiceDemand(request.resource.data) && request.resource.data.requesterUid == request.auth.uid;
-      allow update: if isAuthenticated() && isValidServiceDemand(request.resource.data) && 
-                    (
-                      (resource.data.status != 'Concluído' && request.resource.data.status == 'Concluído' && resource.data.requesterUid == request.auth.uid) ||
-                      (request.resource.data.status != 'Concluído') ||
-                      isAdmin()
-                    );
+      allow update: if isAuthenticated();
       allow delete: if isAdmin();
     }
 

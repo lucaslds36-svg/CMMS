@@ -72,14 +72,21 @@ export const subscribeToCollection = <T>(
   });
 };
 
-const sanitizeData = (data: any) => {
-  if (typeof data !== 'object' || data === null) return data;
-  const sanitized = { ...data };
-  Object.keys(sanitized).forEach(key => {
-    if (sanitized[key] === undefined) {
-      delete sanitized[key];
-    } else if (typeof sanitized[key] === 'object' && sanitized[key] !== null && !(sanitized[key] instanceof Timestamp)) {
-      sanitized[key] = sanitizeData(sanitized[key]);
+const sanitizeData = (data: any): any => {
+  if (data === null || typeof data !== 'object') return data;
+  if (data instanceof Timestamp || data instanceof Date) return data;
+  if (Array.isArray(data)) return data.map(sanitizeData);
+  
+  // Handle Firestore FieldValue (serverTimestamp, increment, etc.)
+  // They don't have a common public class, but they are not plain objects
+  if (data.constructor && data.constructor.name === 'FieldValue') return data;
+  // Fallback for different environments/minification
+  if (data._methodName || (typeof data.toFirestore === 'function')) return data;
+
+  const sanitized: any = {};
+  Object.keys(data).forEach(key => {
+    if (data[key] !== undefined) {
+      sanitized[key] = sanitizeData(data[key]);
     }
   });
   return sanitized;
