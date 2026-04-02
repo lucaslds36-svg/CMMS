@@ -41,6 +41,7 @@ export interface WorkOrder {
   Duration?: number;
   duration?: number;
   Cause?: string;
+  Checklist?: { text: string; completed: boolean }[];
 }
 
 export interface PreventivePlan {
@@ -67,6 +68,7 @@ export interface PreventivePlan {
   Plant: string;
   EstimatedTime: number;
   Collaborators: number;
+  Checklist?: string[];
 }
 
 export interface Employee {

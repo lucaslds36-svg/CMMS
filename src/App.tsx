@@ -37,7 +37,11 @@ import {
   Lightbulb,
   GanttChart,
   FileText,
-  FileDown
+  FileDown,
+  Edit2,
+  Trash2,
+  Printer,
+  Check
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
@@ -1386,8 +1390,83 @@ const Dashboard = ({
 // --- Asset List Component ---
 const AssetList = ({ assets, onAdd, onEdit, onDelete, onImport }: { assets: Asset[], onAdd: () => void, onEdit: (asset: Asset) => void, onDelete: (id: string) => void, onImport: (assets: any[]) => void }) => {
   const [search, setSearch] = useState('');
+  const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
+  const [showMassEditModal, setShowMassEditModal] = useState(false);
+  const [massEditData, setMassEditData] = useState({
+    Status: '',
+    Plant: '',
+    Location: ''
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  const handlePrintReport = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    
+    const assetsToPrint = selectedAssets.length > 0 
+      ? assets.filter(a => selectedAssets.includes(a.ID))
+      : filteredAssets;
+
+    const html = `
+      <html>
+        <head>
+          <title>Relatório de Ativos</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { color: #1e293b; text-align: center; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #e2e8f0; padding: 8px; text-align: left; }
+            th { background-color: #f8fafc; color: #475569; }
+            .status-ativo { color: #10b981; }
+            .status-inativo { color: #ef4444; }
+          </style>
+        </head>
+        <body>
+          <h1>Relatório de Ativos</h1>
+          <p>Total de ativos: ${assetsToPrint.length}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>TAG</th>
+                <th>Modelo</th>
+                <th>Descrição</th>
+                <th>Localização</th>
+                <th>Planta</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${assetsToPrint.map(a => `
+                <tr>
+                  <td>${a.Tag || '-'}</td>
+                  <td>${a.Model || '-'}</td>
+                  <td>${a.Description || '-'}</td>
+                  <td>${a.Location || '-'}</td>
+                  <td>${a.Plant || '-'}</td>
+                  <td class="${a.Status === 'Ativo' ? 'status-ativo' : 'status-inativo'}">${a.Status || '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <script>
+            window.onload = () => { window.print(); window.close(); }
+          </script>
+        </body>
+      </html>
+    `;
+    
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
+  const handleMassDelete = () => {
+    if (selectedAssets.length === 0) return;
+    if (window.confirm(`Tem certeza que deseja excluir ${selectedAssets.length} ativos selecionados?`)) {
+      selectedAssets.forEach(id => onDelete(id));
+      setSelectedAssets([]);
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1470,12 +1549,37 @@ const AssetList = ({ assets, onAdd, onEdit, onDelete, onImport }: { assets: Asse
             />
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
+            {selectedAssets.length > 0 && (
+              <>
+                <button 
+                  onClick={() => setShowMassEditModal(true)}
+                  className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-4 py-2 bg-amber-100 text-amber-700 rounded-xl text-sm font-medium hover:bg-amber-200 transition-colors"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Editar ({selectedAssets.length})</span>
+                </button>
+                <button 
+                  onClick={handleMassDelete}
+                  className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-4 py-2 bg-rose-100 text-rose-700 rounded-xl text-sm font-medium hover:bg-rose-200 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Excluir ({selectedAssets.length})</span>
+                </button>
+              </>
+            )}
+            <button 
+              onClick={handlePrintReport}
+              className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-200 transition-colors"
+            >
+              <Printer className="w-4 h-4" />
+              <span className="hidden sm:inline">Imprimir</span>
+            </button>
             <button 
               onClick={() => fileInputRef.current?.click()}
               className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-200 transition-colors"
             >
               <FileSpreadsheet className="w-4 h-4" />
-              <span>Importar</span>
+              <span className="hidden sm:inline">Importar</span>
             </button>
             <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".xlsx, .xls" />
             <button className="flex-1 sm:flex-none p-2 bg-slate-50 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors flex items-center justify-center">
@@ -1495,6 +1599,20 @@ const AssetList = ({ assets, onAdd, onEdit, onDelete, onImport }: { assets: Asse
         <table className="w-full text-left">
           <thead>
             <tr className="bg-slate-50/50">
+              <th className="px-6 py-4 w-10">
+                <input 
+                  type="checkbox" 
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  checked={selectedAssets.length === filteredAssets.length && filteredAssets.length > 0}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedAssets(filteredAssets.map(a => a.ID));
+                    } else {
+                      setSelectedAssets([]);
+                    }
+                  }}
+                />
+              </th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">TAG</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Modelo</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Descrição</th>
@@ -1506,7 +1624,21 @@ const AssetList = ({ assets, onAdd, onEdit, onDelete, onImport }: { assets: Asse
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filteredAssets.map((asset, i) => (
-              <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+              <tr key={asset.ID || i} className="hover:bg-slate-50/50 transition-colors">
+                <td className="px-6 py-4">
+                  <input 
+                    type="checkbox" 
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    checked={selectedAssets.includes(asset.ID)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedAssets([...selectedAssets, asset.ID]);
+                      } else {
+                        setSelectedAssets(selectedAssets.filter(id => id !== asset.ID));
+                      }
+                    }}
+                  />
+                </td>
                 <td className="px-6 py-4 text-sm font-medium text-slate-900">{asset.Tag}</td>
                 <td className="px-6 py-4 text-sm text-slate-600">{asset.Model}</td>
                 <td className="px-6 py-4 text-sm text-slate-600 max-w-xs truncate">{asset.Description}</td>
@@ -1546,6 +1678,98 @@ const AssetList = ({ assets, onAdd, onEdit, onDelete, onImport }: { assets: Asse
           </tbody>
         </table>
       </div>
+
+      <AnimatePresence>
+        {showMassEditModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowMassEditModal(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden p-6"
+            >
+              <h3 className="text-lg font-bold mb-4">Edição em Massa ({selectedAssets.length} ativos)</h3>
+              <p className="text-sm text-slate-500 mb-4">Preencha apenas os campos que deseja alterar para todos os ativos selecionados.</p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Status</label>
+                  <select 
+                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    value={massEditData.Status}
+                    onChange={e => setMassEditData({...massEditData, Status: e.target.value})}
+                  >
+                    <option value="">Manter original</option>
+                    <option value="Ativo">Ativo</option>
+                    <option value="Inativo">Inativo</option>
+                    <option value="Em Manutenção">Em Manutenção</option>
+                    <option value="Parado">Parado</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Planta</label>
+                  <input 
+                    type="text"
+                    placeholder="Manter original"
+                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    value={massEditData.Plant}
+                    onChange={e => setMassEditData({...massEditData, Plant: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Localização</label>
+                  <input 
+                    type="text"
+                    placeholder="Manter original"
+                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    value={massEditData.Location}
+                    onChange={e => setMassEditData({...massEditData, Location: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 mt-6">
+                <button 
+                  onClick={() => setShowMassEditModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={() => {
+                    const updates: any = {};
+                    if (massEditData.Status) updates.Status = massEditData.Status;
+                    if (massEditData.Plant) updates.Plant = massEditData.Plant;
+                    if (massEditData.Location) updates.Location = massEditData.Location;
+                    
+                    if (Object.keys(updates).length > 0) {
+                      selectedAssets.forEach(id => {
+                        const asset = assets.find(a => a.ID === id);
+                        if (asset) {
+                          onEdit({ ...asset, ...updates });
+                        }
+                      });
+                    }
+                    setShowMassEditModal(false);
+                    setSelectedAssets([]);
+                    setMassEditData({ Status: '', Plant: '', Location: '' });
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors"
+                >
+                  Aplicar Alterações
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -1557,6 +1781,7 @@ const WorkOrderList = ({
   onAdd,
   onEdit,
   onUpdateStatus,
+  onUpdateChecklist,
   onDelete
 }: { 
   wos: WorkOrder[], 
@@ -1564,6 +1789,7 @@ const WorkOrderList = ({
   onAdd: () => void,
   onEdit: (wo: WorkOrder) => void,
   onUpdateStatus: (id: string, status: string, completedAt?: string) => void,
+  onUpdateChecklist?: (id: string, checklist: {text: string, completed: boolean}[]) => void,
   onDelete: (id: string) => void
 }) => {
   const [search, setSearch] = useState('');
@@ -1864,6 +2090,47 @@ const WorkOrderList = ({
                     {viewingWO.Description}
                   </div>
                 </div>
+
+                {viewingWO.Checklist && viewingWO.Checklist.length > 0 && (
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Checklist de Execução</label>
+                    <div className="bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden">
+                      {viewingWO.Checklist.map((item, index) => (
+                        <div 
+                          key={index} 
+                          className={cn(
+                            "flex items-center gap-3 p-4 border-b border-slate-100 last:border-0 transition-colors",
+                            item.completed ? "bg-emerald-50/50" : "hover:bg-slate-100/50"
+                          )}
+                        >
+                          <button
+                            onClick={() => {
+                              if (!onUpdateChecklist) return;
+                              const newChecklist = [...viewingWO.Checklist!];
+                              newChecklist[index].completed = !newChecklist[index].completed;
+                              onUpdateChecklist(viewingWO.ID, newChecklist);
+                              setViewingWO({...viewingWO, Checklist: newChecklist});
+                            }}
+                            className={cn(
+                              "w-6 h-6 rounded-md flex items-center justify-center border-2 transition-colors",
+                              item.completed 
+                                ? "bg-emerald-500 border-emerald-500 text-white" 
+                                : "border-slate-300 text-transparent hover:border-blue-500"
+                            )}
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <span className={cn(
+                            "text-sm font-medium transition-colors",
+                            item.completed ? "text-emerald-700 line-through opacity-70" : "text-slate-700"
+                          )}>
+                            {item.text}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {viewingWO.CompletedAt && (
                   <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center space-x-3">
@@ -2320,10 +2587,12 @@ const PreventiveModule = ({
     Location: '',
     Plant: '',
     EstimatedTime: 1,
-    Collaborators: 1
+    Collaborators: 1,
+    Checklist: []
   });
 
   const [editingPlan, setEditingPlan] = useState<PreventivePlan | null>(null);
+  const [newChecklistItem, setNewChecklistItem] = useState('');
 
   const handleAssetToggle = (assetId: string) => {
     setNewPlan(prev => {
@@ -2422,7 +2691,8 @@ const PreventiveModule = ({
         Location: '',
         Plant: '',
         EstimatedTime: 1,
-        Collaborators: 1
+        Collaborators: 1,
+        Checklist: []
       });
     } catch (error) {
       console.error('Error saving plan:', error);
@@ -2511,6 +2781,9 @@ const PreventiveModule = ({
           if (plan.Collaborators !== undefined && plan.Collaborators !== null) {
             workOrder.Collaborators = Number(plan.Collaborators);
           }
+          if (plan.Checklist && plan.Checklist.length > 0) {
+            workOrder.Checklist = plan.Checklist.map(item => ({ text: item, completed: false }));
+          }
 
           count++;
           await createDocument('work-orders', workOrder, woId);
@@ -2597,7 +2870,8 @@ const PreventiveModule = ({
                           Location: plan.Location,
                           Plant: plan.Plant,
                           EstimatedTime: plan.EstimatedTime,
-                          Collaborators: plan.Collaborators
+                          Collaborators: plan.Collaborators,
+                          Checklist: plan.Checklist || []
                         });
                         setShowModal(true);
                       }}
@@ -2643,6 +2917,21 @@ const PreventiveModule = ({
                     {planAssets.length === 0 && <span className="text-xs text-slate-400 italic">Nenhum equipamento</span>}
                   </div>
                 </div>
+                
+                {plan.Checklist && plan.Checklist.length > 0 && (
+                  <div className="mt-3 space-y-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Checklist ({plan.Checklist.length} itens)</p>
+                    <ul className="text-[10px] text-slate-600 space-y-1 list-disc list-inside">
+                      {plan.Checklist.slice(0, 3).map((item, i) => (
+                        <li key={i} className="truncate">{item}</li>
+                      ))}
+                      {plan.Checklist.length > 3 && (
+                        <li className="text-slate-400 italic">+{plan.Checklist.length - 3} itens...</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap gap-2 mt-3">
                   <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[9px] font-medium">{plan.AssetType}</span>
                   <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[9px] font-medium">{plan.Location}</span>
@@ -3061,6 +3350,72 @@ const PreventiveModule = ({
                         onChange={e => setNewPlan({...newPlan, Collaborators: parseInt(e.target.value)})}
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Checklist de Manutenção</label>
+                    <div className="flex gap-2 mb-2">
+                      <input 
+                        type="text"
+                        placeholder="Adicionar item ao checklist..."
+                        className="flex-1 px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                        value={newChecklistItem}
+                        onChange={e => setNewChecklistItem(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (newChecklistItem.trim()) {
+                              setNewPlan(prev => ({
+                                ...prev,
+                                Checklist: [...(prev.Checklist || []), newChecklistItem.trim()]
+                              }));
+                              setNewChecklistItem('');
+                            }
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (newChecklistItem.trim()) {
+                            setNewPlan(prev => ({
+                              ...prev,
+                              Checklist: [...(prev.Checklist || []), newChecklistItem.trim()]
+                            }));
+                            setNewChecklistItem('');
+                          }
+                        }}
+                        className="px-4 py-2 bg-blue-100 text-blue-600 rounded-xl hover:bg-blue-200 transition-colors"
+                      >
+                        <Plus className="w-5 h-5" />
+                      </button>
+                    </div>
+                    {newPlan.Checklist && newPlan.Checklist.length > 0 && (
+                      <ul className="space-y-2 mt-3">
+                        {newPlan.Checklist.map((item, index) => (
+                          <li key={index} className="flex items-center justify-between bg-slate-50 p-3 rounded-xl text-sm text-slate-700">
+                            <div className="flex items-center gap-3">
+                              <div className="w-5 h-5 rounded border-2 border-slate-300 flex items-center justify-center">
+                                <Check className="w-3 h-3 text-transparent" />
+                              </div>
+                              <span>{item}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNewPlan(prev => ({
+                                  ...prev,
+                                  Checklist: prev.Checklist?.filter((_, i) => i !== index)
+                                }));
+                              }}
+                              className="text-red-500 hover:text-red-700 p-1"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
 
                   <button 
@@ -5142,6 +5497,7 @@ export default function App() {
                     }} 
                     onEdit={handleEditWO}
                     onUpdateStatus={(id, status, completedAt) => handleUpdateWorkOrder(id, { Status: status as any, CompletedAt: completedAt })}
+                    onUpdateChecklist={(id, checklist) => handleUpdateWorkOrder(id, { Checklist: checklist })}
                     onDelete={handleDeleteWorkOrder}
                   />
                 )}
