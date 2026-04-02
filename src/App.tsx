@@ -87,7 +87,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
-import type { Asset, WorkOrder, PreventivePlan, PreventivePlanAsset, UserProfile, Employee, UserPermissions } from './types';
+import type { Asset, WorkOrder, PreventivePlan, PreventivePlanAsset, UserProfile, Employee, UserPermissions, Notification } from './types';
 import { 
   auth, 
   db,
@@ -95,7 +95,8 @@ import {
   logout, 
   loginWithEmail,
   registerWithEmail,
-  subscribeToCollection, 
+  subscribeToCollection,
+  subscribeToUserCollection, 
   createDocument, 
   updateDocument, 
   deleteDocument,
@@ -4084,16 +4085,6 @@ export default function App() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // Subscribe to notifications
-  useEffect(() => {
-    if (!user) return;
-    const unsubscribe = subscribeToCollection('notifications', (data: any[]) => {
-      const userNotifications = data.filter(n => n.userId === user.uid);
-      setNotifications(userNotifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
-    });
-    return () => unsubscribe();
-  }, [user]);
-
   // Test connection to Firestore
   useEffect(() => {
     const testConnection = async () => {
@@ -4173,30 +4164,6 @@ export default function App() {
   const [serviceDemands, setServiceDemands] = useState<ServiceDemand[]>([]);
   const [engineeringProjects, setEngineeringProjects] = useState<EngineeringProject[]>([]);
 
-  const handleSaveImprovementProject = async (project: Partial<EngineeringProject>) => {
-    try {
-      if (project.id) {
-        await updateDocument('engineering-projects', project.id, project);
-        showToast('Projeto atualizado com sucesso!');
-      } else {
-        await createDocument('engineering-projects', { ...project, createdAt: new Date().toISOString(), createdBy: user?.uid });
-        showToast('Projeto criado com sucesso!');
-      }
-    } catch (error) {
-      console.error('Error saving improvement project:', error);
-      showToast('Erro ao salvar projeto', 'error');
-    }
-  };
-
-  const handleDeleteImprovementProject = async (projectId: string) => {
-    try {
-      await deleteDocument('engineering-projects', projectId);
-      showToast('Projeto excluído com sucesso!');
-    } catch (error) {
-      console.error('Error deleting improvement project:', error);
-      showToast('Erro ao excluir projeto', 'error');
-    }
-  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -4365,10 +4332,44 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
 
+    // Subscribe to notifications
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = subscribeToUserCollection('notifications', user.uid, (data: any[]) => {
+      setNotifications(data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+    });
+    return () => unsubscribe();
+  }, [user]);
+
   const [userProfile, setUserProfileState] = useState<UserProfile | null>(null);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [authReady, setAuthReady] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+
+  const handleSaveImprovementProject = async (project: Partial<EngineeringProject>) => {
+    try {
+      if (project.id) {
+        await updateDocument('engineering-projects', project.id, project);
+        showToast('Projeto atualizado com sucesso!');
+      } else {
+        await createDocument('engineering-projects', { ...project, createdAt: new Date().toISOString(), createdBy: user?.uid });
+        showToast('Projeto criado com sucesso!');
+      }
+    } catch (error) {
+      console.error('Error saving improvement project:', error);
+      showToast('Erro ao salvar projeto', 'error');
+    }
+  };
+
+  const handleDeleteImprovementProject = async (projectId: string) => {
+    try {
+      await deleteDocument('engineering-projects', projectId);
+      showToast('Projeto excluído com sucesso!');
+    } catch (error) {
+      console.error('Error deleting improvement project:', error);
+      showToast('Erro ao excluir projeto', 'error');
+    }
+  };
 
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'google'>('google');
   const [email, setEmail] = useState('');

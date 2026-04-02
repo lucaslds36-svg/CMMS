@@ -83,6 +83,20 @@ export const subscribeToCollection = <T>(
   });
 };
 
+export const subscribeToUserCollection = <T>(
+  collectionName: string,
+  userId: string,
+  callback: (data: T[]) => void
+) => {
+  const q = query(collection(db, collectionName), where('userId', '==', userId));
+  return onSnapshot(q, (snapshot) => {
+    const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as unknown as T));
+    callback(data);
+  }, (error) => {
+    handleFirestoreError(error, OperationType.GET, collectionName);
+  });
+};
+
 const sanitizeData = (data: any): any => {
   if (data === null || typeof data !== 'object') return data;
   if (data instanceof Timestamp || data instanceof Date) return data;
