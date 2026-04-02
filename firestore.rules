@@ -304,6 +304,13 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /notifications/{id} {
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
     match /serviceDemands/{id} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidServiceDemand(request.resource.data);

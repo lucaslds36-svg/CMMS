@@ -248,3 +248,12 @@ export interface UserProfile {
   createdAt: string;
   permissions?: UserPermissions;
 }
+
+export interface Notification {
+  id: string;
+  userId: string;
+  message: string;
+  read: boolean;
+  createdAt: string;
+  demandId?: string;
+}

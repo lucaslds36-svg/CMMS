@@ -4081,6 +4081,18 @@ export default function App() {
   });
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [loadingGlobalData, setLoadingGlobalData] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  // Subscribe to notifications
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = subscribeToCollection('notifications', (data: any[]) => {
+      const userNotifications = data.filter(n => n.userId === user.uid);
+      setNotifications(userNotifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+    });
+    return () => unsubscribe();
+  }, [user]);
 
   // Test connection to Firestore
   useEffect(() => {
@@ -5148,6 +5160,30 @@ export default function App() {
       }
 
       await updateDocument('serviceDemands', demandId, updateData);
+
+      // Send notifications
+      const notificationMessage = `O status da demanda "${demand.description}" foi alterado para "${status}".`;
+      
+      // Notify requester
+      await createDocument('notifications', {
+        userId: demand.requesterUid,
+        message: notificationMessage,
+        read: false,
+        createdAt: new Date().toISOString(),
+        demandId: demandId
+      });
+
+      // Notify planner (if exists)
+      if (demand.responsibleId) {
+        await createDocument('notifications', {
+          userId: demand.responsibleId,
+          message: notificationMessage,
+          read: false,
+          createdAt: new Date().toISOString(),
+          demandId: demandId
+        });
+      }
+
       showToast(`Status atualizado para ${status}`);
     } catch (error) {
       console.error('Error updating status:', error);
@@ -5314,6 +5350,15 @@ export default function App() {
             </h2>
           </div>
           <div className="flex items-center space-x-4">
+            <button 
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors relative"
+            >
+              <Mail className="w-6 h-6" />
+              {notifications.filter(n => !n.read).length > 0 && (
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white"></span>
+              )}
+            </button>
             {loadingGlobalData && (
               <div className="flex items-center space-x-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] sm:text-xs font-bold animate-pulse">
                 <RefreshCw className="w-3 h-3 animate-spin" />
@@ -6494,6 +6539,49 @@ export default function App() {
         onConfirm={confirmState.onConfirm}
         onCancel={() => setConfirmState(prev => ({ ...prev, show: false }))}
       />
+      
+      {/* Notifications Modal */}
+      <AnimatePresence>
+        {showNotifications && (
+          <div className="fixed inset-0 z-[200] flex items-start justify-end p-4 pt-20">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowNotifications(false)}
+              className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[80vh] flex flex-col"
+            >
+              <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+                <h3 className="font-bold text-slate-900">Notificações</h3>
+                <button onClick={() => setShowNotifications(false)}><X className="w-5 h-5 text-slate-400" /></button>
+              </div>
+              <div className="overflow-y-auto p-4 space-y-3">
+                {notifications.length === 0 && <p className="text-sm text-slate-500 text-center">Nenhuma notificação.</p>}
+                {notifications.map(n => (
+                  <div key={n.id} className={cn("p-3 rounded-xl border text-sm", n.read ? "bg-slate-50 border-slate-100" : "bg-blue-50 border-blue-100")}>
+                    <p className="text-slate-700">{n.message}</p>
+                    <p className="text-[10px] text-slate-400 mt-1">{new Date(n.createdAt).toLocaleString()}</p>
+                    {!n.read && (
+                      <button 
+                        onClick={() => updateDocument('notifications', n.id, { read: true })}
+                        className="text-[10px] font-bold text-blue-600 mt-2"
+                      >
+                        Marcar como lida
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
