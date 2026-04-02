@@ -115,6 +115,7 @@ import { getDocFromServer, doc as firestoreDoc } from 'firebase/firestore';
 import { FailureAnalysisModule } from './components/FailureAnalysisModule';
 import { DatabaseModule } from './components/DatabaseModule';
 import { ServiceManagementModule } from './components/ServiceManagementModule';
+import { PasswordManagement } from './components/PasswordManagement';
 import { ServiceDemand } from './types';
 import { EngineeringProject } from './types';
 
@@ -311,7 +312,7 @@ const Dashboard = ({
   isProcessingFile?: boolean
 }) => {
   const [loading, setLoading] = useState(false);
-  const [dashboardTab, setDashboardTab] = useState<'excel' | 'smart'>('smart');
+  const [dashboardTab, setDashboardTab] = useState<'excel' | 'smart'>('excel');
 
   const smartKPIs = useMemo(() => {
     if (!wos || wos.length === 0) return null;
@@ -5873,6 +5874,11 @@ export default function App() {
                           <span>{userProfile.email === 'lucas.lds36@gmail.com' ? 'Proprietário Master' : userProfile.role === 'admin' ? 'Administrador' : 'Usuário'}</span>
                         </div>
                       </div>
+                    </div>
+
+                    <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm space-y-6">
+                      <h4 className="text-lg font-bold text-slate-900">Gerenciamento de Senha</h4>
+                      <PasswordManagement />
                     </div>
 
                     <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm space-y-6">
