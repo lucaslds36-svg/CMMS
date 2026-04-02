@@ -1388,7 +1388,7 @@ const Dashboard = ({
 };
 
 // --- Asset List Component ---
-const AssetList = ({ assets, onAdd, onEdit, onDelete, onImport }: { assets: Asset[], onAdd: () => void, onEdit: (asset: Asset) => void, onDelete: (id: string) => void, onImport: (assets: any[]) => void }) => {
+const AssetList = ({ assets, onAdd, onEdit, onDelete, onImport, isAdmin = false, currentUserUid = '' }: { assets: Asset[], onAdd: () => void, onEdit: (asset: Asset) => void, onDelete: (id: string) => void, onImport: (assets: any[]) => void, isAdmin?: boolean, currentUserUid?: string }) => {
   const [search, setSearch] = useState('');
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [showMassEditModal, setShowMassEditModal] = useState(false);
@@ -1657,20 +1657,24 @@ const AssetList = ({ assets, onAdd, onEdit, onDelete, onImport }: { assets: Asse
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center space-x-2">
-                    <button 
-                      onClick={() => onEdit(asset)}
-                      className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
-                      title="Editar Ativo"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => onDelete(asset.ID)}
-                      className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
-                      title="Excluir Ativo"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                    {(isAdmin || asset.createdBy === currentUserUid) && (
+                      <button 
+                        onClick={() => onEdit(asset)}
+                        className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                        title="Editar Ativo"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                    )}
+                    {isAdmin && (
+                      <button 
+                        onClick={() => onDelete(asset.ID)}
+                        className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
+                        title="Excluir Ativo"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -1782,7 +1786,10 @@ const WorkOrderList = ({
   onEdit,
   onUpdateStatus,
   onUpdateChecklist,
-  onDelete
+  onDelete,
+  isPlanner = false,
+  isAdmin = false,
+  currentUserUid = ''
 }: { 
   wos: WorkOrder[], 
   assets: Asset[],
@@ -1790,7 +1797,10 @@ const WorkOrderList = ({
   onEdit: (wo: WorkOrder) => void,
   onUpdateStatus: (id: string, status: string, completedAt?: string) => void,
   onUpdateChecklist?: (id: string, checklist: {text: string, completed: boolean}[]) => void,
-  onDelete: (id: string) => void
+  onDelete: (id: string) => void,
+  isPlanner?: boolean,
+  isAdmin?: boolean,
+  currentUserUid?: string
 }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('Todas');
@@ -1912,7 +1922,7 @@ const WorkOrderList = ({
                 <td className="px-6 py-4 text-sm text-slate-600">{wo.TechnicianID || wo.AssignedTo || '-'}</td>
                 <td className="px-6 py-4">
                   <div className="flex items-center space-x-2">
-                    {wo.Status !== 'Concluída' && wo.Status !== 'Cancelada' && (
+                    {wo.Status !== 'Concluída' && wo.Status !== 'Cancelada' && isPlanner && (isAdmin || wo.requestedBy === currentUserUid) && (
                       <>
                         <button 
                           onClick={() => {
@@ -1940,20 +1950,24 @@ const WorkOrderList = ({
                     >
                       <Eye className="w-4 h-4" />
                     </button>
-                    <button 
-                      onClick={() => onEdit(wo)}
-                      className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
-                      title="Editar O.S."
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => onDelete(wo.ID)}
-                      className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
-                      title="Excluir O.S."
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                    {(isAdmin || wo.requestedBy === currentUserUid || wo.TechnicianID === currentUserUid) && (
+                      <button 
+                        onClick={() => onEdit(wo)}
+                        className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                        title="Editar O.S."
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                    )}
+                    {isPlanner && (isAdmin || wo.requestedBy === currentUserUid || wo.TechnicianID === currentUserUid) && (
+                      <button 
+                        onClick={() => onDelete(wo.ID)}
+                        className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
+                        title="Excluir O.S."
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -2218,12 +2232,18 @@ const EmployeeModule = ({
   employees, 
   onRefresh,
   onDelete,
-  showToast
+  showToast,
+  allUsers = [],
+  isAdmin = false,
+  currentUserUid = ''
 }: { 
   employees: Employee[], 
   onRefresh: () => void,
   onDelete: (id: string) => void,
-  showToast: (msg: string, type?: 'success' | 'error') => void
+  showToast: (msg: string, type?: 'success' | 'error') => void,
+  allUsers?: UserProfile[],
+  isAdmin?: boolean,
+  currentUserUid?: string
 }) => {
   const [showModal, setShowModal] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -2233,7 +2253,8 @@ const EmployeeModule = ({
     Name: '',
     Function: 'Mecânico' as 'Mecânico' | 'Eletrônico' | 'Outro',
     Status: 'Ativo' as 'Ativo' | 'Férias' | 'Afastado',
-    Type: 'Próprio' as 'Próprio' | 'Terceiro'
+    Type: 'Próprio' as 'Próprio' | 'Terceiro',
+    userUid: ''
   });
 
   useEffect(() => {
@@ -2242,14 +2263,16 @@ const EmployeeModule = ({
         Name: editingEmployee.Name,
         Function: editingEmployee.Function,
         Status: editingEmployee.Status,
-        Type: editingEmployee.Type || 'Próprio'
+        Type: editingEmployee.Type || 'Próprio',
+        userUid: editingEmployee.userUid || ''
       });
     } else {
       setFormData({
         Name: '',
         Function: 'Mecânico',
         Status: 'Ativo',
-        Type: 'Próprio'
+        Type: 'Próprio',
+        userUid: ''
       });
     }
   }, [editingEmployee]);
@@ -2262,7 +2285,7 @@ const EmployeeModule = ({
         showToast('Funcionário atualizado com sucesso!');
       } else {
         const id = `EMP-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
-        await createDocument('employees', { ...formData, ID: id }, id);
+        await createDocument('employees', { ...formData, ID: id, createdBy: currentUserUid }, id);
         showToast('Funcionário cadastrado com sucesso!');
       }
       setShowModal(false);
@@ -2327,6 +2350,16 @@ const EmployeeModule = ({
                   <td className="px-6 py-4 text-sm text-slate-600">{emp.Name}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{emp.Function}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{emp.Type}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">
+                    {emp.userUid ? (
+                      <div className="flex items-center space-x-1 text-blue-600">
+                        <UserIcon className="w-3 h-3" />
+                        <span>Vinculado</span>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400">Não vinculado</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4">
                     <span className={cn(
                       "px-2.5 py-1 rounded-full text-xs font-medium",
@@ -2339,23 +2372,27 @@ const EmployeeModule = ({
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center space-x-2">
-                      <button 
-                        onClick={() => {
-                          setEditingEmployee(emp);
-                          setShowModal(true);
-                        }}
-                        className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
-                        title="Editar"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => onDelete(emp.ID)}
-                        className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
-                        title="Excluir"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      {(isAdmin || emp.createdBy === currentUserUid) && (
+                        <button 
+                          onClick={() => {
+                            setEditingEmployee(emp);
+                            setShowModal(true);
+                          }}
+                          className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                          title="Editar"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      )}
+                      {isAdmin && (
+                        <button 
+                          onClick={() => onDelete(emp.ID)}
+                          className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
+                          title="Excluir"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -2444,6 +2481,26 @@ const EmployeeModule = ({
                       <option value="Afastado">Afastado</option>
                     </select>
                   </div>
+
+                  {isAdmin && (
+                    <div className="pt-4 border-t border-slate-100">
+                      <label className="block text-xs font-bold text-blue-600 uppercase mb-1">Vincular a Usuário do Sistema</label>
+                      <select 
+                        className="w-full px-4 py-3 bg-blue-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 font-medium"
+                        value={formData.userUid}
+                        onChange={e => setFormData({...formData, userUid: e.target.value})}
+                      >
+                        <option value="">Nenhum usuário vinculado</option>
+                        {allUsers.map(u => (
+                          <option key={u.uid} value={u.uid}>{u.displayName} ({u.email})</option>
+                        ))}
+                      </select>
+                      <p className="text-[10px] text-slate-500 mt-2 italic px-1">
+                        * Vincular a um usuário permite que esta pessoa gerencie suas próprias tarefas e ordens de serviço com base nas regras de propriedade.
+                      </p>
+                    </div>
+                  )}
+
                   <button 
                     type="submit"
                     className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all mt-4 shadow-lg shadow-blue-200"
@@ -2480,14 +2537,18 @@ const PreventiveModule = ({
   wos,
   onRefresh,
   onDelete,
-  showToast
+  showToast,
+  isAdmin = false,
+  currentUserUid = ''
 }: { 
   plans: PreventivePlan[], 
   assets: Asset[],
   wos: WorkOrder[],
   onRefresh: () => void,
   onDelete: (id: string) => void,
-  showToast: (msg: string, type?: 'success' | 'error') => void
+  showToast: (msg: string, type?: 'success' | 'error') => void,
+  isAdmin?: boolean,
+  currentUserUid?: string
 }) => {
   const [showModal, setShowModal] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
@@ -2673,7 +2734,7 @@ const PreventiveModule = ({
         showToast('Plano preventivo atualizado com sucesso!');
       } else {
         const planId = `P${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
-        await createDocument('preventive-plans', { ...planData, ID: planId }, planId);
+        await createDocument('preventive-plans', { ...planData, ID: planId, createdBy: currentUserUid }, planId);
         showToast('Plano preventivo criado com sucesso!');
       }
       setShowModal(false);
@@ -2854,37 +2915,41 @@ const PreventiveModule = ({
                 </div>
                 <div className="flex flex-col items-end space-y-1">
                   <div className="flex items-center space-x-2">
-                    <button 
-                      onClick={() => {
-                        setEditingPlan(plan);
-                        setNewPlan({
-                          AssetIDs: plan.AssetIDs || [],
-                          Task: plan.Task,
-                          Frequency: plan.Frequency,
-                          FrequencyType: plan.FrequencyType || 'dias',
-                          FrequencyValue: plan.FrequencyValue || 30,
-                          LastDone: plan.LastDone,
-                          Type: plan.Type,
-                          Criticality: plan.Criticality,
-                          AssetType: plan.AssetType,
-                          Location: plan.Location,
-                          Plant: plan.Plant,
-                          EstimatedTime: plan.EstimatedTime,
-                          Collaborators: plan.Collaborators,
-                          Checklist: plan.Checklist || []
-                        });
-                        setShowModal(true);
-                      }}
-                      className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => onDelete(plan.ID)}
-                      className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                    {(isAdmin || plan.createdBy === currentUserUid) && (
+                      <button 
+                        onClick={() => {
+                          setEditingPlan(plan);
+                          setNewPlan({
+                            AssetIDs: plan.AssetIDs || [],
+                            Task: plan.Task,
+                            Frequency: plan.Frequency,
+                            FrequencyType: plan.FrequencyType || 'dias',
+                            FrequencyValue: plan.FrequencyValue || 30,
+                            LastDone: plan.LastDone,
+                            Type: plan.Type,
+                            Criticality: plan.Criticality,
+                            AssetType: plan.AssetType,
+                            Location: plan.Location,
+                            Plant: plan.Plant,
+                            EstimatedTime: plan.EstimatedTime,
+                            Collaborators: plan.Collaborators,
+                            Checklist: plan.Checklist || []
+                          });
+                          setShowModal(true);
+                        }}
+                        className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                    )}
+                    {isAdmin && (
+                      <button 
+                        onClick={() => onDelete(plan.ID)}
+                        className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
                     <span className={cn(
                       "px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider",
                       overdue ? "bg-rose-600 text-white" : "bg-slate-100 text-slate-600"
@@ -3975,7 +4040,7 @@ export default function App() {
         await updateDocument('engineering-projects', project.id, project);
         showToast('Projeto atualizado com sucesso!');
       } else {
-        await createDocument('engineering-projects', { ...project, createdAt: new Date().toISOString() });
+        await createDocument('engineering-projects', { ...project, createdAt: new Date().toISOString(), createdBy: user?.uid });
         showToast('Projeto criado com sucesso!');
       }
     } catch (error) {
@@ -4198,7 +4263,11 @@ export default function App() {
     EndDate: '',
     EstimatedTime: 0,
     Collaborators: 0,
-    Cause: ''
+    Cause: '',
+    requestedBy: '',
+    dueDate: null,
+    scope: '',
+    needsMaterial: false
   });
 
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
@@ -4277,6 +4346,7 @@ export default function App() {
             displayName: user.displayName || 'Usuário',
             photoURL: user.photoURL || null,
             role: role,
+            workOrderRole: 'requester',
             createdAt: new Date().toISOString(),
             permissions: defaultPermissions
           };
@@ -4409,6 +4479,18 @@ export default function App() {
     }
   };
 
+  const handleUpdateUserWorkOrderRole = async (uid: string, newRole: 'planner' | 'requester') => {
+    if (!isAdmin) return;
+    try {
+      await updateDocument('users', uid, { workOrderRole: newRole });
+      const updatedUsers = allUsers.map(u => u.uid === uid ? { ...u, workOrderRole: newRole } : u);
+      setAllUsers(updatedUsers);
+      showToast('Perfil de O.S. atualizado com sucesso!');
+    } catch (error) {
+      showToast('Erro ao atualizar perfil de O.S.', 'error');
+    }
+  };
+
   const handleUpdateUserPermissions = async (uid: string, permissions: UserPermissions) => {
     if (!isAdmin) return;
     try {
@@ -4462,7 +4544,7 @@ export default function App() {
         showToast('Ativo atualizado com sucesso!');
       } else {
         const id = `A${(assets.length + 1).toString().padStart(3, '0')}`;
-        const assetToCreate = { ...newAsset, ID: id };
+        const assetToCreate = { ...newAsset, ID: id, createdBy: user?.uid };
         console.log('Creating asset:', assetToCreate);
         await createDocument('assets', assetToCreate, id);
         showToast('Ativo criado com sucesso!');
@@ -4499,7 +4581,11 @@ export default function App() {
         priority: newWO.Priority,
         startDate: newWO.StartDate || '',
         endDate: newWO.EndDate || '',
-        duration: newWO.Duration || 0
+        duration: newWO.Duration || 0,
+        requestedBy: newWO.requestedBy || user?.uid || '',
+        dueDate: newWO.dueDate || null,
+        scope: newWO.scope || '',
+        needsMaterial: newWO.needsMaterial || false
       };
 
       if (editingWO) {
@@ -4629,6 +4715,15 @@ export default function App() {
 
   const handleUpdateWorkOrder = async (id: string, updates: Partial<WorkOrder>) => {
     try {
+      const isPlanner = userProfile?.workOrderRole === 'planner' || userProfile?.role === 'admin';
+      
+      if (!isPlanner) {
+        delete updates.Status;
+        delete updates.dueDate;
+        delete updates.scope;
+        delete updates.needsMaterial;
+      }
+
       if (updates.Status === 'Concluída') {
         updates.CompletedAt = updates.CompletedAt || new Date().toISOString().split('T')[0];
       }
@@ -4891,6 +4986,16 @@ export default function App() {
     } catch (error) {
       console.error('Error saving service demand:', error);
       showToast('Erro ao salvar demanda', 'error');
+    }
+  };
+
+  const handleDeleteServiceDemand = async (demandId: string) => {
+    try {
+      await deleteDocument('serviceDemands', demandId);
+      showToast('Demanda excluída com sucesso!');
+    } catch (error) {
+      console.error('Error deleting service demand:', error);
+      showToast('Erro ao excluir demanda', 'error');
     }
   };
 
@@ -5388,35 +5493,58 @@ export default function App() {
                               </td>
                               <td className="px-6 py-4">
                                 <div className="flex flex-wrap gap-1 max-w-xs">
-                                  {Object.entries(u.permissions || {}).map(([key, val]) => (
-                                    <button
-                                      key={key}
-                                      onClick={() => {
-                                        if (u.email === 'lucas.lds36@gmail.com') return;
-                                        const newPerms = { ...u.permissions, [key]: !val } as UserPermissions;
-                                        handleUpdateUserPermissions(u.uid, newPerms);
-                                      }}
-                                      disabled={u.email === 'lucas.lds36@gmail.com'}
-                                      className={cn(
-                                        "px-2 py-0.5 rounded text-[9px] font-bold uppercase transition-colors",
-                                        val ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-400"
-                                      )}
-                                    >
-                                      {key}
-                                    </button>
-                                  ))}
+                                  {(Object.entries({
+                                    dashboard: 'Dashboard',
+                                    assets: 'Ativos',
+                                    workOrders: 'Ordens de Serviço',
+                                    preventive: 'Preventiva',
+                                    employees: 'Funcionários',
+                                    failureAnalysis: 'Análise de Falhas',
+                                    database: 'Banco de Dados',
+                                    users: 'Usuários',
+                                    serviceManagement: 'Solicitações'
+                                  }) as [keyof UserPermissions, string][]).map(([key, label]) => {
+                                    const val = u.permissions ? !!u.permissions[key] : false;
+                                    return (
+                                      <button
+                                        key={key}
+                                        onClick={() => {
+                                          if (u.email === 'lucas.lds36@gmail.com') return;
+                                          const newPerms = { ...u.permissions, [key]: !val } as UserPermissions;
+                                          handleUpdateUserPermissions(u.uid, newPerms);
+                                        }}
+                                        disabled={u.email === 'lucas.lds36@gmail.com'}
+                                        className={cn(
+                                          "px-2 py-0.5 rounded text-[9px] font-bold uppercase transition-colors",
+                                          val ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-400"
+                                        )}
+                                      >
+                                        {label}
+                                      </button>
+                                    );
+                                  })}
                                 </div>
                               </td>
-                              <td className="px-6 py-4 text-right">
+                              <td className="px-6 py-4 text-right space-y-2">
                                 {u.email !== 'lucas.lds36@gmail.com' && (
-                                  <select 
-                                    className="text-xs border-none bg-slate-100 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500"
-                                    value={u.role}
-                                    onChange={(e) => handleUpdateUserRole(u.uid, e.target.value as any)}
-                                  >
-                                    <option value="user">Tornar Executante</option>
-                                    <option value="admin">Tornar Master</option>
-                                  </select>
+                                  <>
+                                    <select 
+                                      className="block w-full text-xs border-none bg-slate-100 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500"
+                                      value={u.role}
+                                      onChange={(e) => handleUpdateUserRole(u.uid, e.target.value as any)}
+                                    >
+                                      <option value="user">Tornar Executante</option>
+                                      <option value="admin">Tornar Master</option>
+                                    </select>
+                                    <select 
+                                      className="block w-full text-xs border-none bg-slate-100 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500"
+                                      value={u.workOrderRole || 'requester'}
+                                      onChange={(e) => handleUpdateUserWorkOrderRole(u.uid, e.target.value as any)}
+                                    >
+                                      <option value="requester">O.S. Solicitante</option>
+                                      <option value="planner">O.S. Planejador</option>
+                                    </select>
+                                  </>
                                 )}
                               </td>
                             </tr>
@@ -5429,6 +5557,8 @@ export default function App() {
                 {activeTab === 'assets' && (
                   <AssetList 
                     assets={assets} 
+                    isAdmin={isAdmin}
+                    currentUserUid={user?.uid}
                     onImport={async (importedAssets) => {
                       // Use batching to improve performance for large imports
                       const batchSize = 100;
@@ -5445,7 +5575,8 @@ export default function App() {
                             Manufacturer: asset.Manufacturer,
                             Status: asset.Status || 'Ativo',
                             InstallDate: asset.InstallDate || new Date().toISOString(),
-                            ID: id
+                            ID: id,
+                            createdBy: user?.uid
                           }, id);
                         }));
                       }
@@ -5473,6 +5604,9 @@ export default function App() {
                   <WorkOrderList 
                     wos={wos} 
                     assets={assets}
+                    isPlanner={userProfile?.workOrderRole === 'planner' || userProfile?.role === 'admin'}
+                    isAdmin={isAdmin}
+                    currentUserUid={user?.uid}
                     onAdd={() => {
                       setEditingWO(null);
                       setNewWO({
@@ -5491,7 +5625,11 @@ export default function App() {
                         Collaborators: 0,
                         Duration: 0,
                         PlanID: '',
-                        Cause: ''
+                        Cause: '',
+                        requestedBy: user?.uid || '',
+                        dueDate: null,
+                        scope: '',
+                        needsMaterial: false
                       });
                       setShowWOModal(true);
                     }} 
@@ -5506,6 +5644,8 @@ export default function App() {
                     plans={plans} 
                     assets={assets} 
                     wos={wos}
+                    isAdmin={isAdmin}
+                    currentUserUid={user?.uid}
                     onRefresh={() => {}} // Handled by real-time
                     onDelete={handleDeletePreventive}
                     showToast={showToast}
@@ -5534,6 +5674,7 @@ export default function App() {
                     employees={employees}
                     userProfile={userProfile}
                     onSave={handleSaveServiceDemand}
+                    onDelete={handleDeleteServiceDemand}
                     onUpdateStatus={handleUpdateServiceDemandStatus}
                     onAddScopeChange={handleAddServiceDemandScopeChange}
                     showToast={showToast}
@@ -5542,6 +5683,7 @@ export default function App() {
                 {activeTab === 'improvement-management' && (
                   <ImprovementManagementModule 
                     userProfile={userProfile}
+                    employees={employees}
                     onSave={handleSaveImprovementProject}
                     onDelete={handleDeleteImprovementProject}
                     showToast={showToast}
@@ -5567,6 +5709,9 @@ export default function App() {
                 {activeTab === 'employees' && (
                   <EmployeeModule 
                     employees={employees}
+                    allUsers={allUsers}
+                    isAdmin={isAdmin}
+                    currentUserUid={user?.uid}
                     onRefresh={() => {}} // Handled by real-time
                     onDelete={handleDeleteEmployee}
                     showToast={showToast}
@@ -6124,6 +6269,60 @@ export default function App() {
                         onChange={e => setNewWO({...newWO, PlanID: e.target.value})}
                       />
                     </div>
+                  </div>
+
+                  {editingWO && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Status</label>
+                        <select 
+                          disabled={userProfile?.workOrderRole !== 'planner' && userProfile?.role !== 'admin'}
+                          className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                          value={newWO.Status || 'Em Aberto'}
+                          onChange={e => setNewWO({...newWO, Status: e.target.value as any})}
+                        >
+                          <option value="Em Aberto">Em Aberto</option>
+                          <option value="Em Execução">Em Execução</option>
+                          <option value="Concluída">Concluída</option>
+                          <option value="Cancelada">Cancelada</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Data Limite (Due Date)</label>
+                        <input 
+                          type="date"
+                          disabled={userProfile?.workOrderRole !== 'planner' && userProfile?.role !== 'admin'}
+                          className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                          value={newWO.dueDate || ''}
+                          onChange={e => setNewWO({...newWO, dueDate: e.target.value})}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Escopo (Scope)</label>
+                    <textarea 
+                      disabled={userProfile?.workOrderRole !== 'planner' && userProfile?.role !== 'admin'}
+                      placeholder="Escopo do serviço..."
+                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                      value={newWO.scope || ''}
+                      onChange={e => setNewWO({...newWO, scope: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <input 
+                      type="checkbox"
+                      id="needsMaterial"
+                      disabled={userProfile?.workOrderRole !== 'planner' && userProfile?.role !== 'admin'}
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 disabled:opacity-50"
+                      checked={newWO.needsMaterial || false}
+                      onChange={e => setNewWO({...newWO, needsMaterial: e.target.checked})}
+                    />
+                    <label htmlFor="needsMaterial" className="text-sm font-bold text-slate-700">
+                      Necessita Material
+                    </label>
                   </div>
 
                   <button 

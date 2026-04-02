@@ -47,6 +47,7 @@ interface ServiceManagementModuleProps {
   employees: Employee[];
   userProfile: UserProfile | null;
   onSave: (demand: Partial<ServiceDemand>) => Promise<void>;
+  onDelete?: (demandId: string) => Promise<void>;
   onUpdateStatus: (demandId: string, status: ServiceDemand['status']) => Promise<void>;
   onAddScopeChange: (demandId: string, description: string) => Promise<void>;
   showToast: (msg: string, type?: 'success' | 'error') => void;
@@ -57,6 +58,7 @@ export const ServiceManagementModule = ({
   employees,
   userProfile,
   onSave,
+  onDelete,
   onUpdateStatus,
   onAddScopeChange,
   showToast
@@ -120,6 +122,7 @@ export const ServiceManagementModule = ({
         requesterUid: userProfile.uid,
         requesterName: userProfile.displayName || 'Usuário',
         responsibleName: responsible?.Name || '',
+        responsibleId: responsible?.userUid || formData.responsibleId,
         status: 'Não Iniciado',
         openedAt: new Date().toISOString(),
         scopeChanges: [],
@@ -477,23 +480,33 @@ export const ServiceManagementModule = ({
                         >
                           <Eye className="w-4 h-4" />
                         </button>
-                        <button 
-                          onClick={() => {
-                            setEditingDemand(demand);
-                            setIsEditing(true);
-                          }}
-                          className="p-1.5 bg-amber-500 text-white rounded hover:bg-amber-600 transition-all"
-                          title="Editar"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => {/* Implement delete logic */}}
-                          className="p-1.5 bg-rose-600 text-white rounded hover:bg-rose-700 transition-all"
-                          title="Excluir"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {(userProfile?.role === 'admin' || demand.requesterUid === userProfile?.uid || demand.responsibleId === userProfile?.uid) && (
+                          <>
+                            <button 
+                              onClick={() => {
+                                setEditingDemand(demand);
+                                setIsEditing(true);
+                              }}
+                              className="p-1.5 bg-amber-500 text-white rounded hover:bg-amber-600 transition-all"
+                              title="Editar"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            {onDelete && (
+                              <button 
+                                onClick={() => {
+                                  if (window.confirm('Tem certeza que deseja excluir esta demanda?')) {
+                                    onDelete(demand.id);
+                                  }
+                                }}
+                                className="p-1.5 bg-rose-600 text-white rounded hover:bg-rose-700 transition-all"
+                                title="Excluir"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -598,10 +611,15 @@ export const ServiceManagementModule = ({
                         {employees
                           .filter(emp => emp.Type === formData.executorType)
                           .map(emp => (
-                            <option key={emp.ID} value={emp.ID}>{emp.Name}</option>
+                            <option key={emp.ID} value={emp.ID}>
+                              {emp.Name} {emp.userUid ? '✅' : '⚠️ (Sem acesso)'}
+                            </option>
                           ))
                         }
                       </select>
+                      <p className="text-[10px] text-slate-500 mt-1 italic px-1">
+                        * Apenas responsáveis com ✅ poderão gerenciar esta demanda no sistema.
+                      </p>
                     </div>
 
                     <div>

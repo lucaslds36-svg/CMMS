@@ -17,10 +17,11 @@ import {
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import type { EngineeringProject, UserProfile } from '../types';
+import type { EngineeringProject, UserProfile, Employee } from '../types';
 
 interface ImprovementManagementModuleProps {
   userProfile: UserProfile | null;
+  employees: Employee[];
   onSave: (project: Partial<EngineeringProject>) => Promise<void>;
   onDelete: (projectId: string) => Promise<void>;
   showToast: (msg: string, type?: 'success' | 'error') => void;
@@ -28,6 +29,7 @@ interface ImprovementManagementModuleProps {
 
 export const ImprovementManagementModule = ({
   userProfile,
+  employees,
   onSave,
   onDelete,
   showToast
@@ -63,7 +65,8 @@ export const ImprovementManagementModule = ({
       testStatus: newProject.testStatus || 'Não iniciado',
       standardize: newProject.standardize || false,
       createdAt: newProject.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      createdBy: newProject.createdBy || userProfile?.uid
     } as EngineeringProject);
     setShowNewModal(false);
     setSelectedProject(null);
@@ -564,12 +567,30 @@ export const ImprovementManagementModule = ({
                 value={newProject.plannedTestDays || ''}
                 onChange={e => setNewProject({...newProject, plannedTestDays: parseInt(e.target.value)})}
               />
-              <input 
-                placeholder="Responsável" 
-                className="w-full p-3 border rounded-xl"
-                value={newProject.responsible || ''}
-                onChange={e => setNewProject({...newProject, responsible: e.target.value})}
-              />
+              <div className="space-y-1">
+                <select 
+                  className="w-full p-3 border rounded-xl"
+                  value={newProject.responsibleId || ''}
+                  onChange={e => {
+                    const emp = employees.find(emp => emp.id === e.target.value);
+                    setNewProject({
+                      ...newProject, 
+                      responsibleId: emp?.userUid || e.target.value, 
+                      responsible: emp?.Name || '' 
+                    });
+                  }}
+                >
+                  <option value="">Selecione o Responsável</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.Name} {emp.userUid ? '✅' : '⚠️ (Sem acesso ao sistema)'}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-500 italic px-1">
+                  * Apenas responsáveis com o ícone ✅ poderão editar este projeto no sistema.
+                </p>
+              </div>
             </div>
             <div className="flex justify-end gap-2 shrink-0 pt-2 border-t border-slate-100">
               <button onClick={() => {setShowNewModal(false); setSelectedProject(null); setModalMode(null);}} className="px-4 py-2 text-slate-600">
@@ -613,15 +634,23 @@ export const ImprovementManagementModule = ({
                     >
                       <Eye className="w-4 h-4" />
                     </button>
-                    <button 
-                      className="p-1.5 bg-amber-500 text-white rounded hover:bg-amber-600"
-                      onClick={() => openModal(project, 'edit')}
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button className="p-1.5 bg-rose-500 text-white rounded hover:bg-rose-600" onClick={() => onDelete(project.id)}>
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {(userProfile?.role === 'admin' || project.createdBy === userProfile?.uid || project.responsibleId === userProfile?.uid) && (
+                      <>
+                        <button 
+                          className="p-1.5 bg-amber-500 text-white rounded hover:bg-amber-600"
+                          onClick={() => openModal(project, 'edit')}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button className="p-1.5 bg-rose-500 text-white rounded hover:bg-rose-600" onClick={() => {
+                          if (window.confirm('Tem certeza que deseja excluir este projeto?')) {
+                            onDelete(project.id);
+                          }
+                        }}>
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>

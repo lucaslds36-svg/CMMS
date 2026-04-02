@@ -8,6 +8,7 @@ export interface Asset {
   Plant: string;
   Manufacturer: string;
   InstallDate: string;
+  createdBy?: string;
 }
 
 export interface WorkOrder {
@@ -42,6 +43,10 @@ export interface WorkOrder {
   duration?: number;
   Cause?: string;
   Checklist?: { text: string; completed: boolean }[];
+  requestedBy?: string;
+  dueDate?: string | null;
+  scope?: string;
+  needsMaterial?: boolean;
 }
 
 export interface PreventivePlan {
@@ -69,14 +74,18 @@ export interface PreventivePlan {
   EstimatedTime: number;
   Collaborators: number;
   Checklist?: string[];
+  createdBy?: string;
 }
 
 export interface Employee {
+  id: string;
   ID: string;
   Name: string;
   Function: 'Mecânico' | 'Eletrônico' | 'Outro';
   Status: 'Ativo' | 'Férias' | 'Afastado';
   Type: 'Próprio' | 'Terceiro';
+  userUid?: string;
+  createdBy?: string;
 }
 
 export interface ServiceDemandScopeChange {
@@ -136,6 +145,7 @@ export interface EngineeringProject {
   objective: string;
   indicator: string;
   responsible: string;
+  responsibleId?: string;
   status: 'Planejado' | 'Em execução' | 'Em teste' | 'Validado' | 'Cancelado';
   startDate: string; // ISO string
   testStartDate?: string; // ISO string
@@ -151,6 +161,7 @@ export interface EngineeringProject {
   indicators?: EngineeringIndicator[];
   comments?: EngineeringComment[];
   statusHistory?: EngineeringStatusChange[];
+  createdBy?: string;
 }
 
 export interface ServiceDemandStatusChange {
@@ -180,6 +191,7 @@ export interface Requisition {
   daysRemaining: number;
   status: 'ATRASADO' | 'EM DIA' | 'AGUARDANDO' | 'TOTAL' | 'PARCIAL';
   createdAt: string;
+  createdBy?: string;
 }
 
 export interface ServiceDemand {
@@ -222,6 +234,7 @@ export interface UserProfile {
   displayName: string;
   photoURL: string | null;
   role: 'admin' | 'user';
+  workOrderRole?: 'planner' | 'requester';
   createdAt: string;
   permissions?: UserPermissions;
 }
