@@ -87,7 +87,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
-import type { Asset, WorkOrder, PreventivePlan, UserProfile, Employee, UserPermissions } from './types';
+import type { Asset, WorkOrder, PreventivePlan, PreventivePlanAsset, UserProfile, Employee, UserPermissions } from './types';
 import { 
   auth, 
   db,
@@ -2635,6 +2635,15 @@ const PreventiveModule = ({
     }), ...dayPlans];
   };
 
+  const isOverdue = (date: string | null | undefined) => {
+    if (!date) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueDate = new Date(date);
+    dueDate.setHours(0, 0, 0, 0);
+    return dueDate < today;
+  };
+
   const [newPlan, setNewPlan] = useState({
     AssetIDs: [] as string[],
     Task: '',
@@ -2649,7 +2658,10 @@ const PreventiveModule = ({
     Plant: '',
     EstimatedTime: 1,
     Collaborators: 1,
-    Checklist: []
+    Checklist: [] as string[],
+    scheduleType: 'global' as 'global' | 'individual',
+    globalDate: new Date().toISOString().split('T')[0] as string | null,
+    assets: [] as PreventivePlanAsset[]
   });
 
   const [editingPlan, setEditingPlan] = useState<PreventivePlan | null>(null);
@@ -2706,20 +2718,35 @@ const PreventiveModule = ({
       return;
     }
 
+    const planAssets: PreventivePlanAsset[] = newPlan.AssetIDs.map(assetId => {
+      const existingAsset = newPlan.assets.find(a => a.assetId === assetId);
+      return {
+        assetId,
+        nextDate: newPlan.scheduleType === 'global' 
+          ? (newPlan.globalDate || calculateNextDue(newPlan.LastDone, newPlan.Frequency, newPlan.FrequencyType, newPlan.FrequencyValue))
+          : (existingAsset?.nextDate || calculateNextDue(newPlan.LastDone, newPlan.Frequency, newPlan.FrequencyType, newPlan.FrequencyValue)),
+        lastDate: existingAsset?.lastDate || newPlan.LastDone
+      };
+    });
+
     const assetLastDones: Record<string, string> = {};
     const assetNextDues: Record<string, string> = {};
     
-    newPlan.AssetIDs.forEach(assetId => {
-      assetLastDones[assetId] = newPlan.LastDone;
-      assetNextDues[assetId] = calculateNextDue(newPlan.LastDone, newPlan.Frequency, newPlan.FrequencyType, newPlan.FrequencyValue);
+    planAssets.forEach(asset => {
+      assetLastDones[asset.assetId] = asset.lastDate || newPlan.LastDone;
+      assetNextDues[asset.assetId] = asset.nextDate;
     });
 
-    const nextDue = calculateNextDue(newPlan.LastDone, newPlan.Frequency, newPlan.FrequencyType, newPlan.FrequencyValue);
+    const nextDue = newPlan.scheduleType === 'global' 
+      ? (newPlan.globalDate || calculateNextDue(newPlan.LastDone, newPlan.Frequency, newPlan.FrequencyType, newPlan.FrequencyValue))
+      : (planAssets[0]?.nextDate || calculateNextDue(newPlan.LastDone, newPlan.Frequency, newPlan.FrequencyType, newPlan.FrequencyValue));
+
     const planData = {
       ...newPlan,
       AssetLastDones: assetLastDones,
       AssetNextDues: assetNextDues,
       NextDue: nextDue,
+      assets: planAssets,
       // Lowercase aliases for normalization
       assetId: newPlan.AssetIDs[0] || '',
       frequencyType: newPlan.FrequencyType,
@@ -2753,7 +2780,10 @@ const PreventiveModule = ({
         Plant: '',
         EstimatedTime: 1,
         Collaborators: 1,
-        Checklist: []
+        Checklist: [],
+        scheduleType: 'global',
+        globalDate: new Date().toISOString().split('T')[0],
+        assets: []
       });
     } catch (error) {
       console.error('Error saving plan:', error);
@@ -2761,9 +2791,6 @@ const PreventiveModule = ({
     }
   };
 
-  const isOverdue = (nextDue: string) => {
-    return new Date(nextDue) < new Date();
-  };
 
   const handleOpenGenerationModal = () => {
     const initialSelection: Record<string, string[]> = {};
@@ -2862,6 +2889,38 @@ const PreventiveModule = ({
     }
   };
 
+  const plansWithStatus = plans.map(plan => {
+    // Compatibility conversion
+    const scheduleType = plan.scheduleType || 'global';
+    const globalDate = plan.globalDate || plan.NextDue || plan.nextExecutionDate;
+    const rawAssets = plan.assets || [];
+    
+    // If assets don't exist but AssetIDs do, populate them
+    let assetsList = rawAssets;
+    if (assetsList.length === 0 && plan.AssetIDs && plan.AssetIDs.length > 0) {
+      assetsList = plan.AssetIDs.map(id => ({
+        assetId: id,
+        nextDate: plan.AssetNextDues?.[id] || plan.NextDue || plan.nextExecutionDate || '',
+        lastDate: plan.AssetLastDones?.[id] || plan.LastDone || plan.lastExecutionDate || null
+      }));
+    }
+
+    let overdueCount = 0;
+    const updatedAssets = assetsList.map(asset => {
+      const overdue = isOverdue(asset.nextDate);
+      if (overdue) overdueCount++;
+      return { ...asset, isOverdue: overdue };
+    });
+
+    return {
+      ...plan,
+      scheduleType,
+      globalDate,
+      assets: updatedAssets,
+      overdueCount
+    };
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -2892,7 +2951,7 @@ const PreventiveModule = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {plans.map((plan, i) => {
+        {plansWithStatus.map((plan, i) => {
           const planAssets = assets.filter(a => plan.AssetIDs?.includes(a.ID));
           const overdue = isOverdue(plan.NextDue);
           
@@ -2903,18 +2962,23 @@ const PreventiveModule = ({
               animate={{ opacity: 1, scale: 1 }}
               className={cn(
                 "bg-white p-6 rounded-2xl shadow-sm border transition-all",
-                overdue ? "border-rose-200 bg-rose-50/30" : "border-slate-100"
+                overdue || plan.overdueCount > 0 ? "border-rose-200 bg-rose-50/30" : "border-slate-100"
               )}
             >
               <div className="flex justify-between items-start mb-4">
                 <div className={cn(
                   "p-2 rounded-lg",
-                  overdue ? "bg-rose-100 text-rose-600" : "bg-blue-100 text-blue-600"
+                  overdue || plan.overdueCount > 0 ? "bg-rose-100 text-rose-600" : "bg-blue-100 text-blue-600"
                 )}>
                   <Calendar className="w-5 h-5" />
                 </div>
                 <div className="flex flex-col items-end space-y-1">
                   <div className="flex items-center space-x-2">
+                    {plan.overdueCount > 0 && (
+                      <span className="badge-red">
+                        {plan.overdueCount} atrasadas
+                      </span>
+                    )}
                     {(isAdmin || plan.createdBy === currentUserUid) && (
                       <button 
                         onClick={() => {
@@ -2933,7 +2997,10 @@ const PreventiveModule = ({
                             Plant: plan.Plant,
                             EstimatedTime: plan.EstimatedTime,
                             Collaborators: plan.Collaborators,
-                            Checklist: plan.Checklist || []
+                            Checklist: plan.Checklist || [],
+                            scheduleType: plan.scheduleType || 'global',
+                            globalDate: plan.globalDate || plan.NextDue,
+                            assets: plan.assets.map(a => ({ assetId: a.assetId, nextDate: a.nextDate, lastDate: a.lastDate }))
                           });
                           setShowModal(true);
                         }}
@@ -3018,10 +3085,16 @@ const PreventiveModule = ({
                         const asset = assets.find(a => a.ID === assetId);
                         const nextDue = plan.AssetNextDues?.[assetId] || plan.NextDue;
                         const overdue = isOverdue(nextDue);
+                        const assetInPlan = plan.assets?.find(a => a.assetId === assetId);
+                        const isAssetOverdue = assetInPlan?.isOverdue || overdue;
+
                         return (
                           <div key={assetId} className="flex justify-between items-center text-[10px] p-1.5 bg-slate-50 rounded-lg">
-                            <span className="font-medium text-slate-600 truncate max-w-[100px]">{asset?.Tag}</span>
-                            <span className={cn("font-bold", overdue ? "text-rose-600" : "text-blue-600")}>
+                            <div className="flex flex-col">
+                              <span className="font-medium text-slate-600 truncate max-w-[100px]">{asset?.Tag}</span>
+                              {isAssetOverdue && <span className="text-red text-[8px]">Atrasado</span>}
+                            </div>
+                            <span className={cn("font-bold", isAssetOverdue ? "text-rose-600" : "text-blue-600")}>
                               {new Date(nextDue).toLocaleDateString('pt-BR')}
                             </span>
                           </div>
@@ -3237,6 +3310,18 @@ const PreventiveModule = ({
                   </div>
 
                   <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Tipo de Agendamento</label>
+                    <select 
+                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                      value={newPlan.scheduleType}
+                      onChange={e => setNewPlan({...newPlan, scheduleType: e.target.value as any})}
+                    >
+                      <option value="global">Data única para todos</option>
+                      <option value="individual">Datas por equipamento</option>
+                    </select>
+                  </div>
+
+                  <div>
                     <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Equipamentos (Agrupados por Modelo)</label>
                     <div className="space-y-2 max-h-60 overflow-y-auto p-3 bg-slate-50 rounded-xl border border-slate-100">
                       {Object.entries(assetsByModel).map(([model, modelAssets]) => {
@@ -3381,15 +3466,56 @@ const PreventiveModule = ({
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Próxima Manutenção</label>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Próxima Manutenção {newPlan.scheduleType === 'global' ? '(Global)' : ''}</label>
                       <input 
-                        disabled
+                        required={newPlan.scheduleType === 'global'}
+                        disabled={newPlan.scheduleType !== 'global'}
                         type="date"
-                        className="w-full px-4 py-3 bg-slate-100 border-none rounded-xl text-sm text-slate-500 cursor-not-allowed"
-                        value={calculateNextDue(newPlan.LastDone, newPlan.Frequency, newPlan.FrequencyType, newPlan.FrequencyValue)}
+                        className={cn(
+                          "w-full px-4 py-3 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500",
+                          newPlan.scheduleType === 'global' ? "bg-slate-50" : "bg-slate-100 text-slate-500 cursor-not-allowed"
+                        )}
+                        value={newPlan.scheduleType === 'global' ? (newPlan.globalDate || '') : ''}
+                        onChange={e => setNewPlan({...newPlan, globalDate: e.target.value})}
                       />
                     </div>
                   </div>
+
+                  {newPlan.scheduleType === 'individual' && (
+                    <div className="space-y-3 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+                      <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Datas Individuais</p>
+                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                        {newPlan.AssetIDs.map(assetId => {
+                          const asset = assets.find(a => a.ID === assetId);
+                          const assetData = newPlan.assets.find(a => a.assetId === assetId);
+                          return (
+                            <div key={assetId} className="flex items-center justify-between gap-3 p-2 bg-white rounded-xl border border-blue-100">
+                              <span className="text-xs font-bold text-slate-700 truncate">{asset?.Tag}</span>
+                              <input 
+                                type="date"
+                                required
+                                className="px-2 py-1 bg-slate-50 border-none rounded-lg text-xs focus:ring-2 focus:ring-blue-500"
+                                value={assetData?.nextDate || ''}
+                                onChange={e => {
+                                  const newAssets = [...newPlan.assets];
+                                  const index = newAssets.findIndex(a => a.assetId === assetId);
+                                  if (index >= 0) {
+                                    newAssets[index] = { ...newAssets[index], nextDate: e.target.value };
+                                  } else {
+                                    newAssets.push({ assetId, nextDate: e.target.value, lastDate: newPlan.LastDone });
+                                  }
+                                  setNewPlan({ ...newPlan, assets: newAssets });
+                                }}
+                              />
+                            </div>
+                          );
+                        })}
+                        {newPlan.AssetIDs.length === 0 && (
+                          <p className="text-xs text-slate-400 italic text-center py-4">Selecione equipamentos acima para definir datas</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>

@@ -49,6 +49,12 @@ export interface WorkOrder {
   needsMaterial?: boolean;
 }
 
+export interface PreventivePlanAsset {
+  assetId: string;
+  nextDate: string;
+  lastDate: string | null;
+}
+
 export interface PreventivePlan {
   ID: string;
   AssetID?: string; // Single asset ID for simpler relationship
@@ -75,6 +81,9 @@ export interface PreventivePlan {
   Collaborators: number;
   Checklist?: string[];
   createdBy?: string;
+  scheduleType?: 'global' | 'individual';
+  globalDate?: string | null;
+  assets?: PreventivePlanAsset[];
 }
 
 export interface Employee {

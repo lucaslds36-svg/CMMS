@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
@@ -69,6 +69,15 @@ export const ServiceManagementModule = ({
   const [search, setSearch] = useState('');
   const [filterArea, setFilterArea] = useState<string>('Todas');
   const [filterStatus, setFilterStatus] = useState<string>('Todos');
+
+  useEffect(() => {
+    if (editingDemand && !isEditing) {
+      const updatedDemand = demands.find(d => d.id === editingDemand.id);
+      if (updatedDemand) {
+        setEditingDemand(updatedDemand);
+      }
+    }
+  }, [demands, editingDemand?.id, isEditing]);
 
   const [formData, setFormData] = useState<Partial<ServiceDemand>>({
     description: '',
@@ -921,10 +930,36 @@ export const ServiceManagementModule = ({
                           id="new-scope-change"
                         />
                         <button 
-                          onClick={() => {
+                          onClick={async () => {
                             const input = document.getElementById('new-scope-change') as HTMLInputElement;
-                            if (input && input.value) {
-                              onAddScopeChange(editingDemand.id, input.value);
+                            if (input && input.value && editingDemand) {
+                              const description = input.value;
+                              
+                              const newScopeEntry = {
+                                id: Math.random().toString(36).substr(2, 9),
+                                description,
+                                date: new Date().toISOString(),
+                                user: userProfile?.displayName || 'Usuário'
+                              };
+                              
+                              const updatedDemand = {
+                                ...editingDemand,
+                                scopeChanges: [...(Array.isArray(editingDemand.scopeChanges) ? editingDemand.scopeChanges : []), newScopeEntry]
+                              };
+                              
+                              // Update local state immediately
+                              setEditingDemand(updatedDemand);
+                              
+                              // If not in edit mode, persist immediately
+                              if (!isEditing) {
+                                try {
+                                  await onAddScopeChange(editingDemand.id, description);
+                                } catch (error) {
+                                  console.error('Error adding scope change:', error);
+                                  showToast('Erro ao adicionar alteração de escopo', 'error');
+                                }
+                              }
+                              
                               input.value = '';
                             }
                           }}

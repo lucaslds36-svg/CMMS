@@ -96,7 +96,7 @@ service cloud.firestore {
     }
 
     function isValidPreventivePlan(data) {
-      return hasOnlyAllowedFields(['ID', 'AssetID', 'AssetIDs', 'AssetLastDones', 'AssetNextDues', 'Task', 'Frequency', 'FrequencyType', 'FrequencyValue', 'LastDone', 'NextDue', 'Type', 'Criticality', 'AssetType', 'Location', 'Plant', 'EstimatedTime', 'Collaborators', 'id', 'createdBy']) &&
+      return hasOnlyAllowedFields(['ID', 'AssetID', 'assetId', 'AssetIDs', 'AssetLastDones', 'AssetNextDues', 'Task', 'Frequency', 'FrequencyType', 'frequencyType', 'FrequencyValue', 'frequencyValue', 'LastDone', 'NextDue', 'lastExecutionDate', 'nextExecutionDate', 'Type', 'Criticality', 'AssetType', 'Location', 'Plant', 'EstimatedTime', 'Collaborators', 'Checklist', 'id', 'createdBy', 'scheduleType', 'globalDate', 'assets']) &&
              data.ID is string && data.AssetIDs is list &&
              (data.AssetID is string || !('AssetID' in data)) &&
              (data.AssetLastDones is map || !('AssetLastDones' in data)) &&
@@ -105,7 +105,11 @@ service cloud.firestore {
              (data.FrequencyType in ['dias', 'horas'] || !('FrequencyType' in data)) &&
              (data.FrequencyValue is number || !('FrequencyValue' in data)) &&
              data.Criticality in ['Alta', 'Média', 'Baixa'] &&
-             data.EstimatedTime is number && data.Collaborators is number;
+             data.EstimatedTime is number && data.Collaborators is number &&
+             (!('scheduleType' in data) || data.scheduleType in ['global', 'individual']) &&
+             (!('globalDate' in data) || data.globalDate is string || data.globalDate == null) &&
+             (!('assets' in data) || data.assets is list) &&
+             (!('Checklist' in data) || data.Checklist is list);
     }
 
     function isValidUser(data) {
@@ -119,12 +123,12 @@ service cloud.firestore {
     }
 
     function isValidServiceDemand(data) {
-      return hasOnlyAllowedFields(['id', 'openedAt', 'requesterUid', 'requesterName', 'description', 'area', 'executorType', 'responsibleId', 'responsibleName', 'priority', 'estimatedDeliveryDate', 'startDate', 'executorName', 'status', 'statusHistory', 'scopeChanges', 'needsMaterial', 'materialRequisition']) &&
+      return hasOnlyAllowedFields(['id', 'openedAt', 'requesterUid', 'requesterName', 'description', 'area', 'executorType', 'responsibleId', 'responsibleName', 'priority', 'estimatedDeliveryDate', 'startDate', 'executorName', 'status', 'statusHistory', 'scopeChanges', 'needsMaterial', 'materialRequisition', 'closedAt']) &&
              data.id is string &&
              data.openedAt is string &&
              data.requesterUid is string &&
              data.description is string &&
-             (data.status in ['Não Iniciado', 'Em Andamento', 'Concluído', 'Cancelado'] || !('status' in data));
+             (data.status in ['Não Iniciado', 'Em andamento', 'Parado', 'Cancelado', 'Concluído'] || !('status' in data));
     }
 
     function isValidEmployee(data) {
@@ -302,7 +306,7 @@ service cloud.firestore {
     match /serviceDemands/{id} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidServiceDemand(request.resource.data);
-      allow update: if (isMasterOrOwner('requesterUid') || isMasterOrOwner('responsibleId')) && isValidServiceDemand(request.resource.data);
+      allow update: if (isMasterOrOwner('requesterUid') || isMasterOrOwner('responsibleId') || isPlanner()) && isValidServiceDemand(request.resource.data);
       allow delete: if isAdmin();
     }
 

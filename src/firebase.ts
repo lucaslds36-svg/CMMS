@@ -8,7 +8,9 @@ import {
   User,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  updateProfile
+  updateProfile,
+  sendPasswordResetEmail,
+  updatePassword
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -57,6 +59,15 @@ export const registerWithEmail = async (email: string, password: string, display
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
   await updateProfile(userCredential.user, { displayName });
   return userCredential;
+};
+
+export const resetPassword = async (email: string) => {
+  return sendPasswordResetEmail(auth, email);
+};
+
+export const changePassword = async (newPassword: string) => {
+  if (!auth.currentUser) throw new Error('No user logged in');
+  return updatePassword(auth.currentUser, newPassword);
 };
 
 export const subscribeToCollection = <T>(
