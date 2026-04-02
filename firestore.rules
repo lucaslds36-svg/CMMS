@@ -123,12 +123,13 @@ service cloud.firestore {
     }
 
     function isValidServiceDemand(data) {
-      return hasOnlyAllowedFields(['id', 'openedAt', 'requesterUid', 'requesterName', 'description', 'area', 'executorType', 'responsibleId', 'responsibleName', 'priority', 'estimatedDeliveryDate', 'startDate', 'executorName', 'status', 'statusHistory', 'scopeChanges', 'needsMaterial', 'materialRequisition', 'closedAt']) &&
+      return hasOnlyAllowedFields(['id', 'openedAt', 'requesterUid', 'requesterName', 'description', 'area', 'executorType', 'responsibleId', 'responsibleName', 'priority', 'estimatedDeliveryDate', 'startDate', 'executorName', 'status', 'statusHistory', 'scopeChanges', 'needsMaterial', 'materialRequisition', 'closedAt', 'collaborators']) &&
              data.id is string &&
              data.openedAt is string &&
              data.requesterUid is string &&
              data.description is string &&
-             (data.status in ['Não Iniciado', 'Em andamento', 'Parado', 'Cancelado', 'Concluído'] || !('status' in data));
+             (data.status in ['Não Iniciado', 'Em andamento', 'Parado', 'Cancelado', 'Concluído'] || !('status' in data)) &&
+             (!('collaborators' in data) || data.collaborators is list);
     }
 
     function isValidEmployee(data) {

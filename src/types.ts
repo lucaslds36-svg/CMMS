@@ -220,6 +220,7 @@ export interface ServiceDemand {
   status: 'Não Iniciado' | 'Em andamento' | 'Parado' | 'Cancelado' | 'Concluído';
   needsMaterial: boolean;
   materialRequisition?: MaterialRequisition;
+  collaborators?: { id: string, name: string }[];
   scopeChanges: ServiceDemandScopeChange[];
   statusHistory: ServiceDemandStatusChange[];
   closedAt?: string;

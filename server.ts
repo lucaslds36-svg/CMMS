@@ -8,7 +8,9 @@ async function startServer() {
 
   // Request logging middleware
   app.use((req, res, next) => {
-    console.log(`[REQUEST] ${req.method} ${req.url}`);
+    if (!req.url.endsWith('.tsx') && !req.url.endsWith('.ts')) {
+      console.log(`[REQUEST] ${req.method} ${req.url}`);
+    }
     next();
   });
 

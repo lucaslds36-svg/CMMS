@@ -92,7 +92,8 @@ export const ServiceManagementModule = ({
       item: '',
       requisitionNumber: '',
       deliveryDate: ''
-    }
+    },
+    collaborators: []
   });
 
   const areas = ['Trefila', 'Cordeira Car', 'Cordeira Truck', 'Semi Pronto', 'Logistica', 'Centralizado', 'Área externa', 'Utilidades'];
@@ -132,6 +133,7 @@ export const ServiceManagementModule = ({
         requesterName: userProfile.displayName || 'Usuário',
         responsibleName: responsible?.Name || '',
         responsibleId: responsible?.userUid || formData.responsibleId,
+        collaborators: formData.collaborators || [],
         status: 'Não Iniciado',
         openedAt: new Date().toISOString(),
         scopeChanges: [],
@@ -632,6 +634,50 @@ export const ServiceManagementModule = ({
                     </div>
 
                     <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Colaboradores Adicionais</label>
+                      <div className="flex gap-2">
+                        <select 
+                          className="flex-1 px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
+                          onChange={e => {
+                            const emp = employees.find(emp => emp.ID === e.target.value);
+                            if (emp) {
+                              setFormData({
+                                ...formData,
+                                collaborators: [...(formData.collaborators || []), { id: emp.ID, name: emp.Name }]
+                              });
+                            }
+                          }}
+                        >
+                          <option value="">Adicionar colaborador</option>
+                          {employees
+                            .filter(emp => emp.Type === formData.executorType && emp.ID !== formData.responsibleId)
+                            .map(emp => (
+                              <option key={emp.ID} value={emp.ID}>
+                                {emp.Name}
+                              </option>
+                            ))
+                          }
+                        </select>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {(formData.collaborators || []).map((collab, index) => (
+                          <span key={index} className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs">
+                            {collab.name}
+                            <button 
+                              type="button" 
+                              onClick={() => setFormData({
+                                ...formData,
+                                collaborators: formData.collaborators?.filter((_, i) => i !== index)
+                              })}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Prioridade</label>
                       <div className="flex gap-2">
                         {priorities.map(p => (
@@ -800,6 +846,51 @@ export const ServiceManagementModule = ({
                       <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Responsável</label>
                         <p className="text-sm font-bold text-slate-900">{editingDemand.responsibleName}</p>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Colaboradores</label>
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          {(editingDemand.collaborators || []).map((collab, index) => (
+                            <span key={index} className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs">
+                              {collab.name}
+                              {isEditing && (
+                                <button 
+                                  type="button" 
+                                  onClick={() => setEditingDemand({
+                                    ...editingDemand,
+                                    collaborators: editingDemand.collaborators?.filter((_, i) => i !== index)
+                                  })}
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                        {isEditing && (
+                          <select 
+                            className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                            onChange={e => {
+                              const emp = employees.find(emp => emp.ID === e.target.value);
+                              if (emp) {
+                                setEditingDemand({
+                                  ...editingDemand,
+                                  collaborators: [...(editingDemand.collaborators || []), { id: emp.ID, name: emp.Name }]
+                                });
+                              }
+                            }}
+                          >
+                            <option value="">Adicionar colaborador</option>
+                            {employees
+                              .filter(emp => emp.Type === editingDemand.executorType && emp.ID !== editingDemand.responsibleId && !(editingDemand.collaborators || []).find(c => c.id === emp.ID))
+                              .map(emp => (
+                                <option key={emp.ID} value={emp.ID}>
+                                  {emp.Name}
+                                </option>
+                              ))
+                            }
+                          </select>
+                        )}
                       </div>
                     </div>
 
