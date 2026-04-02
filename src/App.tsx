@@ -1388,20 +1388,63 @@ const AssetList = ({ assets, onAdd, onEdit, onDelete, onImport }: { assets: Asse
   const [search, setSearch] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (evt) => {
-      const bstr = evt.target?.result;
-      const wb = XLSX.read(bstr, { type: 'binary' });
+    reader.onload = async (evt) => {
+      const buffer = evt.target?.result;
+      if (!buffer) return;
+      
+      const wb = XLSX.read(buffer, { type: 'array' });
+      console.log('Workbook sheet names:', wb.SheetNames);
       const wsname = wb.SheetNames[0];
       const ws = wb.Sheets[wsname];
-      const data = XLSX.utils.sheet_to_json(ws);
-      onImport(data);
+      
+      // Read as array of arrays first to find header
+      const rawData: any[] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      console.log('Raw data (first 5 rows):', rawData.slice(0, 5));
+      
+      let headerRowIdx = 0;
+      for (let i = 0; i < Math.min(rawData.length, 30); i++) {
+        const row = rawData[i];
+        if (Array.isArray(row)) {
+          // Look for a row that has at least 2 of our key columns
+          const matches = row.filter(h => {
+            const s = String(h || '').toUpperCase();
+            // Normalize to remove accents for better matching
+            const normalized = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            return normalized.includes('TAG') || normalized.includes('MODELO') || normalized.includes('DESCRI') || normalized.includes('LOCALIZA');
+          }).length;
+          
+          console.log(`Row ${i} matches:`, matches);
+          if (matches >= 2) {
+            headerRowIdx = i;
+            console.log('Header row detected at index:', headerRowIdx);
+            break;
+          }
+        }
+      }
+
+      const data = XLSX.utils.sheet_to_json(ws, { range: headerRowIdx, raw: true });
+      console.log('Parsed data (first 5 rows):', data.slice(0, 5));
+      
+      const mappedData = data.map((row: any) => ({
+        Tag: row['TAG'] || row['Tag'] || row['tag'],
+        Model: row['MODELO'] || row['Modelo'] || row['modelo'],
+        Description: row['DESCRIÇÃO'] || row['DESCRIÇAO'] || row['DESCRICAO'] || row['Descricao'] || row['descricao'],
+        Location: row['LOCALIZAÇÃO'] || row['LOCALIZAÇAO'] || row['LOCALIZACAO'] || row['Localizacao'] || row['localizacao'],
+        Plant: row['PLANTA'] || row['Planta'] || row['planta'],
+        Manufacturer: row['FABRICANTE'] || row['Fabricante'] || row['fabricante'],
+        Status: row['STATUS'] || row['Status'] || row['status'] || 'Ativo',
+        InstallDate: row['DATA DE INSTALAÇÃO'] || row['Data de Instalação'] || row['data de instalação'] || new Date().toISOString().split('T')[0]
+      }));
+      
+      console.log('Mapped data (first 5 rows):', mappedData.slice(0, 5));
+      onImport(mappedData);
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
   
   const filteredAssets = assets.filter(a => 
@@ -5032,20 +5075,26 @@ export default function App() {
                   <AssetList 
                     assets={assets} 
                     onImport={async (importedAssets) => {
-                      for (const asset of importedAssets) {
-                        const id = `A${(assets.length + 1).toString().padStart(3, '0')}`;
-                        await createDocument('assets', {
-                          Tag: asset.Tag,
-                          Model: asset.Model,
-                          Description: asset.Description,
-                          Location: asset.Location,
-                          Plant: asset.Plant,
-                          Manufacturer: asset.Manufacturer,
-                          Status: asset.Status || 'Ativo',
-                          InstallDate: asset.InstallDate || new Date().toISOString(),
-                          ID: id
-                        }, id);
+                      // Use batching to improve performance for large imports
+                      const batchSize = 100;
+                      for (let i = 0; i < importedAssets.length; i += batchSize) {
+                        const batch = importedAssets.slice(i, i + batchSize);
+                        await Promise.all(batch.map(async (asset, index) => {
+                          const id = `A${(assets.length + i + index + 1).toString().padStart(4, '0')}`;
+                          await createDocument('assets', {
+                            Tag: asset.Tag,
+                            Model: asset.Model,
+                            Description: asset.Description,
+                            Location: asset.Location,
+                            Plant: asset.Plant,
+                            Manufacturer: asset.Manufacturer,
+                            Status: asset.Status || 'Ativo',
+                            InstallDate: asset.InstallDate || new Date().toISOString(),
+                            ID: id
+                          }, id);
+                        }));
                       }
+                      alert(`Importação concluída com sucesso! ${importedAssets.length} ativos foram adicionados.`);
                     }}
                     onAdd={() => {
                       setEditingAsset(null);

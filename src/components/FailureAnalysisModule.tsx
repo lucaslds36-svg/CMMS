@@ -250,7 +250,29 @@ export const FailureAnalysisModule = ({
       ) || workbook.SheetNames[0];
 
       const sheet = workbook.Sheets[sheetName];
-      const data = XLSX.utils.sheet_to_json(sheet);
+      
+      // Read as array of arrays first to find header
+      const rawData: any[] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+      
+      let headerRowIdx = 0;
+      for (let i = 0; i < Math.min(rawData.length, 30); i++) {
+        const row = rawData[i];
+        if (Array.isArray(row)) {
+          // Look for a row that has at least 2 of our key columns
+          const matches = row.filter(h => {
+            const s = String(h || '').toUpperCase();
+            return s.includes('HORA') || s.includes('MAQUINA') || s.includes('MÁQUINA') || s.includes('GRUPO') || s.includes('SETOR') || s.includes('CAUSA') || s.includes('DESCRIÇÃO') || s.includes('STATUS');
+          }).length;
+          
+          if (matches >= 2) {
+            headerRowIdx = i;
+            break;
+          }
+        }
+      }
+
+      const data = XLSX.utils.sheet_to_json(sheet, { range: headerRowIdx, raw: true });
+      console.log('FailureAnalysisModule: Parsed data:', data);
       setRawData(data);
       if (onDataUpdate) onDataUpdate(data);
       localStorage.setItem('failureAnalysisData', JSON.stringify(data));

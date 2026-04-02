@@ -109,7 +109,7 @@ export const DatabaseModule: React.FC<DatabaseModuleProps> = ({ onDataImported, 
             // Look for a row that has at least 2 of our key columns
             const matches = row.filter(h => {
               const s = String(h || '').toUpperCase();
-              return s.includes('HORA') || s.includes('MAQUINA') || s.includes('MÁQUINA') || s.includes('GRUPO') || s.includes('SETOR') || s.includes('CAUSA') || s.includes('DESCRIÇÃO');
+              return s.includes('HORA') || s.includes('MAQUINA') || s.includes('MÁQUINA') || s.includes('GRUPO') || s.includes('SETOR') || s.includes('CAUSA') || s.includes('DESCRIÇÃO') || s.includes('STATUS');
             }).length;
             
             if (matches >= 2) {
@@ -123,11 +123,17 @@ export const DatabaseModule: React.FC<DatabaseModuleProps> = ({ onDataImported, 
         // Use raw: true to get the actual numbers directly from Excel
         const bditssParsed = XLSX.utils.sheet_to_json(sheet, { range: headerRowIdx, raw: true });
         
+        console.log('BDITSS parsed rows:', bditssParsed.length);
+        console.log('BDITSS first row:', bditssParsed[0]);
+        
         // Filter out rows that are clearly empty or just summary footers
         bditssData = bditssParsed.filter((row: any) => {
           const values = Object.values(row);
           const isEmptyRow = values.every(v => v === null || v === '' || v === undefined);
           const isSummaryRow = values.some(v => String(v).toUpperCase() === 'TOTAL GERAL') && values.length < 5;
+          if (isEmptyRow || isSummaryRow) {
+            console.log('Filtering out row:', row);
+          }
           return !isEmptyRow && !isSummaryRow;
         });
 
