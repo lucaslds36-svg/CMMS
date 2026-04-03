@@ -3465,8 +3465,8 @@ const PreventiveModule = ({
                         type="number"
                         min="1"
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newPlan.FrequencyValue}
-                        onChange={e => setNewPlan({...newPlan, FrequencyValue: parseInt(e.target.value)})}
+                        value={Number.isNaN(newPlan.FrequencyValue) || newPlan.FrequencyValue === 0 ? '' : newPlan.FrequencyValue}
+                        onChange={e => setNewPlan({...newPlan, FrequencyValue: parseInt(e.target.value) || 0})}
                       />
                     </div>
                   </div>
@@ -3543,8 +3543,8 @@ const PreventiveModule = ({
                         min="0.1"
                         step="0.1"
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newPlan.EstimatedTime}
-                        onChange={e => setNewPlan({...newPlan, EstimatedTime: parseFloat(e.target.value)})}
+                        value={Number.isNaN(newPlan.EstimatedTime) || newPlan.EstimatedTime === 0 ? '' : newPlan.EstimatedTime}
+                        onChange={e => setNewPlan({...newPlan, EstimatedTime: parseFloat(e.target.value) || 0})}
                       />
                     </div>
                     <div>
@@ -3554,8 +3554,8 @@ const PreventiveModule = ({
                         type="number"
                         min="1"
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newPlan.Collaborators}
-                        onChange={e => setNewPlan({...newPlan, Collaborators: parseInt(e.target.value)})}
+                        value={Number.isNaN(newPlan.Collaborators) || newPlan.Collaborators === 0 ? '' : newPlan.Collaborators}
+                        onChange={e => setNewPlan({...newPlan, Collaborators: parseInt(e.target.value) || 0})}
                       />
                     </div>
                   </div>
@@ -4726,17 +4726,22 @@ export default function App() {
     e.preventDefault();
     try {
       const woData = {
-        ...newWO,
-        assetId: newWO.AssetID,
-        planId: newWO.PlanID || '',
-        technicianId: newWO.TechnicianID || '',
-        type: newWO.Type,
-        nature: newWO.Nature,
-        activityType: newWO.ActivityType,
-        priority: newWO.Priority,
-        startDate: newWO.StartDate || '',
-        endDate: newWO.EndDate || '',
-        duration: newWO.Duration || 0,
+        AssetID: newWO.AssetID || '',
+        PlanID: newWO.PlanID || '',
+        TechnicianID: newWO.TechnicianID || '',
+        Description: newWO.Description || '',
+        Priority: newWO.Priority || 'Média',
+        Type: newWO.Type || 'Corretiva',
+        Nature: newWO.Nature || 'Programada',
+        ActivityType: newWO.ActivityType || 'Reparo',
+        AssignedTo: newWO.AssignedTo || '',
+        ScheduledDate: newWO.ScheduledDate || '',
+        StartDate: newWO.StartDate || '',
+        EndDate: newWO.EndDate || '',
+        EstimatedTime: newWO.EstimatedTime || 0,
+        Collaborators: newWO.Collaborators || 0,
+        Duration: newWO.Duration || 0,
+        Cause: newWO.Cause || '',
         requestedBy: newWO.requestedBy || user?.uid || '',
         dueDate: newWO.dueDate || null,
         scope: newWO.scope || '',
@@ -5259,8 +5264,8 @@ export default function App() {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-100 transition-all duration-300 flex flex-col overflow-hidden",
-        sidebarOpen ? "w-64" : "w-16 sm:w-20"
+        "fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-100 transition-all duration-300 flex flex-col overflow-hidden shadow-2xl lg:shadow-none",
+        sidebarOpen ? "w-72 translate-x-0" : "-translate-x-full lg:translate-x-0 lg:w-20"
       )}>
         <div className="h-full flex flex-col">
           <div className={cn(
@@ -5409,7 +5414,7 @@ export default function App() {
       {/* Main Content */}
       <main className={cn(
         "flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50/50 transition-all duration-300",
-        sidebarOpen ? "pl-64" : "pl-16 sm:pl-20"
+        sidebarOpen ? "lg:pl-72" : "lg:pl-20"
       )}>
         {/* Header */}
         <header className="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-40">
@@ -6516,8 +6521,8 @@ export default function App() {
                         step="0.5"
                         min="0"
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newWO.EstimatedTime}
-                        onChange={e => setNewWO({...newWO, EstimatedTime: parseFloat(e.target.value)})}
+                        value={Number.isNaN(newWO.EstimatedTime) || newWO.EstimatedTime === 0 ? '' : newWO.EstimatedTime}
+                        onChange={e => setNewWO({...newWO, EstimatedTime: parseFloat(e.target.value) || 0})}
                       />
                     </div>
                     <div>
@@ -6527,8 +6532,8 @@ export default function App() {
                         step="0.5"
                         min="0"
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newWO.Duration || ''}
-                        onChange={e => setNewWO({...newWO, Duration: parseFloat(e.target.value)})}
+                        value={Number.isNaN(newWO.Duration) || newWO.Duration === 0 ? '' : newWO.Duration}
+                        onChange={e => setNewWO({...newWO, Duration: parseFloat(e.target.value) || 0})}
                       />
                     </div>
                   </div>
@@ -6540,8 +6545,8 @@ export default function App() {
                         type="number"
                         min="1"
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newWO.Collaborators}
-                        onChange={e => setNewWO({...newWO, Collaborators: parseInt(e.target.value)})}
+                        value={Number.isNaN(newWO.Collaborators) || newWO.Collaborators === 0 ? '' : newWO.Collaborators}
+                        onChange={e => setNewWO({...newWO, Collaborators: parseInt(e.target.value) || 0})}
                       />
                     </div>
                     <div>

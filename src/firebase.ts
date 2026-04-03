@@ -1,7 +1,4 @@
-import { initializeApp } from 'firebase/app';
 import { 
-  getAuth, 
-  GoogleAuthProvider, 
   signInWithPopup,
   signOut, 
   onAuthStateChanged, 
@@ -13,7 +10,6 @@ import {
   updatePassword
 } from 'firebase/auth';
 import { 
-  getFirestore, 
   collection, 
   doc, 
   setDoc, 
@@ -29,17 +25,12 @@ import {
   updateDoc,
   increment
 } from 'firebase/firestore';
-import firebaseConfig from '../firebase-applet-config.json';
-console.log('Firebase Config:', firebaseConfig);
+import { auth, db, googleProvider } from './firebase-init';
+import { realtimeManager } from './services/realtimeManager';
+import { handleFirestoreError, OperationType } from './services/errorHandler';
 import type { UserProfile } from './types';
 
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-// Use the named database if provided, otherwise fallback to default
-const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
-console.log('Initializing Firestore with database ID:', dbId, 'Project ID:', firebaseConfig.projectId);
-export const db = getFirestore(app, dbId);
-export const googleProvider = new GoogleAuthProvider();
+export { auth, db, googleProvider, handleFirestoreError, OperationType };
 
 export const loginWithGoogle = async () => {
   try {
@@ -77,13 +68,7 @@ export const subscribeToCollection = <T>(
   collectionName: string,
   callback: (data: T[]) => void
 ) => {
-  const q = query(collection(db, collectionName));
-  return onSnapshot(q, (snapshot) => {
-    const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as unknown as T));
-    callback(data);
-  }, (error) => {
-    handleFirestoreError(error, OperationType.GET, collectionName);
-  });
+  return realtimeManager.subscribe<T>(collectionName, callback);
 };
 
 export const subscribeToUserCollection = <T>(
@@ -91,13 +76,7 @@ export const subscribeToUserCollection = <T>(
   userId: string,
   callback: (data: T[]) => void
 ) => {
-  const q = query(collection(db, collectionName), where('userId', '==', userId));
-  return onSnapshot(q, (snapshot) => {
-    const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as unknown as T));
-    callback(data);
-  }, (error) => {
-    handleFirestoreError(error, OperationType.GET, collectionName);
-  });
+  return realtimeManager.subscribe<T>(collectionName, callback, userId);
 };
 
 const sanitizeData = (data: any): any => {
@@ -196,57 +175,6 @@ export const setUserProfile = async (profile: UserProfile) => {
     handleFirestoreError(error, OperationType.WRITE, path);
   }
 };
-
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId: string | undefined;
-    email: string | null | undefined;
-    emailVerified: boolean | undefined;
-    isAnonymous: boolean | undefined;
-    tenantId: string | null | undefined;
-    providerInfo: {
-      providerId: string;
-      displayName: string | null;
-      email: string | null;
-      photoUrl: string | null;
-    }[];
-  }
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
-    },
-    operationType,
-    path
-  }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
-}
 
 // ... (previous imports)
 
