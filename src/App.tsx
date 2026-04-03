@@ -1087,7 +1087,7 @@ const Dashboard = ({
                 </div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">MTBF</span>
               </div>
-              <h4 className="text-2xl font-bold text-slate-900">{smartKPIs?.mtbf.toFixed(1)}h</h4>
+              <h4 className="text-2xl font-bold text-slate-900">{(smartKPIs?.mtbf || 0).toFixed(1)}h</h4>
               <p className="text-xs text-slate-500 mt-1">Tempo médio entre falhas</p>
             </div>
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col">
@@ -1097,7 +1097,7 @@ const Dashboard = ({
                 </div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">MTTR</span>
               </div>
-              <h4 className="text-2xl font-bold text-slate-900">{smartKPIs?.mttr.toFixed(1)}h</h4>
+              <h4 className="text-2xl font-bold text-slate-900">{(smartKPIs?.mttr || 0).toFixed(1)}h</h4>
               <p className="text-xs text-slate-500 mt-1">Tempo médio para reparo</p>
             </div>
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col">
@@ -1107,7 +1107,7 @@ const Dashboard = ({
                 </div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Disponibilidade</span>
               </div>
-              <h4 className="text-2xl font-bold text-slate-900">{smartKPIs?.availability.toFixed(1)}%</h4>
+              <h4 className="text-2xl font-bold text-slate-900">{(smartKPIs?.availability || 0).toFixed(1)}%</h4>
               <p className="text-xs text-slate-500 mt-1">Tempo operacional total</p>
             </div>
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col">
@@ -1117,7 +1117,7 @@ const Dashboard = ({
                 </div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Confiabilidade</span>
               </div>
-              <h4 className="text-2xl font-bold text-slate-900">{smartKPIs?.reliability.toFixed(1)}%</h4>
+              <h4 className="text-2xl font-bold text-slate-900">{(smartKPIs?.reliability || 0).toFixed(1)}%</h4>
               <p className="text-xs text-slate-500 mt-1">Probabilidade de sucesso</p>
             </div>
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col">
@@ -1127,7 +1127,7 @@ const Dashboard = ({
                 </div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Backlog</span>
               </div>
-              <h4 className="text-2xl font-bold text-slate-900">{smartKPIs?.backlogHours.toFixed(1)}h</h4>
+              <h4 className="text-2xl font-bold text-slate-900">{(smartKPIs?.backlogHours || 0).toFixed(1)}h</h4>
               <p className="text-xs text-slate-500 mt-1">Carga de trabalho pendente</p>
             </div>
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col">
@@ -1137,7 +1137,7 @@ const Dashboard = ({
                 </div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Custo Est.</span>
               </div>
-              <h4 className="text-2xl font-bold text-slate-900">R$ {smartKPIs?.maintenanceCost.toLocaleString()}</h4>
+              <h4 className="text-2xl font-bold text-slate-900">R$ {(smartKPIs?.maintenanceCost || 0).toLocaleString()}</h4>
               <p className="text-xs text-slate-500 mt-1">Baseado em horas estimadas</p>
             </div>
           </div>
@@ -4124,16 +4124,16 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const bditss = localStorage.getItem('bditssData');
+    const bdDataStr = localStorage.getItem('bdData');
     const dinamica = localStorage.getItem('dinamicaData');
-    const failureAnalysis = localStorage.getItem('failureAnalysisData');
+    const bditssDataStr = localStorage.getItem('bditssData');
     
-    if (bditss) {
+    if (bdDataStr) {
       try {
-        const parsed = JSON.parse(bditss);
+        const parsed = JSON.parse(bdDataStr);
         setBditssData(Array.isArray(parsed) ? parsed : []);
       } catch (e) {
-        console.error('Error parsing bditssData from localStorage:', e);
+        console.error('Error parsing bdData from localStorage:', e);
         setBditssData([]);
       }
     }
@@ -4148,12 +4148,12 @@ export default function App() {
       }
     }
     
-    if (failureAnalysis) {
+    if (bditssDataStr) {
       try {
-        const parsed = JSON.parse(failureAnalysis);
+        const parsed = JSON.parse(bditssDataStr);
         setFailureAnalysisData(Array.isArray(parsed) ? parsed : []);
       } catch (e) {
-        console.error('Error parsing failureAnalysisData from localStorage:', e);
+        console.error('Error parsing bditssData from localStorage:', e);
         setFailureAnalysisData([]);
       }
     }
@@ -4351,7 +4351,7 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     const unsubscribe = subscribeToUserCollection('notifications', user.uid, (data: any[]) => {
-      setNotifications(data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      setNotifications([...data].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     });
     return () => unsubscribe();
   }, [user]);
@@ -5183,19 +5183,22 @@ export default function App() {
       await updateDocument('serviceDemands', demandId, updateData);
 
       // Send notifications
-      const notificationMessage = `O status da demanda "${demand.description}" foi alterado para "${status}".`;
+      const truncatedDesc = demand.description.length > 100 ? demand.description.substring(0, 100) + '...' : demand.description;
+      const notificationMessage = `O status da demanda "${truncatedDesc}" foi alterado para "${status}".`;
       
       // Notify requester
-      await createDocument('notifications', {
-        userId: demand.requesterUid,
-        message: notificationMessage,
-        read: false,
-        createdAt: new Date().toISOString(),
-        demandId: demandId
-      });
+      if (demand.requesterUid) {
+        await createDocument('notifications', {
+          userId: demand.requesterUid,
+          message: notificationMessage,
+          read: false,
+          createdAt: new Date().toISOString(),
+          demandId: demandId
+        });
+      }
 
-      // Notify planner (if exists)
-      if (demand.responsibleId) {
+      // Notify planner (if exists and different from requester)
+      if (demand.responsibleId && demand.responsibleId !== demand.requesterUid) {
         await createDocument('notifications', {
           userId: demand.responsibleId,
           message: notificationMessage,
@@ -5451,18 +5454,18 @@ export default function App() {
                 setLoading(true);
                 try {
                   // Try global data first (shared data from master)
-                  let bditss = await loadGlobalData('bditssData');
+                  let bdDataStr = await loadGlobalData('bdData');
                   let dinamica = await loadGlobalData('dinamicaData');
-                  let failureAnalysis = await loadGlobalData('failureAnalysisData');
+                  let bditssDataStr = await loadGlobalData('bditssData');
 
                   // Fallback to per-user data if global is empty
-                  if (!bditss) bditss = await loadDatabaseEntry(user.uid, 'bditssData');
+                  if (!bdDataStr) bdDataStr = await loadDatabaseEntry(user.uid, 'bdData');
                   if (!dinamica) dinamica = await loadDatabaseEntry(user.uid, 'dinamicaData');
-                  if (!failureAnalysis) failureAnalysis = await loadDatabaseEntry(user.uid, 'failureAnalysisData');
+                  if (!bditssDataStr) bditssDataStr = await loadDatabaseEntry(user.uid, 'bditssData');
                   
-                  if (bditss) {
-                      localStorage.setItem('bditssData', bditss);
-                      const parsed = JSON.parse(bditss);
+                  if (bdDataStr) {
+                      localStorage.setItem('bdData', bdDataStr);
+                      const parsed = JSON.parse(bdDataStr);
                       setBditssData(parsed);
                       updateFiltersFromData(parsed);
                   }
@@ -5470,9 +5473,9 @@ export default function App() {
                       localStorage.setItem('dinamicaData', dinamica);
                       setDinamicaData(JSON.parse(dinamica));
                   }
-                  if (failureAnalysis) {
-                      localStorage.setItem('failureAnalysisData', failureAnalysis);
-                      setFailureAnalysisData(JSON.parse(failureAnalysis));
+                  if (bditssDataStr) {
+                      localStorage.setItem('bditssData', bditssDataStr);
+                      setFailureAnalysisData(JSON.parse(bditssDataStr));
                       window.dispatchEvent(new Event('failureAnalysisDataUpdated'));
                   }
                   showToast('Dados sincronizados com sucesso!');
