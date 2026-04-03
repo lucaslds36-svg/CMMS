@@ -58,20 +58,28 @@ export const ImprovementManagementModule = ({
       showToast('Preencha todos os campos obrigatórios', 'error');
       return;
     }
-    await onSave({
-      ...newProject,
-      startDate: newProject.startDate || new Date().toISOString(),
-      plannedTestDays: newProject.plannedTestDays || 0,
-      testStatus: newProject.testStatus || 'Não iniciado',
-      standardize: newProject.standardize || false,
-      createdAt: newProject.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      createdBy: newProject.createdBy || userProfile?.uid
-    } as EngineeringProject);
-    setShowNewModal(false);
-    setSelectedProject(null);
-    setModalMode(null);
-    setNewProject({ status: 'Planejado', testStatus: 'Não iniciado', standardize: false });
+    
+    try {
+      const projectToSave = sanitize({
+        ...newProject,
+        startDate: newProject.startDate || new Date().toISOString(),
+        plannedTestDays: newProject.plannedTestDays || 0,
+        testStatus: newProject.testStatus || 'Não iniciado',
+        standardize: newProject.standardize || false,
+        createdAt: newProject.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: newProject.createdBy || userProfile?.uid
+      });
+
+      await onSave(projectToSave as EngineeringProject);
+      setShowNewModal(false);
+      setSelectedProject(null);
+      setModalMode(null);
+      setNewProject({ status: 'Planejado', testStatus: 'Não iniciado', standardize: false });
+    } catch (error) {
+      console.error('Error in handleSave:', error);
+      showToast('Erro ao salvar projeto', 'error');
+    }
   };
 
   const openModal = (project: EngineeringProject | null, mode: 'view' | 'edit' | 'create') => {

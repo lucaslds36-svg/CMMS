@@ -80,14 +80,16 @@ export const subscribeToUserCollection = <T>(
 };
 
 const sanitizeData = (data: any): any => {
-  if (data === null || typeof data !== 'object') return data;
+  if (data === null || typeof data !== 'object') {
+    // Firestore doesn't support NaN or Infinity
+    if (typeof data === 'number' && (isNaN(data) || !isFinite(data))) return 0;
+    return data;
+  }
   if (data instanceof Timestamp || data instanceof Date) return data;
   if (Array.isArray(data)) return data.map(sanitizeData);
   
   // Handle Firestore FieldValue (serverTimestamp, increment, etc.)
-  // They don't have a common public class, but they are not plain objects
   if (data.constructor && data.constructor.name === 'FieldValue') return data;
-  // Fallback for different environments/minification
   if (data._methodName || (typeof data.toFirestore === 'function')) return data;
 
   const sanitized: any = {};
@@ -121,9 +123,13 @@ export const updateDocument = async (collectionName: string, id: string, data: a
   const path = `${collectionName}/${id}`;
   try {
     const sanitizedData = sanitizeData(data);
+    // Remove id from data if it exists to avoid Firestore errors when updating
+    if (sanitizedData.id) delete sanitizedData.id;
+    
     const docRef = doc(db, collectionName, id);
     await updateDoc(docRef, sanitizedData);
   } catch (error) {
+    console.error(`Error updating document ${path}:`, error);
     handleFirestoreError(error, OperationType.UPDATE, path);
   }
 };
@@ -162,6 +168,10 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
     }
     return null;
   } catch (error) {
+    if (error instanceof Error && error.message.includes('offline')) {
+      console.warn(`Could not fetch user profile for ${uid} because client is offline. Returning null.`);
+      return null;
+    }
     handleFirestoreError(error, OperationType.GET, path);
   }
 };

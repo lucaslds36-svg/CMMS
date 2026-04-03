@@ -4100,22 +4100,33 @@ export default function App() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // Test connection to Firestore
+  // Test connection to Firestore with retries
   useEffect(() => {
-    const testConnection = async () => {
-      try {
-        // Try to fetch a non-existent document to test connectivity
-        // We use getDocFromServer to bypass any local cache
-        await getDocFromServer(firestoreDoc(db, 'globalData', 'connection_test'));
-        console.log("Firestore connection test successful.");
-      } catch (error) {
-        if (error instanceof Error) {
-          if (error.message.includes('the client is offline') || error.message.includes('unavailable')) {
-            console.error("Firestore connection failed: The client is offline or the backend is unreachable.");
-            showToast("Erro de conexão com o banco de dados. Verifique sua internet ou a configuração do Firebase.", "error");
-          } else {
+    const testConnection = async (retries = 3, delay = 2000) => {
+      for (let i = 0; i < retries; i++) {
+        try {
+          // Try to fetch a non-existent document to test connectivity
+          // We use getDocFromServer to bypass any local cache
+          await getDocFromServer(firestoreDoc(db, 'globalData', 'connection_test'));
+          console.log("Firestore connection test successful.");
+          return; // Success
+        } catch (error) {
+          if (error instanceof Error) {
             // Document not found is a successful connection test
-            console.log("Firestore connection test complete (document not found).");
+            if (error.message.includes('not-found') || !error.message.includes('offline')) {
+              console.log("Firestore connection test complete (document not found or other non-offline error).");
+              return;
+            }
+            
+            console.warn(`Firestore connection attempt ${i + 1} failed:`, error.message);
+            if (i < retries - 1) {
+              await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)));
+              continue;
+            }
+            
+            console.error("Firestore connection failed after retries: The client is offline or the backend is unreachable.");
+            // Only show toast on the final failure
+            showToast("Erro de conexão com o banco de dados. O sistema funcionará em modo offline.", "error");
           }
         }
       }
@@ -4362,17 +4373,24 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   const handleSaveImprovementProject = async (project: Partial<EngineeringProject>) => {
+    console.log('Attempting to save improvement project:', project);
     try {
       if (project.id) {
-        await updateDocument('engineering-projects', project.id, project);
+        console.log('Updating existing project:', project.id);
+        // Ensure the ID is not in the data object to avoid Firestore errors
+        const { id, ...dataToUpdate } = project as any;
+        await updateDocument('engineering-projects', id, dataToUpdate);
         showToast('Projeto atualizado com sucesso!');
       } else {
-        await createDocument('engineering-projects', { ...project, createdAt: new Date().toISOString(), createdBy: user?.uid });
+        console.log('Creating new project');
+        const newId = await createDocument('engineering-projects', { ...project, createdAt: new Date().toISOString(), createdBy: user?.uid });
+        console.log('Project created with ID:', newId);
         showToast('Projeto criado com sucesso!');
       }
     } catch (error) {
       console.error('Error saving improvement project:', error);
       showToast('Erro ao salvar projeto', 'error');
+      throw error; // Re-throw so the UI knows it failed
     }
   };
 
