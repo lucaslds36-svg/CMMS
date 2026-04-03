@@ -5268,7 +5268,7 @@ export default function App() {
       {/* Sidebar */}
       <aside className={cn(
         "fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-100 transition-all duration-300 flex flex-col overflow-hidden shadow-2xl lg:shadow-none",
-        sidebarOpen ? "w-72 translate-x-0" : "-translate-x-full lg:translate-x-0 lg:w-20"
+        sidebarOpen ? "w-72 translate-x-0" : "-translate-x-full lg:-translate-x-full lg:w-0"
       )}>
         <div className="h-full flex flex-col">
           <div className={cn(
@@ -5413,11 +5413,10 @@ export default function App() {
           </div>
         </div>
       </aside>
-
       {/* Main Content */}
       <main className={cn(
         "flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50/50 transition-all duration-300",
-        sidebarOpen ? "lg:pl-72" : "lg:pl-20"
+        sidebarOpen ? "lg:pl-72" : "lg:pl-0"
       )}>
         {/* Header */}
         <header className="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-40">
