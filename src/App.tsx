@@ -1511,18 +1511,33 @@ const AssetList = ({ assets, onAdd, onEdit, onDelete, onImport, isAdmin = false,
       const data = XLSX.utils.sheet_to_json(ws, { range: headerRowIdx, raw: true });
       console.log('Parsed data (first 5 rows):', data.slice(0, 5));
       
-      const mappedData = data.map((row: any) => ({
-        Tag: row['TAG'] || row['Tag'] || row['tag'],
-        Model: row['MODELO'] || row['Modelo'] || row['modelo'],
-        Description: row['DESCRIÇÃO'] || row['DESCRIÇAO'] || row['DESCRICAO'] || row['Descricao'] || row['descricao'],
-        Location: row['LOCALIZAÇÃO'] || row['LOCALIZAÇAO'] || row['LOCALIZACAO'] || row['Localizacao'] || row['localizacao'],
-        Plant: row['PLANTA'] || row['Planta'] || row['planta'],
-        Manufacturer: row['FABRICANTE'] || row['Fabricante'] || row['fabricante'],
-        Status: row['STATUS'] || row['Status'] || row['status'] || 'Ativo',
-        InstallDate: row['DATA DE INSTALAÇÃO'] || row['Data de Instalação'] || row['data de instalação'] || new Date().toISOString().split('T')[0]
-      }));
+      const mappedData = data.map((row: any) => {
+        const tag = String(row['TAG'] || row['Tag'] || row['tag'] || '').trim();
+        const model = String(row['MODELO'] || row['Modelo'] || row['modelo'] || '').trim();
+        const description = String(row['DESCRIÇÃO'] || row['DESCRIÇAO'] || row['DESCRICAO'] || row['Descricao'] || row['descricao'] || '').trim();
+        const location = String(row['LOCALIZAÇÃO'] || row['LOCALIZAÇAO'] || row['LOCALIZACAO'] || row['Localizacao'] || row['localizacao'] || '').trim();
+        const plant = String(row['PLANTA'] || row['Planta'] || row['planta'] || '').trim();
+        const manufacturer = String(row['FABRICANTE'] || row['Fabricante'] || row['fabricante'] || '').trim();
+        const status = String(row['STATUS'] || row['Status'] || row['status'] || 'Ativo').trim();
+        const installDate = row['DATA DE INSTALAÇÃO'] || row['Data de Instalação'] || row['data de instalação'] || new Date().toISOString().split('T')[0];
+
+        return {
+          Tag: tag,
+          Model: model,
+          Description: description,
+          Location: location,
+          Plant: plant,
+          Manufacturer: manufacturer,
+          Status: ['Ativo', 'Inativo', 'Em Manutenção', 'Parado'].includes(status) ? status : 'Ativo',
+          InstallDate: typeof installDate === 'string' ? installDate : new Date().toISOString().split('T')[0]
+        };
+      }).filter(asset => asset.Tag && asset.Model);
       
-      console.log('Mapped data (first 5 rows):', mappedData.slice(0, 5));
+      console.log(`Mapped and filtered data: ${mappedData.length} valid assets found.`);
+      if (mappedData.length === 0) {
+        alert('Nenhum ativo válido encontrado no arquivo. Verifique se as colunas TAG e MODELO estão preenchidas.');
+        return;
+      }
       onImport(mappedData);
     };
     reader.readAsArrayBuffer(file);
@@ -3281,7 +3296,7 @@ const PreventiveModule = ({
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Tipo de Plano</label>
                       <select 
@@ -3389,7 +3404,7 @@ const PreventiveModule = ({
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Tipo Ativo</label>
                       <input 
@@ -3431,7 +3446,7 @@ const PreventiveModule = ({
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Frequência (Tipo)</label>
                       <select 
@@ -3456,7 +3471,7 @@ const PreventiveModule = ({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Última Realização</label>
                       <input 
@@ -4005,7 +4020,7 @@ const ReportsModule = ({ wos, assets, employees, plans }: {
           </div>
 
           {reportType === 'wos' && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="block text-xs font-medium text-slate-500 uppercase">Início</label>
                 <input 
@@ -5244,47 +5259,73 @@ export default function App() {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-100 transition-transform duration-300 lg:relative lg:translate-x-0",
-        !sidebarOpen && "-translate-x-full"
+        "fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-100 transition-all duration-300 flex flex-col overflow-hidden",
+        sidebarOpen ? "w-64" : "w-16 sm:w-20"
       )}>
         <div className="h-full flex flex-col">
-          <div className="p-6 flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
+          <div className={cn(
+            "p-4 sm:p-6 flex items-center transition-all duration-300",
+            sidebarOpen ? "justify-between" : "justify-center"
+          )}>
+            <div className="flex items-center space-x-3 overflow-hidden">
+              <div className="w-10 h-10 bg-blue-600 rounded-xl flex-shrink-0 flex items-center justify-center shadow-lg shadow-blue-200">
                 <Wrench className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xl font-bold tracking-tight">CMMS Pro</span>
+              {sidebarOpen && (
+                <motion.span 
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="text-xl font-bold tracking-tight whitespace-nowrap text-slate-900"
+                >
+                  CMMS Pro
+                </motion.span>
+              )}
             </div>
-            <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-2 text-slate-400">
-              <X className="w-6 h-6" />
-            </button>
           </div>
 
-          <nav className="flex-1 px-4 space-y-6 overflow-y-auto custom-scrollbar pb-6">
+          <nav className="flex-1 px-2 sm:px-4 space-y-6 overflow-y-auto custom-scrollbar pb-6 overflow-x-hidden">
             {menuGroups.map((group) => (
               <div key={group.title} className="space-y-2">
-                <h3 className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  {group.title}
-                </h3>
+                {sidebarOpen ? (
+                  <h3 className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                    {group.title}
+                  </h3>
+                ) : (
+                  <div className="h-px bg-slate-100 mx-2 my-4" />
+                )}
                 <div className="space-y-1">
                   {group.items.map((item) => (
                     <button
                       key={item.id}
                       onClick={() => setActiveTab(item.id)}
+                      title={!sidebarOpen ? item.label : undefined}
                       className={cn(
-                        "w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl transition-all duration-200 group",
+                        "w-full flex items-center rounded-xl transition-all duration-200 group relative",
+                        sidebarOpen ? "space-x-3 px-4 py-2.5" : "justify-center p-3",
                         activeTab === item.id 
                           ? "bg-blue-50 text-blue-600 shadow-sm shadow-blue-100/50" 
                           : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                       )}
                     >
                       <item.icon className={cn(
-                        "w-5 h-5 transition-colors",
+                        "w-5 h-5 flex-shrink-0 transition-colors",
                         activeTab === item.id ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"
                       )} />
-                      <span className="font-medium text-sm">{item.label}</span>
+                      {sidebarOpen && (
+                        <motion.span 
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className="font-medium text-sm whitespace-nowrap"
+                        >
+                          {item.label}
+                        </motion.span>
+                      )}
                       {activeTab === item.id && (
-                        <motion.div layoutId="active-pill" className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600" />
+                        sidebarOpen ? (
+                          <motion.div layoutId="active-pill" className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600" />
+                        ) : (
+                          <motion.div layoutId="active-pill-collapsed" className="absolute left-0 w-1 h-6 bg-blue-600 rounded-r-full" />
+                        )
                       )}
                     </button>
                   ))}
@@ -5293,44 +5334,71 @@ export default function App() {
             ))}
           </nav>
 
-          <div className="p-4 mt-auto">
+          <div className={cn("p-2 sm:p-4 mt-auto transition-all duration-300", !sidebarOpen && "px-2")}>
             {user ? (
-              <div className="bg-slate-900 rounded-2xl p-4 text-white">
-                <div className="flex items-center space-x-3 mb-4">
+              <div className={cn(
+                "bg-slate-900 rounded-2xl text-white transition-all duration-300",
+                sidebarOpen ? "p-4" : "p-2 flex flex-col items-center"
+              )}>
+                <div className={cn(
+                  "flex items-center mb-4 transition-all duration-300",
+                  sidebarOpen ? "space-x-3" : "justify-center"
+                )}>
                   {user.photoURL ? (
-                    <img src={user.photoURL} alt={user.displayName || ''} className="w-10 h-10 rounded-full border-2 border-white/20" referrerPolicy="no-referrer" />
+                    <img src={user.photoURL} alt={user.displayName || ''} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white/20 flex-shrink-0" referrerPolicy="no-referrer" />
                   ) : (
-                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                      <UserIcon className="w-6 h-6 text-white" />
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-600 rounded-full flex-shrink-0 flex items-center justify-center">
+                      <UserIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                     </div>
                   )}
-                  <div className="min-w-0">
-                    <div className="flex items-center space-x-1">
-                      <p className="text-sm font-bold truncate">{user.displayName || 'Usuário'}</p>
-                      {isAdmin && <ShieldCheck className="w-3 h-3 text-blue-400" />}
-                    </div>
-                    <p className="text-[10px] text-slate-400 truncate">{user.email}</p>
-                  </div>
+                  {sidebarOpen && (
+                    <motion.div 
+                      initial={{ opacity: 0, width: 0 }}
+                      animate={{ opacity: 1, width: 'auto' }}
+                      className="min-w-0"
+                    >
+                      <div className="flex items-center space-x-1">
+                        <p className="text-sm font-bold truncate">{user.displayName || 'Usuário'}</p>
+                        {isAdmin && <ShieldCheck className="w-3 h-3 text-blue-400" />}
+                      </div>
+                      <p className="text-[10px] text-slate-400 truncate">{user.email}</p>
+                    </motion.div>
+                  )}
                 </div>
                 <button 
                   onClick={handleLogout}
-                  className="w-full flex items-center justify-center space-x-2 py-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors text-sm font-medium"
+                  title={!sidebarOpen ? "Sair" : undefined}
+                  className={cn(
+                    "flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-xl transition-colors text-sm font-medium",
+                    sidebarOpen ? "w-full space-x-2 py-2" : "w-8 h-8 sm:w-10 sm:h-10"
+                  )}
                 >
                   <LogOut className="w-4 h-4" />
-                  <span>Sair</span>
+                  {sidebarOpen && <span>Sair</span>}
                 </button>
               </div>
             ) : (
-              <div className="bg-slate-900 rounded-2xl p-4 text-white">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Acesso Restrito</p>
-                <p className="text-sm font-medium mb-4">Faça login para gerenciar os dados.</p>
+              <div className={cn(
+                "bg-slate-900 rounded-2xl text-white transition-all duration-300",
+                sidebarOpen ? "p-4" : "p-2 flex flex-col items-center"
+              )}>
+                {sidebarOpen && (
+                  <>
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Acesso Restrito</p>
+                    <p className="text-sm font-medium mb-4">Faça login para gerenciar os dados.</p>
+                  </>
+                )}
                 <button 
                   onClick={handleLogin}
                   disabled={loginLoading}
-                  className="w-full flex items-center justify-center space-x-2 py-2 bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors text-sm font-medium disabled:opacity-50"
+                  title={!sidebarOpen ? "Entrar" : undefined}
+                  className={cn(
+                    "flex items-center justify-center bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors text-sm font-medium disabled:opacity-50",
+                    sidebarOpen ? "w-full space-x-2 py-2" : "w-8 h-8 sm:w-10 sm:h-10"
+                  )}
                 >
                   {loginLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
-                  <span>{loginLoading ? 'Conectando...' : 'Entrar com Google'}</span>
+                  {sidebarOpen && <span>{loginLoading ? 'Conectando...' : 'Entrar com Google'}</span>}
                 </button>
               </div>
             )}
@@ -5339,11 +5407,14 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50/50">
+      <main className={cn(
+        "flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50/50 transition-all duration-300",
+        sidebarOpen ? "pl-64" : "pl-16 sm:pl-20"
+      )}>
         {/* Header */}
         <header className="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-40">
           <div className="flex items-center space-x-3 sm:space-x-4">
-            <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 -ml-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors">
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 -ml-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors">
               <Menu className="w-6 h-6" />
             </button>
             <h2 className="text-base sm:text-lg font-semibold text-slate-900 capitalize truncate max-w-[150px] sm:max-w-none">
@@ -5733,27 +5804,63 @@ export default function App() {
                     isAdmin={isAdmin}
                     currentUserUid={user?.uid}
                     onImport={async (importedAssets) => {
-                      // Use batching to improve performance for large imports
-                      const batchSize = 100;
-                      for (let i = 0; i < importedAssets.length; i += batchSize) {
-                        const batch = importedAssets.slice(i, i + batchSize);
-                        await Promise.all(batch.map(async (asset, index) => {
-                          const id = `A${(assets.length + i + index + 1).toString().padStart(4, '0')}`;
-                          await createDocument('assets', {
-                            Tag: asset.Tag,
-                            Model: asset.Model,
-                            Description: asset.Description,
-                            Location: asset.Location,
-                            Plant: asset.Plant,
-                            Manufacturer: asset.Manufacturer,
-                            Status: asset.Status || 'Ativo',
-                            InstallDate: asset.InstallDate || new Date().toISOString(),
-                            ID: id,
-                            createdBy: user?.uid
-                          }, id);
-                        }));
+                      if (!user) {
+                        showToast('Faça login para importar ativos', 'error');
+                        return;
                       }
-                      alert(`Importação concluída com sucesso! ${importedAssets.length} ativos foram adicionados.`);
+                      
+                      setLoading(true);
+                      let successCount = 0;
+                      let errorCount = 0;
+                      
+                      // Use batching to improve performance for large imports
+                      const batchSize = 50;
+                      const total = importedAssets.length;
+                      
+                      // Get the current max ID to avoid collisions
+                      const currentMaxId = assets.reduce((max, asset) => {
+                        const idNum = parseInt(asset.ID.replace('A', ''));
+                        return isNaN(idNum) ? max : Math.max(max, idNum);
+                      }, 0);
+
+                      try {
+                        for (let i = 0; i < total; i += batchSize) {
+                          const batch = importedAssets.slice(i, i + batchSize);
+                          await Promise.all(batch.map(async (asset, index) => {
+                            const idNum = currentMaxId + i + index + 1;
+                            const id = `A${idNum.toString().padStart(4, '0')}`;
+                            try {
+                              await createDocument('assets', {
+                                Tag: asset.Tag,
+                                Model: asset.Model,
+                                Description: asset.Description,
+                                Location: asset.Location,
+                                Plant: asset.Plant,
+                                Manufacturer: asset.Manufacturer,
+                                Status: asset.Status || 'Ativo',
+                                InstallDate: asset.InstallDate || new Date().toISOString(),
+                                ID: id,
+                                createdBy: user.uid
+                              }, id);
+                              successCount++;
+                            } catch (err) {
+                              console.error(`Error importing asset ${asset.Tag}:`, err);
+                              errorCount++;
+                            }
+                          }));
+                        }
+                        
+                        if (errorCount === 0) {
+                          showToast(`Importação concluída! ${successCount} ativos adicionados.`, 'success');
+                        } else {
+                          showToast(`Importação finalizada: ${successCount} sucessos, ${errorCount} falhas.`, 'error');
+                        }
+                      } catch (err) {
+                        console.error('Bulk import error:', err);
+                        showToast('Erro durante a importação em massa', 'error');
+                      } finally {
+                        setLoading(false);
+                      }
                     }}
                     onAdd={() => {
                       setEditingAsset(null);
@@ -6090,7 +6197,7 @@ export default function App() {
                 </div>
 
                 <form onSubmit={handleCreateAsset} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-1">TAG</label>
                       <input 
@@ -6117,7 +6224,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Modelo</label>
                       <input 
@@ -6153,7 +6260,7 @@ export default function App() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Localização</label>
                       <input 
@@ -6401,7 +6508,7 @@ export default function App() {
                     </div>
                   )}
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Tempo Est. (h)</label>
                       <input 
@@ -6426,7 +6533,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Nº Colaboradores</label>
                       <input 
@@ -6450,7 +6557,7 @@ export default function App() {
                   </div>
 
                   {editingWO && (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Status</label>
                         <select 

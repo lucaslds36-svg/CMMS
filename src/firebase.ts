@@ -30,12 +30,15 @@ import {
   increment
 } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
+console.log('Firebase Config:', firebaseConfig);
 import type { UserProfile } from './types';
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 // Use the named database if provided, otherwise fallback to default
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || '(default)');
+const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
+console.log('Initializing Firestore with database ID:', dbId, 'Project ID:', firebaseConfig.projectId);
+export const db = getFirestore(app, dbId);
 export const googleProvider = new GoogleAuthProvider();
 
 export const loginWithGoogle = async () => {

@@ -256,7 +256,7 @@ service cloud.firestore {
     match /assets/{assetId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidAsset(request.resource.data);
-      allow update: if isMasterOrOwner('createdBy') && isValidAsset(request.resource.data);
+      allow update: if (isMasterOrOwner('createdBy') || !('createdBy' in resource.data)) && isValidAsset(request.resource.data);
       allow delete: if isAdmin();
     }
 

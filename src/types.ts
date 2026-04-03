@@ -1,4 +1,5 @@
 export interface Asset {
+  id: string;
   ID: string;
   Tag: string;
   Model: string;
