@@ -95,6 +95,7 @@ import {
   logout, 
   loginWithEmail,
   registerWithEmail,
+  resetPassword,
   subscribeToCollection,
   subscribeToUserCollection, 
   createDocument, 
@@ -4404,7 +4405,7 @@ export default function App() {
     }
   };
 
-  const [authMode, setAuthMode] = useState<'login' | 'register' | 'google'>('google');
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'google'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -4496,8 +4497,16 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user);
       if (user) {
+        // Restrict Google Login to Master User in onAuthStateChanged
+        const isGoogle = user.providerData.some(p => p.providerId === 'google.com');
+        if (isGoogle && user.email !== 'lucas.lds36@gmail.com') {
+          await logout();
+          showToast('Acesso via Google restrito ao Administrador Master.', 'error');
+          return;
+        }
+
+        setUser(user);
         console.log("User authenticated:", user.uid);
         let profile = await getUserProfile(user.uid);
         if (!profile) {
@@ -5006,7 +5015,16 @@ export default function App() {
     if (loginLoading) return;
     setLoginLoading(true);
     try {
-      await loginWithGoogle();
+      const result = await loginWithGoogle();
+      const user = result.user;
+      
+      // Restrict Google Login to Master User
+      if (user.email !== 'lucas.lds36@gmail.com') {
+        await logout();
+        showToast('Acesso via Google restrito ao Administrador Master.', 'error');
+        return;
+      }
+      
       showToast('Login realizado com sucesso!');
     } catch (error: any) {
       console.error('Login error:', error);
@@ -5030,6 +5048,23 @@ export default function App() {
     } catch (error: any) {
       console.error('Email login error:', error);
       showToast(error.message || 'Erro ao realizar login', 'error');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!email) {
+      showToast('Por favor, insira seu e-mail para recuperar a senha', 'error');
+      return;
+    }
+    setAuthLoading(true);
+    try {
+      await resetPassword(email);
+      showToast('E-mail de recuperação enviado! Verifique sua caixa de entrada.');
+    } catch (error: any) {
+      console.error('Reset password error:', error);
+      showToast(error.message || 'Erro ao enviar e-mail de recuperação', 'error');
     } finally {
       setAuthLoading(false);
     }
@@ -5590,6 +5625,15 @@ export default function App() {
                       />
                     </div>
                   </div>
+                  <div className="flex justify-end">
+                    <button 
+                      type="button"
+                      onClick={handleResetPassword}
+                      className="text-xs font-bold text-blue-600 hover:text-blue-700"
+                    >
+                      Esqueceu a senha?
+                    </button>
+                  </div>
                   <button 
                     type="submit"
                     disabled={authLoading}
@@ -5609,9 +5653,9 @@ export default function App() {
                     <button 
                       type="button"
                       onClick={() => setAuthMode('google')}
-                      className="text-sm font-bold text-slate-500 hover:text-slate-600"
+                      className="text-xs font-medium text-slate-400 hover:text-slate-600 mt-2"
                     >
-                      Voltar para Login Google
+                      Entrar como Administrador (Google)
                     </button>
                   </div>
                 </form>
