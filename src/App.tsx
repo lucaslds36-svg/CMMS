@@ -20,6 +20,7 @@ import {
   X,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   Filter,
   RefreshCw,
   LogIn,
@@ -2572,6 +2573,7 @@ const PreventiveModule = ({
   const [showSummary, setShowSummary] = useState(false);
   const [showGenerationModal, setShowGenerationModal] = useState(false);
   const [selectedPlanAssets, setSelectedPlanAssets] = useState<Record<string, string[]>>({});
+  const [expandedGenerationPlans, setExpandedGenerationPlans] = useState<Record<string, boolean>>({});
 
   const handleTogglePlanAsset = (planId: string, assetId: string) => {
     setSelectedPlanAssets(prev => {
@@ -3179,13 +3181,20 @@ const PreventiveModule = ({
                     const selectedAssets = selectedPlanAssets[plan.ID] || [];
                     const allSelected = planAssets.length > 0 && selectedAssets.length === planAssets.length;
                     const someSelected = selectedAssets.length > 0 && !allSelected;
+                    const isExpanded = expandedGenerationPlans[plan.ID];
 
                     return (
                       <div key={plan.ID} className="bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden">
-                        <div className="p-4 bg-white border-b border-slate-100 flex items-center justify-between">
+                        <div 
+                          className="p-4 bg-white border-b border-slate-100 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors"
+                          onClick={() => setExpandedGenerationPlans(prev => ({ ...prev, [plan.ID]: !prev[plan.ID] }))}
+                        >
                           <div className="flex items-center space-x-3">
                             <button 
-                              onClick={() => handleToggleAllPlanAssets(plan.ID, planAssets.map(a => a.ID))}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleAllPlanAssets(plan.ID, planAssets.map(a => a.ID));
+                              }}
                               className={cn(
                                 "w-5 h-5 rounded border flex items-center justify-center transition-all",
                                 allSelected ? "bg-blue-600 border-blue-600 text-white" : someSelected ? "bg-blue-100 border-blue-400 text-blue-600" : "border-slate-300 bg-white"
@@ -3199,52 +3208,57 @@ const PreventiveModule = ({
                               <p className="text-[10px] text-slate-400 uppercase font-bold">{plan.Frequency} • {plan.Type}</p>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-xs font-bold text-slate-500">
-                              {selectedAssets.length} / {planAssets.length} selecionados
-                            </p>
+                          <div className="flex items-center space-x-4">
+                            <div className="text-right">
+                              <p className="text-xs font-bold text-slate-500">
+                                {selectedAssets.length} / {planAssets.length} selecionados
+                              </p>
+                            </div>
+                            {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
                           </div>
                         </div>
-                        <div className="p-2 grid grid-cols-1 gap-1">
-                          {planAssets.map(asset => {
-                            const nextDue = plan.AssetNextDues?.[asset.ID] || plan.NextDue;
-                            const overdue = isOverdue(nextDue);
-                            const isSelected = selectedAssets.includes(asset.ID);
+                        {isExpanded && (
+                          <div className="p-2 grid grid-cols-1 gap-1">
+                            {planAssets.map(asset => {
+                              const nextDue = plan.AssetNextDues?.[asset.ID] || plan.NextDue;
+                              const overdue = isOverdue(nextDue);
+                              const isSelected = selectedAssets.includes(asset.ID);
 
-                            return (
-                              <div 
-                                key={asset.ID}
-                                onClick={() => handleTogglePlanAsset(plan.ID, asset.ID)}
-                                className={cn(
-                                  "flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all",
-                                  isSelected ? "bg-blue-50/50 border border-blue-100" : "hover:bg-white border border-transparent"
-                                )}
-                              >
-                                <div className="flex items-center space-x-3">
-                                  <div className={cn(
-                                    "w-4 h-4 rounded border flex items-center justify-center transition-all",
-                                    isSelected ? "bg-blue-600 border-blue-600 text-white" : "border-slate-300 bg-white"
-                                  )}>
-                                    {isSelected && <CheckCircle2 className="w-3 h-3" />}
+                              return (
+                                <div 
+                                  key={asset.ID}
+                                  onClick={() => handleTogglePlanAsset(plan.ID, asset.ID)}
+                                  className={cn(
+                                    "flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all",
+                                    isSelected ? "bg-blue-50/50 border border-blue-100" : "hover:bg-white border border-transparent"
+                                  )}
+                                >
+                                  <div className="flex items-center space-x-3">
+                                    <div className={cn(
+                                      "w-4 h-4 rounded border flex items-center justify-center transition-all",
+                                      isSelected ? "bg-blue-600 border-blue-600 text-white" : "border-slate-300 bg-white"
+                                    )}>
+                                      {isSelected && <CheckCircle2 className="w-3 h-3" />}
+                                    </div>
+                                    <div>
+                                      <p className="font-bold text-slate-700 text-xs">{asset.Tag}</p>
+                                      <p className="text-[10px] text-slate-400">{asset.Description || asset.Model}</p>
+                                    </div>
                                   </div>
-                                  <div>
-                                    <p className="font-bold text-slate-700 text-xs">{asset.Tag}</p>
-                                    <p className="text-[10px] text-slate-400">{asset.Model}</p>
+                                  <div className="text-right">
+                                    <p className={cn(
+                                      "text-[10px] font-bold",
+                                      overdue ? "text-rose-600" : "text-slate-500"
+                                    )}>
+                                      {new Date(nextDue).toLocaleDateString('pt-BR')}
+                                    </p>
+                                    {overdue && <p className="text-[8px] text-rose-400 font-bold uppercase">Atrasado</p>}
                                   </div>
                                 </div>
-                                <div className="text-right">
-                                  <p className={cn(
-                                    "text-[10px] font-bold",
-                                    overdue ? "text-rose-600" : "text-slate-500"
-                                  )}>
-                                    {new Date(nextDue).toLocaleDateString('pt-BR')}
-                                  </p>
-                                  {overdue && <p className="text-[8px] text-rose-400 font-bold uppercase">Atrasado</p>}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -4082,7 +4096,24 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showAssetModal, setShowAssetModal] = useState(false);
   const [showWOModal, setShowWOModal] = useState(false);
+  const [selectedModelForWO, setSelectedModelForWO] = useState<string>('');
   const [assets, setAssets] = useState<Asset[]>([]);
+  const assetsByModel = useMemo(() => {
+    const grouped = assets.reduce((acc, asset) => {
+      const model = asset.Model || 'Sem Modelo';
+      if (!acc[model]) acc[model] = [];
+      acc[model].push(asset);
+      return acc;
+    }, {} as Record<string, Asset[]>);
+
+    const sortedGrouped: Record<string, Asset[]> = {};
+    Object.keys(grouped).sort().forEach(model => {
+      sortedGrouped[model] = grouped[model].sort((a, b) => 
+        (a.Description || a.Tag).localeCompare(b.Description || b.Tag)
+      );
+    });
+    return sortedGrouped;
+  }, [assets]);
   const [wos, setWos] = useState<WorkOrder[]>([]);
   const [plans, setPlans] = useState<PreventivePlan[]>([]);
   const [bditssData, setBditssData] = useState<any[]>([]);
@@ -5980,9 +6011,16 @@ export default function App() {
                         scope: '',
                         needsMaterial: false
                       });
+                      setSelectedModelForWO('');
                       setShowWOModal(true);
                     }} 
-                    onEdit={handleEditWO}
+                    onEdit={(wo) => {
+                      setEditingWO(wo);
+                      setNewWO(wo);
+                      const asset = assets.find(a => a.ID === wo.AssetID);
+                      setSelectedModelForWO(asset?.Model || '');
+                      setShowWOModal(true);
+                    }}
                     onUpdateStatus={(id, status, completedAt) => handleUpdateWorkOrder(id, { Status: status as any, CompletedAt: completedAt })}
                     onUpdateChecklist={(id, checklist) => handleUpdateWorkOrder(id, { Checklist: checklist })}
                     onDelete={handleDeleteWorkOrder}
@@ -6410,19 +6448,47 @@ export default function App() {
                 </div>
 
                 <form onSubmit={handleCreateWorkOrder} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Ativo</label>
-                    <select 
-                      required
-                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                      value={newWO.AssetID}
-                      onChange={e => setNewWO({...newWO, AssetID: e.target.value})}
-                    >
-                      <option value="">Selecione um ativo</option>
-                      {assets.map(a => (
-                        <option key={a.ID} value={a.ID}>{a.Tag} - {a.Model}</option>
-                      ))}
-                    </select>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Modelo do Equipamento</label>
+                      <select 
+                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                        value={selectedModelForWO}
+                        onChange={e => {
+                          setSelectedModelForWO(e.target.value);
+                          setNewWO({...newWO, AssetID: ''});
+                        }}
+                      >
+                        <option value="">Todos os Modelos</option>
+                        {Object.keys(assetsByModel).map(model => (
+                          <option key={model} value={model}>{model}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Ativo (Descrição)</label>
+                      <select 
+                        required
+                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                        value={newWO.AssetID}
+                        onChange={e => setNewWO({...newWO, AssetID: e.target.value})}
+                      >
+                        <option value="">Selecione um ativo</option>
+                        {selectedModelForWO ? (
+                          assetsByModel[selectedModelForWO]?.map(a => (
+                            <option key={a.ID} value={a.ID}>{a.Description || a.Tag} ({a.Tag})</option>
+                          ))
+                        ) : (
+                          Object.entries(assetsByModel).map(([model, modelAssets]) => (
+                            <optgroup key={model} label={model}>
+                              {modelAssets.map(a => (
+                                <option key={a.ID} value={a.ID}>{a.Description || a.Tag} ({a.Tag})</option>
+                              ))}
+                            </optgroup>
+                          ))
+                        )}
+                      </select>
+                    </div>
                   </div>
 
                   <div>
