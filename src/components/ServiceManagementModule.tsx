@@ -399,7 +399,7 @@ export const ServiceManagementModule = ({
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-100">
         <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center gap-4">
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -432,8 +432,8 @@ export const ServiceManagementModule = ({
         </div>
 
         {viewMode === 'table' ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          <div className="overflow-x-auto w-full touch-pan-x">
+            <table className="w-max min-w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
                 <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">OS</th>
@@ -503,7 +503,7 @@ export const ServiceManagementModule = ({
                             >
                               <Pencil className="w-4 h-4" />
                             </button>
-                            {onDelete && (
+                            {onDelete && (userProfile?.role === 'admin' || demand.requesterUid === userProfile?.uid || userProfile?.workOrderRole === 'planner') && (
                               <button 
                                 onClick={() => onDelete(demand.id)}
                                 className="p-1.5 bg-rose-600 text-white rounded hover:bg-rose-700 transition-all"

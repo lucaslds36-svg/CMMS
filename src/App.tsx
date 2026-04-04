@@ -5586,7 +5586,7 @@ export default function App() {
       </aside>
       {/* Main Content */}
       <main className={cn(
-        "flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50/50 transition-all duration-300",
+        "flex-1 flex flex-col min-w-0 bg-slate-50/50 transition-all duration-300",
         sidebarOpen ? "lg:pl-72" : "lg:pl-0"
       )}>
         {/* Header */}
@@ -5890,8 +5890,9 @@ export default function App() {
                 {activeTab === 'users' && isAdmin && (
                   <div className="space-y-6">
                     <h3 className="text-xl font-bold text-slate-900">Gerenciamento de Usuários</h3>
-                    <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
-                      <table className="w-full text-left">
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left min-w-[600px]">
                         <thead className="bg-slate-50 border-b border-slate-100">
                           <tr>
                             <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Usuário</th>
@@ -5982,6 +5983,7 @@ export default function App() {
                           ))}
                         </tbody>
                       </table>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -6201,7 +6203,7 @@ export default function App() {
                 )}
                 {activeTab === 'profile' && userProfile && (
                   <div className="max-w-2xl mx-auto space-y-8">
-                    <div className="flex items-center space-x-4">
+                    <div className="flex flex-col sm:flex-row items-center text-center sm:text-left space-y-4 sm:space-y-0 sm:space-x-4">
                       <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center overflow-hidden border-4 border-white shadow-xl">
                         {userProfile.photoURL ? (
                           <img src={userProfile.photoURL} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -6211,7 +6213,7 @@ export default function App() {
                       </div>
                       <div>
                         <h3 className="text-2xl font-bold text-slate-900">{userProfile.displayName}</h3>
-                        <p className="text-slate-500">{userProfile.email}</p>
+                        <p className="text-slate-500 break-all">{userProfile.email}</p>
                         <div className={cn(
                           "inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase mt-2",
                           userProfile.role === 'admin' ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-600",
