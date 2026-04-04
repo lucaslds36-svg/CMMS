@@ -491,7 +491,7 @@ export const ServiceManagementModule = ({
                         >
                           <Eye className="w-4 h-4" />
                         </button>
-                        {(userProfile?.role === 'admin' || demand.requesterUid === userProfile?.uid || demand.responsibleId === userProfile?.uid) && (
+                        {(userProfile?.role === 'admin' || demand.requesterUid === userProfile?.uid || demand.responsibleId === userProfile?.uid || userProfile?.workOrderRole === 'planner') && (
                           <>
                             <button 
                               onClick={() => {
@@ -505,11 +505,7 @@ export const ServiceManagementModule = ({
                             </button>
                             {onDelete && (
                               <button 
-                                onClick={() => {
-                                  if (window.confirm('Tem certeza que deseja excluir esta demanda?')) {
-                                    onDelete(demand.id);
-                                  }
-                                }}
+                                onClick={() => onDelete(demand.id)}
                                 className="p-1.5 bg-rose-600 text-white rounded hover:bg-rose-700 transition-all"
                                 title="Excluir"
                               >
@@ -545,9 +541,9 @@ export const ServiceManagementModule = ({
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden"
+              className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
             >
-              <div className="p-8">
+              <div className="p-8 overflow-y-auto">
                 <div className="flex items-center justify-between mb-8">
                   <div>
                     <h3 className="text-2xl font-bold text-slate-900">Nova Demanda de Serviço</h3>
@@ -801,7 +797,7 @@ export const ServiceManagementModule = ({
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
             >
-              <div className="p-8 overflow-y-auto">
+              <div className="p-4 sm:p-8 overflow-y-auto">
                 <div className="flex items-center justify-between mb-8">
                   <div>
                     <h3 className="text-2xl font-bold text-slate-900">Detalhes da Demanda</h3>

@@ -4527,6 +4527,23 @@ export default function App() {
   };
 
   useEffect(() => {
+    const testConnection = async () => {
+      try {
+        const { getDocFromServer, doc: firestoreDoc } = await import('firebase/firestore');
+        await getDocFromServer(firestoreDoc(db, 'test', 'connection'));
+        console.log("Firestore connection test successful");
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('the client is offline')) {
+          console.error("Firestore connection test failed: the client is offline. Check your Firebase configuration.");
+        } else {
+          console.log("Firestore connection test completed (other error expected if not admin):", error);
+        }
+      }
+    };
+    testConnection();
+  }, []);
+
+  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         // Restrict Google Login to Master User in onAuthStateChanged
@@ -4569,6 +4586,7 @@ export default function App() {
         setUserProfileState(profile);
         setIsAdmin(isAdminUser);
       } else {
+        setUser(null);
         setUserProfileState(null);
         setIsAdmin(false);
       }
@@ -4579,7 +4597,7 @@ export default function App() {
 
   // Real-time Global Data Subscriptions
   useEffect(() => {
-    if (!user) return;
+    if (!authReady || !user) return;
 
     setLoadingGlobalData(true);
     console.log("Starting global data subscriptions...");
@@ -5116,8 +5134,10 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    console.log('handleLogout called');
     try {
       await logout();
+      console.log('logout successful');
       showToast('Logout realizado com sucesso!');
     } catch (error) {
       console.error('Logout error:', error);
@@ -5218,6 +5238,32 @@ export default function App() {
         });
         
         await updateDocument('serviceDemands', demand.id, updatedDemand);
+
+        // Send notifications for updates
+        const truncatedDesc = mergedDemand.description.length > 100 ? mergedDemand.description.substring(0, 100) + '...' : mergedDemand.description;
+        const notificationMessage = `A demanda "${truncatedDesc}" foi atualizada.`;
+        
+        // Notify responsible if assigned
+        if (mergedDemand.responsibleId && mergedDemand.responsibleId !== user?.uid) {
+          await createDocument('notifications', {
+            userId: mergedDemand.responsibleId,
+            message: notificationMessage,
+            read: false,
+            createdAt: new Date().toISOString(),
+            demandId: demand.id
+          });
+        }
+        
+        // Notify requester if not the one who updated
+        if (mergedDemand.requesterUid && mergedDemand.requesterUid !== user?.uid) {
+          await createDocument('notifications', {
+            userId: mergedDemand.requesterUid,
+            message: notificationMessage,
+            read: false,
+            createdAt: new Date().toISOString(),
+            demandId: demand.id
+          });
+        }
       } else {
         const id = demand.id || `SD-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
         const newDemand: any = { ...demand, id };
@@ -5225,6 +5271,18 @@ export default function App() {
           if (newDemand[key] === undefined) delete newDemand[key];
         });
         await createDocument('serviceDemands', newDemand, id);
+
+        // Notify responsible about new demand
+        if (newDemand.responsibleId && newDemand.responsibleId !== user?.uid) {
+          const truncatedDesc = newDemand.description.length > 100 ? newDemand.description.substring(0, 100) + '...' : newDemand.description;
+          await createDocument('notifications', {
+            userId: newDemand.responsibleId,
+            message: `Uma nova demanda foi atribuída a você: "${truncatedDesc}"`,
+            read: false,
+            createdAt: new Date().toISOString(),
+            demandId: id
+          });
+        }
       }
       showToast('Demanda salva com sucesso!');
     } catch (error) {
@@ -5235,11 +5293,13 @@ export default function App() {
 
   const handleDeleteServiceDemand = async (demandId: string) => {
     try {
+      console.log('Tentando excluir demanda:', demandId);
+      showToast('Excluindo demanda...');
       await deleteDocument('serviceDemands', demandId);
       showToast('Demanda excluída com sucesso!');
     } catch (error) {
-      console.error('Error deleting service demand:', error);
-      showToast('Erro ao excluir demanda', 'error');
+      console.error('Erro detalhado ao excluir demanda:', error);
+      showToast('Erro ao excluir demanda: ' + (error instanceof Error ? error.message : 'Erro desconhecido'), 'error');
     }
   };
 
@@ -5270,8 +5330,8 @@ export default function App() {
       const truncatedDesc = demand.description.length > 100 ? demand.description.substring(0, 100) + '...' : demand.description;
       const notificationMessage = `O status da demanda "${truncatedDesc}" foi alterado para "${status}".`;
       
-      // Notify requester
-      if (demand.requesterUid) {
+      // Notify requester if not the one who updated
+      if (demand.requesterUid && demand.requesterUid !== user?.uid) {
         await createDocument('notifications', {
           userId: demand.requesterUid,
           message: notificationMessage,
@@ -5281,8 +5341,8 @@ export default function App() {
         });
       }
 
-      // Notify planner (if exists and different from requester)
-      if (demand.responsibleId && demand.responsibleId !== demand.requesterUid) {
+      // Notify planner (if exists and different from requester and not the one who updated)
+      if (demand.responsibleId && demand.responsibleId !== demand.requesterUid && demand.responsibleId !== user?.uid) {
         await createDocument('notifications', {
           userId: demand.responsibleId,
           message: notificationMessage,
@@ -5323,6 +5383,33 @@ export default function App() {
       });
 
       await updateDocument('serviceDemands', demandId, updatedDemand);
+
+      // Send notifications for scope change
+      const truncatedDesc = demand.description.length > 100 ? demand.description.substring(0, 100) + '...' : demand.description;
+      const notificationMessage = `O escopo da demanda "${truncatedDesc}" foi alterado.`;
+      
+      // Notify responsible if assigned and not the one who updated
+      if (demand.responsibleId && demand.responsibleId !== user?.uid) {
+        await createDocument('notifications', {
+          userId: demand.responsibleId,
+          message: notificationMessage,
+          read: false,
+          createdAt: new Date().toISOString(),
+          demandId: demandId
+        });
+      }
+      
+      // Notify requester if not the one who updated
+      if (demand.requesterUid && demand.requesterUid !== user?.uid) {
+        await createDocument('notifications', {
+          userId: demand.requesterUid,
+          message: notificationMessage,
+          read: false,
+          createdAt: new Date().toISOString(),
+          demandId: demandId
+        });
+      }
+
       showToast('Alteração de escopo registrada!');
     } catch (error) {
       console.error('Error adding scope change:', error);
@@ -6810,7 +6897,14 @@ export default function App() {
                   <div key={n.id} className={cn("p-3 rounded-xl border text-sm", n.read ? "bg-slate-50 border-slate-100" : "bg-blue-50 border-blue-100")}>
                     <p className="text-slate-700">{n.message}</p>
                     <p className="text-[10px] text-slate-400 mt-1">{new Date(n.createdAt).toLocaleString()}</p>
-                    {!n.read && (
+                    {n.read ? (
+                      <button 
+                        onClick={() => deleteDocument('notifications', n.id)}
+                        className="text-[10px] font-bold text-red-600 mt-2"
+                      >
+                        Apagar
+                      </button>
+                    ) : (
                       <button 
                         onClick={() => updateDocument('notifications', n.id, { read: true })}
                         className="text-[10px] font-bold text-blue-600 mt-2"
