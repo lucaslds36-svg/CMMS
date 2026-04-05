@@ -6160,6 +6160,7 @@ export default function App() {
                   <ImprovementManagementModule 
                     userProfile={userProfile}
                     employees={employees}
+                    assets={assets}
                     onSave={handleSaveImprovementProject}
                     onDelete={handleDeleteImprovementProject}
                     showToast={showToast}

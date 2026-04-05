@@ -162,7 +162,7 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidEngineeringProject(data) {
-      return hasOnlyAllowedFields(['id', 'title', 'assetId', 'assetName', 'description', 'objective', 'indicator', 'responsible', 'responsibleId', 'status', 'startDate', 'testStartDate', 'plannedTestDays', 'testStatus', 'result', 'lessonsLearned', 'standardize', 'createdAt', 'updatedAt', 'tasks', 'adjustments', 'indicators', 'comments', 'statusHistory', 'createdBy']) &&
+      return hasOnlyAllowedFields(['id', 'title', 'assetId', 'assetName', 'assets', 'description', 'objective', 'indicator', 'responsible', 'responsibleId', 'status', 'startDate', 'testStartDate', 'plannedTestDays', 'testStatus', 'result', 'lessonsLearned', 'standardize', 'scope', 'createdAt', 'updatedAt', 'tasks', 'adjustments', 'indicators', 'comments', 'statusHistory', 'createdBy', 'investmentValue']) &&
              (!('title' in data) || (data.title is string && data.title.size() > 0)) &&
              (!('assetId' in data) || data.assetId is string) &&
              (!('assetName' in data) || data.assetName is string) &&
@@ -171,14 +171,20 @@ service cloud.firestore {
              (!('startDate' in data) || data.startDate is string || data.startDate == null) &&
              (!('testStartDate' in data) || data.testStartDate is string || data.testStartDate == null) &&
              (!('plannedTestDays' in data) || data.plannedTestDays is number) &&
+             (!('investmentValue' in data) || data.investmentValue is number) &&
              (!('testStatus' in data) || data.testStatus in ['Não iniciado', 'Em teste', 'Aprovado', 'Reprovado', '']) &&
              (!('result' in data) || data.result in ['Sucesso', 'Parcial', 'Falha', ''] || data.result == null) &&
              (!('lessonsLearned' in data) || data.lessonsLearned is string || data.lessonsLearned == null) &&
              (!('standardize' in data) || data.standardize is bool) &&
+             (!('scope' in data) || data.scope in ['specific', 'all']) &&
+             (!('assets' in data) || data.assets is list) &&
              (!('createdAt' in data) || data.createdAt is string) &&
              (!('updatedAt' in data) || data.updatedAt is string) &&
              (!('id' in data) || data.id is string) &&
+             (!('responsible' in data) || data.responsible is string) &&
              (!('responsibleId' in data) || data.responsibleId is string || data.responsibleId == null) &&
+             (!('indicator' in data) || data.indicator is string) &&
+             (!('createdBy' in data) || data.createdBy is string) &&
              (!('tasks' in data) || data.tasks is list) &&
              (!('adjustments' in data) || data.adjustments is list) &&
              (!('indicators' in data) || data.indicators is list) &&

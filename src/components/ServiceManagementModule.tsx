@@ -126,13 +126,12 @@ export const ServiceManagementModule = ({
     if (!userProfile) return;
 
     try {
-      const responsible = employees.find(emp => emp.ID === formData.responsibleId);
       const demandData: Partial<ServiceDemand> = {
         ...formData,
         requesterUid: userProfile.uid,
         requesterName: userProfile.displayName || 'Usuário',
-        responsibleName: responsible?.Name || '',
-        responsibleId: responsible?.userUid || formData.responsibleId,
+        responsibleName: formData.responsibleName || '',
+        responsibleId: formData.responsibleId || '',
         collaborators: formData.collaborators || [],
         status: 'Não Iniciado',
         openedAt: new Date().toISOString(),
@@ -608,24 +607,16 @@ export const ServiceManagementModule = ({
 
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Responsável</label>
-                      <select 
+                      <input 
                         required
+                        type="text"
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={formData.responsibleId}
-                        onChange={e => setFormData({...formData, responsibleId: e.target.value})}
-                      >
-                        <option value="">Selecione um responsável</option>
-                        {employees
-                          .filter(emp => emp.Type === formData.executorType)
-                          .map(emp => (
-                            <option key={emp.ID} value={emp.ID}>
-                              {emp.Name} {emp.userUid ? '✅' : '⚠️ (Sem acesso)'}
-                            </option>
-                          ))
-                        }
-                      </select>
+                        placeholder="Nome do responsável..."
+                        value={formData.responsibleName || ''}
+                        onChange={e => setFormData({...formData, responsibleName: e.target.value, responsibleId: ''})}
+                      />
                       <p className="text-[10px] text-slate-500 mt-1 italic px-1">
-                        * Apenas responsáveis com ✅ poderão gerenciar esta demanda no sistema.
+                        * Digite o nome do responsável pela demanda.
                       </p>
                     </div>
 
@@ -732,10 +723,10 @@ export const ServiceManagementModule = ({
                             <input 
                               type="text"
                               className="w-full px-4 py-2 bg-white border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                              value={formData.materialRequisition?.item}
+                              value={formData.materialRequisition?.item ?? ''}
                               onChange={e => setFormData({
                                 ...formData, 
-                                materialRequisition: { ...formData.materialRequisition!, item: e.target.value }
+                                materialRequisition: { ...(formData.materialRequisition || { item: '', requisitionNumber: '', deliveryDate: '' }), item: e.target.value }
                               })}
                             />
                           </div>
@@ -744,10 +735,10 @@ export const ServiceManagementModule = ({
                             <input 
                               type="text"
                               className="w-full px-4 py-2 bg-white border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                              value={formData.materialRequisition?.requisitionNumber}
+                              value={formData.materialRequisition?.requisitionNumber ?? ''}
                               onChange={e => setFormData({
                                 ...formData, 
-                                materialRequisition: { ...formData.materialRequisition!, requisitionNumber: e.target.value }
+                                materialRequisition: { ...(formData.materialRequisition || { item: '', requisitionNumber: '', deliveryDate: '' }), requisitionNumber: e.target.value }
                               })}
                             />
                           </div>
@@ -756,10 +747,10 @@ export const ServiceManagementModule = ({
                             <input 
                               type="date"
                               className="w-full px-4 py-2 bg-white border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                              value={formData.materialRequisition?.deliveryDate}
+                              value={formData.materialRequisition?.deliveryDate ?? ''}
                               onChange={e => setFormData({
                                 ...formData, 
-                                materialRequisition: { ...formData.materialRequisition!, deliveryDate: e.target.value }
+                                materialRequisition: { ...(formData.materialRequisition || { item: '', requisitionNumber: '', deliveryDate: '' }), deliveryDate: e.target.value }
                               })}
                             />
                           </div>
@@ -841,7 +832,17 @@ export const ServiceManagementModule = ({
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Responsável</label>
-                        <p className="text-sm font-bold text-slate-900">{editingDemand.responsibleName}</p>
+                        {isEditing ? (
+                          <input 
+                            type="text"
+                            className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                            value={editingDemand.responsibleName || ''}
+                            onChange={e => setEditingDemand({...editingDemand, responsibleName: e.target.value, responsibleId: ''})}
+                            placeholder="Nome do responsável..."
+                          />
+                        ) : (
+                          <p className="text-sm font-bold text-slate-900">{editingDemand.responsibleName}</p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Colaboradores</label>

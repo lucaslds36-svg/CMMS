@@ -151,6 +151,7 @@ export interface EngineeringProject {
   title: string;
   assetId: string;
   assetName: string;
+  assets?: { id: string, tag: string, model: string, description: string }[];
   description: string;
   objective: string;
   indicator: string;
@@ -164,6 +165,8 @@ export interface EngineeringProject {
   result?: 'Sucesso' | 'Parcial' | 'Falha';
   lessonsLearned?: string;
   standardize: boolean;
+  scope: 'specific' | 'all';
+  investmentValue?: number;
   createdAt: string;
   updatedAt: string;
   tasks?: EngineeringTask[];

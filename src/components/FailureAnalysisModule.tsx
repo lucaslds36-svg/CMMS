@@ -410,6 +410,24 @@ export const FailureAnalysisModule = ({
     }
   };
 
+  const generatePDF = async () => {
+    const doc = new jsPDF('p', 'mm', 'a4');
+    doc.setFontSize(16);
+    doc.text('Relatório de Análise de Falhas', 10, 10);
+    doc.setFontSize(10);
+    doc.text(`Gerado em: ${new Date().toLocaleString()}`, 10, 15);
+    
+    // Capture charts
+    const charts = document.querySelectorAll('.h-96');
+    for (let i = 0; i < charts.length; i++) {
+        const canvas = await html2canvas(charts[i] as HTMLElement);
+        const imgData = canvas.toDataURL('image/png');
+        doc.addImage(imgData, 'PNG', 10, 30 + (i * 90), 180, 80);
+    }
+    
+    doc.save('relatorio_falhas.pdf');
+  };
+
   // Pre-calculate column mappings for filters to improve performance
   const filterColMapping = useMemo(() => {
     const mapping: Record<string, string> = {};
@@ -624,6 +642,13 @@ export const FailureAnalysisModule = ({
                 <span>Filtros Dinâmicos</span>
               </div>
             <div className="flex items-center space-x-4">
+              <button 
+                onClick={generatePDF}
+                className="text-xs text-emerald-600 hover:text-emerald-700 flex items-center space-x-1 font-bold bg-emerald-50 px-3 py-1.5 rounded-lg transition-all"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Gerar PDF</span>
+              </button>
               <button 
                 onClick={handlePrintReport}
                 className="text-xs text-blue-600 hover:text-blue-700 flex items-center space-x-1 font-bold bg-blue-50 px-3 py-1.5 rounded-lg transition-all"
