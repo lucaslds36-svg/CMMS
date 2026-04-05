@@ -441,6 +441,7 @@ export const ImprovementManagementModule = ({
                   <th className="pb-2">Tarefa</th>
                   <th className="pb-2">Responsável</th>
                   <th className="pb-2">Data Prevista</th>
+                  <th className="pb-2">Investimento</th>
                   <th className="pb-2">Status</th>
                 </tr>
               </thead>
@@ -450,6 +451,7 @@ export const ImprovementManagementModule = ({
                     <td className="py-3">{task.name}</td>
                     <td className="py-3">{task.responsible}</td>
                     <td className="py-3">{task.plannedDate ? format(new Date(task.plannedDate), 'dd/MM/yyyy') : '-'}</td>
+                    <td className="py-3">R$ {task.investmentValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}</td>
                     <td className="py-3" onClick={(e) => e.stopPropagation()}>
                       <select 
                         value={task.status}
@@ -467,6 +469,11 @@ export const ImprovementManagementModule = ({
                     </td>
                   </tr>
                 ))}
+                <tr className="border-t-2 border-slate-200 font-bold">
+                  <td className="py-3" colSpan={3}>Total</td>
+                  <td className="py-3">R$ {selectedProject.tasks?.reduce((sum, task) => sum + (task.investmentValue || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                  <td className="py-3"></td>
+                </tr>
               </tbody>
             </table>
             <button onClick={() => setActiveSubModal({type: 'task', mode: 'create'})} className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold">+ Adicionar Tarefa</button>
