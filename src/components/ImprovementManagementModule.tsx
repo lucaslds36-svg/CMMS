@@ -13,10 +13,13 @@ import {
   Pencil, 
   Trash2, 
   Eye,
-  Clock
+  Clock,
+  Download
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import type { EngineeringProject, UserProfile, Employee } from '../types';
 
 interface ImprovementManagementModuleProps {
@@ -219,6 +222,7 @@ export const ImprovementManagementModule = ({
                 <input placeholder="Nome da Tarefa" value={subItemData?.name || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, name: e.target.value})} />
                 <input placeholder="Responsável" value={subItemData?.responsible || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, responsible: e.target.value})} />
                 <input type="date" value={subItemData?.plannedDate || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, plannedDate: e.target.value})} />
+                <input type="number" placeholder="Valor do Investimento (R$)" value={subItemData?.investmentValue || ''} className="w-full p-3 border rounded-xl" onChange={e => setSubItemData({...subItemData, investmentValue: parseFloat(e.target.value)})} />
               </>
             )}
             {type === 'indicator' && (
@@ -256,8 +260,61 @@ export const ImprovementManagementModule = ({
     }
   };
 
+  const generatePDF = (project: EngineeringProject) => {
+    const doc = new jsPDF();
+    const total = project.tasks?.reduce((sum, task) => sum + (task.investmentValue || 0), 0) || 0;
+    
+    doc.setFontSize(16);
+    doc.text(`Relatório de Projeto: ${project.title}`, 10, 10);
+    doc.setFontSize(12);
+    doc.text(`Ativo: ${project.assetName} (ID: ${project.assetId})`, 10, 20);
+    doc.text(`Responsável: ${project.responsible}`, 10, 30);
+    doc.text(`Status: ${project.status}`, 10, 40);
+    doc.text(`Data de Início: ${project.startDate ? format(new Date(project.startDate), 'dd/MM/yyyy') : '-'}`, 10, 50);
+    doc.text(`Investimento Total: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 10, 60);
+    
+    doc.text('Descrição:', 10, 75);
+    doc.setFontSize(10);
+    doc.text(project.description, 10, 80, { maxWidth: 180 });
+    doc.setFontSize(12);
+    doc.text('Objetivo:', 10, 95);
+    doc.setFontSize(10);
+    doc.text(project.objective, 10, 100, { maxWidth: 180 });
+    doc.setFontSize(12);
+    doc.text(`Indicador: ${project.indicator}`, 10, 115);
+    doc.text(`Status do Teste: ${project.testStatus}`, 10, 125);
+    doc.text(`Resultado: ${project.result || '-'}`, 10, 135);
+    doc.text(`Padronizar: ${project.standardize ? 'Sim' : 'Não'}`, 10, 145);
+    
+    let y = 160;
+    if (project.lessonsLearned) {
+      doc.text('Lições Aprendidas:', 10, y);
+      doc.setFontSize(10);
+      doc.text(project.lessonsLearned, 10, y + 5, { maxWidth: 180 });
+      y += 20;
+      doc.setFontSize(12);
+    }
+
+    // Add tasks table
+    autoTable(doc, {
+      head: [['Tarefa', 'Responsável', 'Data Planejada', 'Investimento']],
+      body: project.tasks?.map(t => [t.name, t.responsible, t.plannedDate, `R$ ${t.investmentValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}`]) || [],
+      startY: y,
+    });
+    
+    // Add indicators table
+    autoTable(doc, {
+      head: [['Indicador', 'Antes', 'Depois', 'Variação']],
+      body: project.indicators?.map(i => [i.name, i.before, i.after, `${i.variation}%`]) || [],
+      startY: (doc as any).lastAutoTable.finalY + 10,
+    });
+    
+    doc.save(`projeto_${project.title}.pdf`);
+  };
+
   if (selectedProject && modalMode === 'view') {
     const testDays = selectedProject.testStartDate ? differenceInDays(new Date(), new Date(selectedProject.testStartDate)) : 0;
+    const totalInvestment = selectedProject.tasks?.reduce((sum, task) => sum + (task.investmentValue || 0), 0) || 0;
     
     return (
       <div className="p-4 sm:p-6 space-y-6 bg-slate-100 min-h-screen">
@@ -273,6 +330,12 @@ export const ImprovementManagementModule = ({
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <button 
+              onClick={() => generatePDF(selectedProject)}
+              className="px-4 py-2 bg-slate-800 text-white rounded-full text-sm font-bold flex items-center gap-2 hover:bg-slate-900"
+            >
+              <Download className="w-4 h-4" /> Relatório PDF
+            </button>
             <select 
               className="px-4 py-2 rounded-full text-sm font-bold border border-slate-200"
               value={selectedProject.status}
@@ -301,6 +364,9 @@ export const ImprovementManagementModule = ({
             <p><span className="font-bold">Problema:</span> {selectedProject.description}</p>
             <p><span className="font-bold">Objetivo:</span> {selectedProject.objective}</p>
             <p><span className="font-bold">Indicador:</span> {selectedProject.indicator}</p>
+            <div className="pt-4 border-t border-slate-100">
+              <p className="font-bold text-lg">Investimento Total: R$ {totalInvestment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+            </div>
           </div>
 
           {/* Card: Controle de Teste */}
