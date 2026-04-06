@@ -7,7 +7,8 @@ import { Upload, FileSpreadsheet, Filter, X, Eye, Clock, User, Settings, Info, D
 import * as XLSX from 'xlsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
+import autoTable from 'jspdf-autotable';
 
 export const FailureAnalysisModule = ({ 
   showToast, 
@@ -308,124 +309,204 @@ export const FailureAnalysisModule = ({
     });
   };
 
-  const handlePrintReport = async () => {
+  const generatePDF = async () => {
     if (filteredData.length === 0) {
-      if (showToast) showToast('Não há dados para imprimir.', 'error');
+      if (showToast) showToast('Não há dados para gerar o PDF.', 'error');
       return;
     }
 
-    if (showToast) showToast('Gerando relatório...', 'success');
+    if (showToast) showToast('Gerando relatório PDF profissional...', 'success');
+
+    // Wait for UI to settle
+    await new Promise(resolve => setTimeout(resolve, 800));
 
     try {
       const doc = new jsPDF('p', 'mm', 'a4');
       const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
       
-      // Header
-      doc.setFontSize(18);
-      doc.setTextColor(30, 58, 138); // blue-900
-      doc.text('Relatório de Análise de Falhas', pageWidth / 2, 20, { align: 'center' });
+      // Professional Header
+      doc.setFillColor(30, 58, 138); 
+      doc.rect(0, 0, pageWidth, 25, 'F');
       
-      doc.setFontSize(10);
-      doc.setTextColor(100, 116, 139); // slate-500
-      doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, pageWidth / 2, 28, { align: 'center' });
-      
-      // Filters summary
-      doc.setFontSize(12);
-      doc.setTextColor(51, 65, 85); // slate-700
-      doc.text('Filtros Aplicados:', 15, 40);
-      
-      doc.setFontSize(9);
-      let filterY = 46;
-      const activeFilters = Object.entries(filters).filter(([_, v]) => v !== '');
-      if (activeFilters.length === 0) {
-        doc.text('Nenhum filtro aplicado (Todos os dados)', 20, filterY);
-        filterY += 6;
-      } else {
-        activeFilters.forEach(([k, v]) => {
-          doc.text(`${k}: ${v}`, 20, filterY);
-          filterY += 5;
-        });
-      }
-      
-      // Stats
-      doc.setFontSize(12);
-      doc.setTextColor(51, 65, 85);
-      doc.text('Resumo:', 15, filterY + 5);
-      doc.setFontSize(10);
-      doc.text(`Total de Horas: ${totalHoras}h`, 20, filterY + 12);
-      doc.text(`Total de Registros: ${filteredData.length}`, 20, filterY + 18);
-      
-      // Table Header
-      let tableY = filterY + 30;
-      doc.setFillColor(241, 245, 249); // slate-100
-      doc.rect(15, tableY - 5, pageWidth - 30, 8, 'F');
-      doc.setFontSize(8);
+      doc.setFontSize(20);
+      doc.setTextColor(255, 255, 255);
       doc.setFont('helvetica', 'bold');
-      doc.text('Data', 17, tableY);
-      doc.text('Máquina', 35, tableY);
-      doc.text('Causa', 70, tableY);
-      doc.text('Horas', 105, tableY);
-      doc.text('Descrição', 120, tableY);
+      doc.text('RELATÓRIO DE ANÁLISE DE FALHAS', pageWidth / 2, 16, { align: 'center' });
       
-      // Table Rows
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      let currentY = tableY + 8;
-      const rowsToPrint = filteredData.slice(0, 40); // Limit to first 40 for the report
+      doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, pageWidth - 15, 20, { align: 'right' });
       
-      rowsToPrint.forEach((row, index) => {
-        if (currentY > 280) {
+      let currentY = 35;
+
+      // Stats Section
+      doc.setTextColor(30, 58, 138);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Resumo Executivo', 15, currentY);
+      
+      currentY += 8;
+      doc.setDrawColor(226, 232, 240);
+      doc.line(15, currentY, pageWidth - 15, currentY);
+      
+      currentY += 10;
+      doc.setFontSize(11);
+      doc.setTextColor(51, 65, 85);
+      doc.setFont('helvetica', 'normal');
+      
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(15, currentY, 85, 20, 2, 2, 'F');
+      doc.roundedRect(110, currentY, 85, 20, 2, 2, 'F');
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('Total de Horas Paradas', 20, currentY + 7);
+      doc.text('Total de Ocorrências', 115, currentY + 7);
+      
+      doc.setFontSize(14);
+      doc.setTextColor(30, 58, 138);
+      doc.text(`${totalHoras}h`, 20, currentY + 15);
+      doc.text(`${filteredData.length}`, 115, currentY + 15);
+      
+      currentY += 30;
+
+      // Filters summary
+      const activeFilters = Object.entries(filters).filter(([_, v]) => v !== '');
+      if (activeFilters.length > 0) {
+        doc.setFontSize(12);
+        doc.setTextColor(30, 58, 138);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Parâmetros de Seleção', 15, currentY);
+        currentY += 6;
+        doc.setFontSize(9);
+        doc.setTextColor(71, 85, 105);
+        doc.setFont('helvetica', 'normal');
+        
+        const filterTexts = activeFilters.map(([k, v]) => `${k}: ${v}`).join('  |  ');
+        const splitFilters = doc.splitTextToSize(filterTexts, pageWidth - 30);
+        doc.text(splitFilters, 15, currentY);
+        currentY += (splitFilters.length * 5) + 10;
+      }
+
+      // Capture charts
+      doc.setFontSize(14);
+      doc.setTextColor(30, 58, 138);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Análise Gráfica', 15, currentY);
+      currentY += 10;
+
+      const chartContainers = document.querySelectorAll('.failure-analysis-chart');
+      const chartTitles = [
+        'Hr. Parada / Grupo (Tipo)',
+        'Hr. Parada / Setor (Elétrico vs Mecânico)',
+        'Hr. Parada / Máquina',
+        'Hr. Parada / Parte',
+        'Hr. Parada / Causa'
+      ];
+      
+      for (let i = 0; i < chartContainers.length; i++) {
+        // Maximize width to page margins (210mm - 20mm = 190mm)
+        const imgWidth = 190;
+        // Increase height for better visibility
+        const imgHeight = 135; 
+        const spacing = 10;
+        const xPos = (pageWidth - imgWidth) / 2;
+
+        // Check if we need a new page before adding the title and chart
+        // Title (8mm) + Chart (135mm) + Margin (10mm)
+        if (currentY + imgHeight + 15 > pageHeight - 15) {
           doc.addPage();
           currentY = 20;
-          // Re-draw header on new page if needed
         }
         
-        const date = formatDate(row['Data'] || row['Dia']);
-        const machine = String(row['Máquina'] || row['Maquina'] || '-').substring(0, 15);
-        const cause = String(row['Causa'] || '-').substring(0, 15);
-        const hours = `${parseHours(row[horasCol]).toFixed(2)}h`;
-        const desc = String(row['Descrição'] || row['Descricao'] || '-').substring(0, 45);
-        
-        doc.text(date, 17, currentY);
-        doc.text(machine, 35, currentY);
-        doc.text(cause, 70, currentY);
-        doc.text(hours, 105, currentY);
-        doc.text(desc, 120, currentY);
-        
-        doc.setDrawColor(241, 245, 249);
-        doc.line(15, currentY + 2, pageWidth - 15, currentY + 2);
-        currentY += 7;
+        doc.setFontSize(12);
+        doc.setTextColor(30, 58, 138);
+        doc.setFont('helvetica', 'bold');
+        doc.text(chartTitles[i] || `Gráfico ${i + 1}`, 15, currentY);
+        currentY += 8;
+
+        try {
+          const element = chartContainers[i] as HTMLElement;
+          
+          // Use toPng with high quality and stable dimensions
+          // We use a 16:9-ish aspect ratio for the capture to match the PDF dimensions
+          const imgData = await toPng(element, {
+            quality: 1,
+            pixelRatio: 3,
+            backgroundColor: '#ffffff',
+            width: 1400, 
+            height: 900, 
+            style: {
+              padding: '30px', 
+              margin: '0',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center'
+            }
+          });
+          
+          doc.addImage(imgData, 'PNG', xPos, currentY, imgWidth, imgHeight);
+          currentY += imgHeight + spacing;
+        } catch (err) {
+          console.error(`Failed to capture chart ${i}:`, err);
+          doc.setFontSize(10);
+          doc.setTextColor(239, 68, 68);
+          doc.text(`[Erro na renderização do gráfico ${i + 1}]`, 20, currentY + 10);
+          currentY += 20;
+        }
+      }
+
+      // Action History Table
+      doc.addPage();
+      currentY = 20;
+      doc.setFontSize(14);
+      doc.setTextColor(30, 58, 138);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Histórico Detalhado de Ocorrências', 15, currentY);
+      
+      const tableData = filteredData.map(row => [
+        formatDate(row['Data'] || row['Dia'] || row['Date']),
+        row['Máquina'] || row['Maquina'] || row['Equipamento'] || '-',
+        row['Setor'] || row['Área'] || '-',
+        row['Causa'] || row['Motivo'] || '-',
+        `${parseHours(row[horasCol]).toFixed(2)}h`,
+        row['Descrição'] || row['Descricao'] || '-'
+      ]);
+
+      autoTable(doc, {
+        head: [['Data', 'Máquina', 'Setor', 'Causa', 'Horas', 'Descrição']],
+        body: tableData,
+        startY: currentY + 10,
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [30, 58, 138], textColor: [255, 255, 255], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        columnStyles: {
+          0: { cellWidth: 20 },
+          1: { cellWidth: 25 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 25 },
+          4: { cellWidth: 15 },
+          5: { cellWidth: 'auto' }
+        },
+        margin: { left: 15, right: 15 }
       });
       
-      if (filteredData.length > 40) {
+      // Add page numbers to all pages
+      const totalPages = doc.internal.pages.length - 1;
+      for (let j = 1; j <= totalPages; j++) {
+        doc.setPage(j);
         doc.setFontSize(8);
-        doc.setFont('helvetica', 'italic');
-        doc.text(`* Exibindo apenas os primeiros 40 de ${filteredData.length} registros filtrados.`, 15, currentY + 5);
+        doc.setTextColor(148, 163, 184);
+        doc.text(`Página ${j} de ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
       }
-      
-      doc.save(`Relatorio_Falhas_${new Date().getTime()}.pdf`);
-      if (showToast) showToast('Relatório gerado com sucesso!', 'success');
+
+      doc.save(`Relatorio_Analise_Falhas_${new Date().getTime()}.pdf`);
+
+      if (showToast) showToast('Relatório PDF gerado com sucesso!', 'success');
     } catch (error) {
       console.error('Error generating PDF:', error);
-      if (showToast) showToast('Erro ao gerar relatório.', 'error');
+      if (showToast) showToast('Erro ao gerar relatório PDF.', 'error');
     }
-  };
-
-  const generatePDF = async () => {
-    const doc = new jsPDF('p', 'mm', 'a4');
-    doc.setFontSize(16);
-    doc.text('Relatório de Análise de Falhas', 10, 10);
-    doc.setFontSize(10);
-    doc.text(`Gerado em: ${new Date().toLocaleString()}`, 10, 15);
-    
-    // Capture charts
-    const charts = document.querySelectorAll('.h-96');
-    for (let i = 0; i < charts.length; i++) {
-        const canvas = await html2canvas(charts[i] as HTMLElement);
-        const imgData = canvas.toDataURL('image/png');
-        doc.addImage(imgData, 'PNG', 10, 30 + (i * 90), 180, 80);
-    }
-    
-    doc.save('relatorio_falhas.pdf');
   };
 
   // Pre-calculate column mappings for filters to improve performance
@@ -650,13 +731,6 @@ export const FailureAnalysisModule = ({
                 <span>Gerar PDF</span>
               </button>
               <button 
-                onClick={handlePrintReport}
-                className="text-xs text-blue-600 hover:text-blue-700 flex items-center space-x-1 font-bold bg-blue-50 px-3 py-1.5 rounded-lg transition-all"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Imprimir Relatório</span>
-              </button>
-              <button 
                 onClick={clearFilters}
                 className="text-xs text-slate-500 hover:text-blue-600 flex items-center space-x-1"
               >
@@ -749,7 +823,7 @@ export const FailureAnalysisModule = ({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
               <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Grupo (Tipo)</h4>
-              <div className="h-96">
+              <div className="h-96 failure-analysis-chart">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <BarChart 
                     layout="vertical"
@@ -765,6 +839,7 @@ export const FailureAnalysisModule = ({
                       name="Horas Paradas" 
                       fill="#f97316" 
                       barSize={30} 
+                      isAnimationActive={false}
                       onClick={(data) => handleChartClick('Grupo', String(data.name))}
                       style={{ cursor: 'pointer' }}
                     >
@@ -777,7 +852,7 @@ export const FailureAnalysisModule = ({
 
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
               <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Setor (Elétrico vs Mecânico)</h4>
-              <div className="h-96">
+              <div className="h-96 failure-analysis-chart">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <PieChart>
                     <Pie
@@ -785,6 +860,7 @@ export const FailureAnalysisModule = ({
                       cx="50%"
                       cy="50%"
                       labelLine={true}
+                      isAnimationActive={false}
                       label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
                         if (percent <= 0.05) return null;
                         const RADIAN = Math.PI / 180;
@@ -827,7 +903,7 @@ export const FailureAnalysisModule = ({
 
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
               <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Máquina</h4>
-              <div className="h-96">
+              <div className="h-96 failure-analysis-chart">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <BarChart 
                     layout="vertical"
@@ -844,12 +920,13 @@ export const FailureAnalysisModule = ({
                       name="Hr. Total Parada" 
                       fill="#f97316" 
                       barSize={20} 
+                      isAnimationActive={false}
                       onClick={(data) => handleChartClick('Máquina', String(data.name))}
                       style={{ cursor: 'pointer' }}
                     >
                       <LabelList dataKey={horasCol} position="right" fontSize={12} fontWeight="bold" formatter={(val: any) => `${val}h`} />
                     </Bar>
-                    <Bar dataKey="paradas" name="Número paradas" fill="#1e3a8a" barSize={20}>
+                    <Bar dataKey="paradas" name="Número paradas" fill="#1e3a8a" barSize={20} isAnimationActive={false}>
                       <LabelList dataKey="paradas" position="right" fontSize={12} fontWeight="bold" />
                     </Bar>
                   </BarChart>
@@ -859,7 +936,7 @@ export const FailureAnalysisModule = ({
 
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
               <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Parte</h4>
-              <div className="h-96">
+              <div className="h-96 failure-analysis-chart">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <BarChart 
                     layout="vertical"
@@ -876,12 +953,13 @@ export const FailureAnalysisModule = ({
                       name="Horas Paradas" 
                       fill="#f97316" 
                       barSize={20} 
+                      isAnimationActive={false}
                       onClick={(data) => handleChartClick('Parte', String(data.name))}
                       style={{ cursor: 'pointer' }}
                     >
                       <LabelList dataKey={horasCol} position="right" fontSize={12} fontWeight="bold" formatter={(val: any) => `${val}h`} />
                     </Bar>
-                    <Bar dataKey="paradas" name="Número Paradas" fill="#1e3a8a" barSize={20}>
+                    <Bar dataKey="paradas" name="Número Paradas" fill="#1e3a8a" barSize={20} isAnimationActive={false}>
                       <LabelList dataKey="paradas" position="right" fontSize={12} fontWeight="bold" />
                     </Bar>
                   </BarChart>
@@ -891,7 +969,7 @@ export const FailureAnalysisModule = ({
 
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm lg:col-span-2">
               <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Causa</h4>
-              <div className="h-96">
+              <div className="h-96 failure-analysis-chart">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <BarChart 
                     layout="vertical"
@@ -907,6 +985,7 @@ export const FailureAnalysisModule = ({
                       name="Horas Paradas" 
                       fill="#f97316" 
                       barSize={30} 
+                      isAnimationActive={false}
                       onClick={(data) => handleChartClick('Causa', String(data.name))}
                       style={{ cursor: 'pointer' }}
                     >
