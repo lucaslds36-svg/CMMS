@@ -43,7 +43,8 @@ import {
   Trash2,
   Printer,
   Check,
-  Building2
+  Building2,
+  DollarSign
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
@@ -2359,13 +2360,16 @@ const EmployeeModule = ({
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h3 className="text-lg font-semibold text-slate-900">Gestão de Funcionários</h3>
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900">Gestão de Funcionários</h3>
+          <p className="text-sm text-slate-500">Gerencie colaboradores próprios e terceirizados</p>
+        </div>
         <button 
           onClick={() => {
             setEditingEmployee(null);
             setShowModal(true);
           }}
-          className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
+          className="flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200"
         >
           <Plus className="w-4 h-4" />
           <span>Novo Funcionário</span>
@@ -2457,7 +2461,7 @@ const EmployeeModule = ({
                             className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
                             title="Excluir"
                           >
-                            <X className="w-4 h-4" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         )}
                       </div>
@@ -2487,35 +2491,41 @@ const EmployeeModule = ({
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden"
+              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl flex flex-col max-h-[90vh]"
             >
-              <div className="p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold">{editingEmployee ? 'Editar Funcionário' : 'Novo Funcionário'}</h3>
+              <div className="p-8 border-b border-slate-100">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900">{editingEmployee ? 'Editar Funcionário' : 'Novo Funcionário'}</h3>
+                    <p className="text-sm text-slate-500">Dados profissionais do colaborador</p>
+                  </div>
                   <button onClick={() => {
                     setShowModal(false);
                     setEditingEmployee(null);
-                  }} className="p-2 hover:bg-slate-100 rounded-full">
-                    <X className="w-5 h-5" />
+                  }} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                    <X className="w-5 h-5 text-slate-400" />
                   </button>
                 </div>
+              </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="p-8 overflow-y-auto custom-scrollbar">
+                <form onSubmit={handleSubmit} className="space-y-6">
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Nome Completo</label>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Nome Completo</label>
                     <input 
                       required
                       type="text"
-                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                      placeholder="Ex: João Silva"
+                      className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
                       value={formData.Name}
                       onChange={e => setFormData({...formData, Name: e.target.value})}
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Função</label>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Função</label>
                     <select 
                       required
-                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
                       value={formData.Function}
                       onChange={e => setFormData({...formData, Function: e.target.value as any})}
                     >
@@ -2526,10 +2536,10 @@ const EmployeeModule = ({
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Tipo</label>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Tipo</label>
                       <select 
                         required
-                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
                         value={formData.Type}
                         onChange={e => setFormData({...formData, Type: e.target.value as any, companyId: e.target.value === 'Próprio' ? '' : formData.companyId})}
                       >
@@ -2538,10 +2548,10 @@ const EmployeeModule = ({
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Status</label>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Status</label>
                       <select 
                         required
-                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
                         value={formData.Status}
                         onChange={e => setFormData({...formData, Status: e.target.value as any})}
                       >
@@ -2555,10 +2565,10 @@ const EmployeeModule = ({
                   {formData.Type === 'Terceiro' && (
                     <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 space-y-4">
                       <div>
-                        <label className="block text-xs font-bold text-blue-600 uppercase mb-1">Empresa Terceira</label>
+                        <label className="block text-[10px] font-bold text-blue-600 uppercase mb-1.5 ml-1">Empresa</label>
                         <select 
                           required
-                          className="w-full px-4 py-2 bg-white border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-4 py-2 bg-white border-2 border-transparent rounded-xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
                           value={formData.companyId}
                           onChange={e => setFormData({...formData, companyId: e.target.value})}
                         >
@@ -2569,25 +2579,28 @@ const EmployeeModule = ({
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-blue-600 uppercase mb-1">Valor Homem-Hora (R$)</label>
-                        <input 
-                          required
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          className="w-full px-4 py-2 bg-white border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                          value={formData.hourlyRate || ''}
-                          onChange={e => setFormData({...formData, hourlyRate: parseFloat(e.target.value) || 0})}
-                        />
+                        <label className="block text-[10px] font-bold text-blue-600 uppercase mb-1.5 ml-1">Valor Homem-Hora (R$)</label>
+                        <div className="relative">
+                          <DollarSign className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input 
+                            required
+                            type="number"
+                            step="0.01"
+                            placeholder="0,00"
+                            className="w-full pl-10 pr-4 py-2 bg-white border-2 border-transparent rounded-xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
+                            value={formData.hourlyRate || ''}
+                            onChange={e => setFormData({...formData, hourlyRate: parseFloat(e.target.value) || 0})}
+                          />
+                        </div>
                       </div>
                     </div>
                   )}
 
                   {isAdmin && (
                     <div className="pt-4 border-t border-slate-100">
-                      <label className="block text-xs font-bold text-blue-600 uppercase mb-1">Vincular a Usuário do Sistema</label>
+                      <label className="block text-[10px] font-bold text-blue-600 uppercase mb-1.5 ml-1">Vincular a Usuário do Sistema</label>
                       <select 
-                        className="w-full px-4 py-3 bg-blue-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 font-medium"
+                        className="w-full px-4 py-3 bg-blue-50 border-2 border-transparent rounded-2xl text-sm focus:ring-0 focus:border-blue-500 transition-all font-medium"
                         value={formData.userUid}
                         onChange={e => setFormData({...formData, userUid: e.target.value})}
                       >
@@ -2602,12 +2615,14 @@ const EmployeeModule = ({
                     </div>
                   )}
 
-                  <button 
-                    type="submit"
-                    className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all mt-4 shadow-lg shadow-blue-200"
-                  >
-                    {editingEmployee ? 'Salvar Alterações' : 'Cadastrar Funcionário'}
-                  </button>
+                  <div className="pt-4 sticky bottom-0 bg-white pb-2">
+                    <button 
+                      type="submit"
+                      className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-xl shadow-blue-200 active:scale-[0.98]"
+                    >
+                      {editingEmployee ? 'Salvar Alterações' : 'Cadastrar Funcionário'}
+                    </button>
+                  </div>
                 </form>
               </div>
             </motion.div>

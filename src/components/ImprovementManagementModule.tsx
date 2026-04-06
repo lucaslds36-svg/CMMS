@@ -333,29 +333,65 @@ export const ImprovementManagementModule = ({
 
     // Tasks Table
     doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
     doc.text('Plano de Ação e Investimentos', 10, y);
+    doc.setFont('helvetica', 'normal');
+    
     autoTable(doc, {
-      head: [['Tarefa', 'Responsável', 'Data Planejada', 'Investimento Unit.']],
+      head: [['Tarefa', 'Responsável', 'Data Planejada', 'Investimento Unit.', 'Investimento Total']],
       body: project.tasks?.map(t => [
         t.name, 
         t.responsible, 
         t.plannedDate ? format(new Date(t.plannedDate), 'dd/MM/yyyy') : '-', 
-        `R$ ${t.investmentValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}`
+        `R$ ${t.investmentValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}`,
+        `R$ ${((t.investmentValue || 0) * assetsCount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
       ]) || [],
       startY: y + 5,
-      headStyles: { fillColor: [30, 64, 175] }
+      headStyles: { 
+        fillColor: [30, 64, 175],
+        fontSize: 10,
+        halign: 'center'
+      },
+      columnStyles: {
+        3: { halign: 'right' },
+        4: { halign: 'right' }
+      },
+      styles: { fontSize: 9 }
     });
     
     y = (doc as any).lastAutoTable.finalY + 10;
     
-    // Investment Summary
-    doc.setFontSize(10);
-    doc.text(`Soma das Etapas (Unitário): R$ ${sumTasksInvestment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 140, y, { align: 'right' });
-    doc.text(`Quantidade de Equipamentos: ${assetsCount}`, 140, y + 5, { align: 'right' });
-    doc.setFontSize(12);
-    doc.text(`Investimento Total: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 140, y + 12, { align: 'right' });
+    // Investment Summary Box
+    const summaryWidth = 85;
+    const summaryX = 200 - summaryWidth; 
     
-    y += 25;
+    doc.setFillColor(255, 255, 255); // White background
+    doc.setDrawColor(241, 245, 249); // slate-100
+    doc.roundedRect(summaryX, y, summaryWidth, 32, 3, 3, 'FD');
+    
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139); // slate-500
+    doc.setFont('helvetica', 'normal');
+    doc.text('Soma Unitária das Etapas:', summaryX + 5, y + 8);
+    doc.text('Quantidade de Equipamentos:', summaryX + 5, y + 16);
+    
+    doc.setTextColor(30, 41, 59); // slate-900
+    doc.setFont('helvetica', 'bold');
+    doc.text(`R$ ${sumTasksInvestment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 195, y + 8, { align: 'right' });
+    doc.text(`${assetsCount}`, 195, y + 16, { align: 'right' });
+    
+    doc.setDrawColor(241, 245, 249);
+    doc.line(summaryX + 5, y + 20, 195, y + 20);
+    
+    doc.setFontSize(11);
+    doc.setTextColor(37, 99, 235); // blue-600
+    doc.text('Investimento Total do Projeto:', summaryX + 5, y + 27);
+    doc.text(`R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 195, y + 27, { align: 'right' });
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
+    
+    y += 42;
 
     // Indicators Table
     if (project.indicators && project.indicators.length > 0) {
@@ -434,23 +470,26 @@ export const ImprovementManagementModule = ({
         {/* Grid Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Card: Descrição */}
-          <div className="bg-white p-6 rounded-3xl shadow-sm space-y-4">
-            <h3 className="font-bold text-lg">Descrição do Projeto</h3>
-            <p><span className="font-bold">Problema:</span> {project.description}</p>
-            <p><span className="font-bold">Objetivo:</span> {project.objective}</p>
-            <p><span className="font-bold">Indicador:</span> {project.indicator}</p>
-            <div className="pt-4 border-t border-slate-100">
+          <div className="bg-white p-6 rounded-3xl shadow-sm space-y-4 border border-slate-100">
+            <h3 className="font-bold text-lg text-slate-800">Descrição do Projeto</h3>
+            <div className="space-y-3 text-sm">
+              <p><span className="font-bold text-slate-700">Problema:</span> <span className="text-slate-600">{project.description}</span></p>
+              <p><span className="font-bold text-slate-700">Objetivo:</span> <span className="text-slate-600">{project.objective}</span></p>
+              <p><span className="font-bold text-slate-700">Indicador:</span> <span className="text-slate-600">{project.indicator}</span></p>
+            </div>
+            
+            <div className="pt-6 mt-4 border-t border-slate-100 space-y-3">
               <div className="flex justify-between items-center">
                 <p className="text-slate-500 text-sm">Soma das Etapas:</p>
-                <p className="font-bold text-slate-700">R$ {sumTasksInvestment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                <p className="font-bold text-slate-900">R$ {sumTasksInvestment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
               </div>
               <div className="flex justify-between items-center">
                 <p className="text-slate-500 text-sm">Quantidade de Equipamentos:</p>
-                <p className="font-bold text-slate-700">{assetsCount}</p>
+                <p className="font-bold text-slate-900">{assetsCount}</p>
               </div>
-              <div className="mt-2 pt-2 border-t border-slate-100 flex justify-between items-center">
+              <div className="pt-4 mt-2 border-t border-slate-100 flex justify-between items-center">
                 <p className="font-bold text-lg text-blue-600">Investimento Total:</p>
-                <p className="font-bold text-lg text-blue-600">R$ {totalInvestment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                <p className="font-bold text-xl text-blue-600">R$ {totalInvestment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
               </div>
             </div>
           </div>
@@ -519,55 +558,73 @@ export const ImprovementManagementModule = ({
           </div>
 
           {/* Card: Plano de Ação */}
-          <div className="bg-white p-6 rounded-3xl shadow-sm col-span-1 lg:col-span-2 overflow-x-auto">
-            <h3 className="font-bold text-lg mb-4">Plano de Ação</h3>
-            <table className="w-full text-sm min-w-[600px]">
-              <thead>
-                <tr className="text-left text-slate-500">
-                  <th className="pb-2">Tarefa</th>
-                  <th className="pb-2">Responsável</th>
-                  <th className="pb-2">Data Prevista</th>
-                  <th className="pb-2">Investimento</th>
-                  <th className="pb-2">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {project.tasks?.map(task => (
-                  <tr key={task.id} onClick={() => setActiveSubModal({type: 'task', mode: 'edit', data: task})} className="cursor-pointer hover:bg-slate-50">
-                    <td className="py-3">{task.name}</td>
-                    <td className="py-3">{task.responsible}</td>
-                    <td className="py-3">{task.plannedDate ? format(new Date(task.plannedDate), 'dd/MM/yyyy') : '-'}</td>
-                    <td className="py-3">R$ {task.investmentValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}</td>
-                    <td className="py-3" onClick={(e) => e.stopPropagation()}>
-                      <select 
-                        value={task.status ?? 'Pendente'}
-                        onChange={(e) => handleUpdateTaskStatus(task.id, e.target.value as any)}
-                        className={`px-2 py-1 rounded text-xs font-bold border-none outline-none cursor-pointer ${
-                          task.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700' : 
-                          task.status === 'Em andamento' ? 'bg-blue-100 text-blue-700' : 
-                          'bg-slate-100 text-slate-700'
-                        }`}
-                      >
-                        <option value="Pendente">Pendente</option>
-                        <option value="Em andamento">Em andamento</option>
-                        <option value="Concluído">Concluído</option>
-                      </select>
-                    </td>
+          <div className="bg-white rounded-3xl shadow-sm col-span-1 lg:col-span-2 overflow-hidden border border-slate-100">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <h3 className="font-bold text-lg text-slate-800">Plano de Ação e Investimentos</h3>
+              <button 
+                onClick={() => setActiveSubModal({type: 'task', mode: 'create'})} 
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm"
+              >
+                <Plus className="w-4 h-4" /> Adicionar Tarefa
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[600px]">
+                <thead>
+                  <tr className="text-left bg-slate-800 text-white">
+                    <th className="px-6 py-4 font-semibold uppercase tracking-wider text-[10px]">Tarefa</th>
+                    <th className="px-6 py-4 font-semibold uppercase tracking-wider text-[10px]">Responsável</th>
+                    <th className="px-6 py-4 font-semibold uppercase tracking-wider text-[10px]">Data Planejada</th>
+                    <th className="px-6 py-4 font-semibold uppercase tracking-wider text-[10px]">Investimento Unit.</th>
+                    <th className="px-6 py-4 font-semibold uppercase tracking-wider text-[10px]">Status</th>
                   </tr>
-                ))}
-                <tr className="border-t-2 border-slate-200 font-bold bg-slate-50">
-                  <td className="py-3" colSpan={3}>Soma das Etapas</td>
-                  <td className="py-3">R$ {sumTasksInvestment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                  <td className="py-3"></td>
-                </tr>
-                <tr className="font-bold bg-blue-50 text-blue-700">
-                  <td className="py-3" colSpan={3}>Investimento Total ({assetsCount} {assetsCount === 1 ? 'Equipamento' : 'Equipamentos'})</td>
-                  <td className="py-3">R$ {totalInvestment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                  <td className="py-3"></td>
-                </tr>
-              </tbody>
-            </table>
-            <button onClick={() => setActiveSubModal({type: 'task', mode: 'create'})} className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold">+ Adicionar Tarefa</button>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {project.tasks?.map(task => (
+                    <tr key={task.id} onClick={() => setActiveSubModal({type: 'task', mode: 'edit', data: task})} className="group cursor-pointer hover:bg-blue-50/30 transition-colors">
+                      <td className="px-6 py-4 font-medium text-slate-700">{task.name}</td>
+                      <td className="px-6 py-4 text-slate-600">{task.responsible}</td>
+                      <td className="px-6 py-4 text-slate-600">
+                        {task.plannedDate ? format(new Date(task.plannedDate), 'dd/MM/yyyy') : '-'}
+                      </td>
+                      <td className="px-6 py-4 font-mono text-slate-700">
+                        R$ {task.investmentValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
+                      </td>
+                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                        <select 
+                          value={task.status ?? 'Pendente'}
+                          onChange={(e) => handleUpdateTaskStatus(task.id, e.target.value as any)}
+                          className={`px-3 py-1.5 rounded-full text-[10px] font-bold border-none outline-none cursor-pointer transition-all ${
+                            task.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 
+                            task.status === 'Em andamento' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : 
+                            'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          <option value="Pendente">Pendente</option>
+                          <option value="Em andamento">Em andamento</option>
+                          <option value="Concluído">Concluído</option>
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            <div className="p-8 bg-white border-t border-slate-100 flex flex-col items-end space-y-4">
+              <div className="flex justify-between w-full max-w-sm items-center">
+                <span className="text-slate-500 font-medium">Soma das Etapas:</span>
+                <span className="font-bold text-slate-900 text-lg">R$ {sumTasksInvestment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between w-full max-w-sm items-center">
+                <span className="text-slate-500 font-medium">Quantidade de Equipamentos:</span>
+                <span className="font-bold text-slate-900 text-lg">{assetsCount}</span>
+              </div>
+              <div className="pt-6 mt-2 border-t border-slate-100 flex justify-between w-full max-w-sm items-center">
+                <span className="font-bold text-blue-600 text-lg uppercase tracking-wider">Investimento Total:</span>
+                <span className="font-bold text-3xl text-blue-600">R$ {totalInvestment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+              </div>
+            </div>
           </div>
 
           {/* Card: Indicadores */}

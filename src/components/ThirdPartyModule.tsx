@@ -146,7 +146,7 @@ export const ThirdPartyModule = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h3 className="text-lg font-semibold text-slate-900">Empresas</h3>
-          <p className="text-sm text-slate-500">Gerencie empresas parceiras e seus colaboradores</p>
+          <p className="text-sm text-slate-500">Gerencie as empresas parceiras e seus colaboradores</p>
         </div>
         <button 
           onClick={() => {
@@ -462,157 +462,161 @@ export const ThirdPartyModule = ({
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl flex flex-col max-h-[90vh]"
             >
-              <div className="p-8 overflow-y-auto">
-                <div className="flex items-center justify-between mb-8">
-                  <div>
-                    <h3 className="text-2xl font-bold text-slate-900">
-                      {editingCompany ? 'Editar Empresa' : 'Nova Empresa'}
-                    </h3>
-                    <p className="text-sm text-slate-500">Preencha os dados cadastrais da empresa</p>
-                  </div>
-                  <button onClick={() => {
-                    setShowModal(false);
-                    setEditingCompany(null);
-                  }} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-                    <X className="w-6 h-6 text-slate-400" />
-                  </button>
-                </div>
-
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="md:col-span-2">
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Nome da Empresa</label>
-                      <input 
-                        required
-                        type="text"
-                        placeholder="Ex: Manutenção Express Ltda"
-                        className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
-                        value={formData.name}
-                        onChange={e => setFormData({...formData, name: e.target.value})}
-                      />
-                    </div>
+              <div className="flex flex-col h-full max-h-[90vh]">
+                <div className="p-8 border-b border-slate-100">
+                  <div className="flex items-center justify-between">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">CNPJ</label>
-                      <input 
-                        type="text"
-                        placeholder="00.000.000/0000-00"
-                        className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
-                        value={formData.cnpj}
-                        onChange={e => setFormData({...formData, cnpj: e.target.value})}
-                      />
+                      <h3 className="text-2xl font-bold text-slate-900">
+                        {editingCompany ? 'Editar Empresa' : 'Nova Empresa'}
+                      </h3>
+                      <p className="text-sm text-slate-500">Preencha os dados cadastrais da empresa</p>
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Status</label>
-                      <select 
-                        required
-                        className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
-                        value={formData.status}
-                        onChange={e => setFormData({...formData, status: e.target.value as any})}
-                      >
-                        <option value="Ativo">Ativo</option>
-                        <option value="Inativo">Inativo</option>
-                      </select>
-                    </div>
-
-                    <div className="md:col-span-2 p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
-                      <h4 className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-2">
-                        <FileText className="w-3 h-3" />
-                        Informações de Contrato
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Nº Contrato</label>
-                          <input 
-                            type="text"
-                            placeholder="Ex: 2024-001"
-                            className="w-full px-4 py-2 bg-white border-2 border-transparent rounded-xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
-                            value={formData.contractNumber}
-                            onChange={e => setFormData({...formData, contractNumber: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Início</label>
-                          <input 
-                            type="date"
-                            className="w-full px-4 py-2 bg-white border-2 border-transparent rounded-xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
-                            value={formData.contractStartDate}
-                            onChange={e => setFormData({...formData, contractStartDate: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Vencimento</label>
-                          <input 
-                            type="date"
-                            className="w-full px-4 py-2 bg-white border-2 border-transparent rounded-xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
-                            value={formData.contractEndDate}
-                            onChange={e => setFormData({...formData, contractEndDate: e.target.value})}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Avaliação de Performance</label>
-                      <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-2xl">
-                        {[1, 2, 3, 4, 5].map(star => (
-                          <button
-                            key={star}
-                            type="button"
-                            onClick={() => setFormData({...formData, performanceRating: star})}
-                            className="focus:outline-none transition-transform active:scale-90"
-                          >
-                            <Star 
-                              className={cn(
-                                "w-5 h-5",
-                                star <= formData.performanceRating ? "fill-amber-400 text-amber-400" : "text-slate-300"
-                              )} 
-                            />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Contato Principal</label>
-                      <input 
-                        type="text"
-                        placeholder="Nome do responsável"
-                        className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
-                        value={formData.contactName}
-                        onChange={e => setFormData({...formData, contactName: e.target.value})}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Telefone</label>
-                      <input 
-                        type="text"
-                        placeholder="(00) 00000-0000"
-                        className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
-                        value={formData.phone}
-                        onChange={e => setFormData({...formData, phone: e.target.value})}
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">E-mail de Contato</label>
-                      <input 
-                        type="email"
-                        placeholder="contato@empresa.com.br"
-                        className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
-                        value={formData.email}
-                        onChange={e => setFormData({...formData, email: e.target.value})}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-4">
-                    <button 
-                      type="submit"
-                      className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-xl shadow-blue-200 active:scale-[0.98]"
-                    >
-                      {editingCompany ? 'Salvar Alterações' : 'Cadastrar Empresa'}
+                    <button onClick={() => {
+                      setShowModal(false);
+                      setEditingCompany(null);
+                    }} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                      <X className="w-6 h-6 text-slate-400" />
                     </button>
                   </div>
-                </form>
+                </div>
+
+                <div className="p-8 overflow-y-auto custom-scrollbar">
+                  <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="md:col-span-2">
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Nome da Empresa</label>
+                        <input 
+                          required
+                          type="text"
+                          placeholder="Ex: Manutenção Express Ltda"
+                          className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
+                          value={formData.name}
+                          onChange={e => setFormData({...formData, name: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">CNPJ</label>
+                        <input 
+                          type="text"
+                          placeholder="00.000.000/0000-00"
+                          className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
+                          value={formData.cnpj}
+                          onChange={e => setFormData({...formData, cnpj: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Status</label>
+                        <select 
+                          required
+                          className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
+                          value={formData.status}
+                          onChange={e => setFormData({...formData, status: e.target.value as any})}
+                        >
+                          <option value="Ativo">Ativo</option>
+                          <option value="Inativo">Inativo</option>
+                        </select>
+                      </div>
+
+                      <div className="md:col-span-2 p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
+                        <h4 className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-2">
+                          <FileText className="w-3 h-3" />
+                          Informações de Contrato
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Nº Contrato</label>
+                            <input 
+                              type="text"
+                              placeholder="Ex: 2024-001"
+                              className="w-full px-4 py-2 bg-white border-2 border-transparent rounded-xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
+                              value={formData.contractNumber}
+                              onChange={e => setFormData({...formData, contractNumber: e.target.value})}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Início</label>
+                            <input 
+                              type="date"
+                              className="w-full px-4 py-2 bg-white border-2 border-transparent rounded-xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
+                              value={formData.contractStartDate}
+                              onChange={e => setFormData({...formData, contractStartDate: e.target.value})}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Vencimento</label>
+                            <input 
+                              type="date"
+                              className="w-full px-4 py-2 bg-white border-2 border-transparent rounded-xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
+                              value={formData.contractEndDate}
+                              onChange={e => setFormData({...formData, contractEndDate: e.target.value})}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Avaliação de Performance</label>
+                        <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-2xl">
+                          {[1, 2, 3, 4, 5].map(star => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setFormData({...formData, performanceRating: star})}
+                              className="focus:outline-none transition-transform active:scale-90"
+                            >
+                              <Star 
+                                className={cn(
+                                  "w-5 h-5",
+                                  star <= formData.performanceRating ? "fill-amber-400 text-amber-400" : "text-slate-300"
+                                )} 
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Contato Principal</label>
+                        <input 
+                          type="text"
+                          placeholder="Nome do responsável"
+                          className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
+                          value={formData.contactName}
+                          onChange={e => setFormData({...formData, contactName: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Telefone</label>
+                        <input 
+                          type="text"
+                          placeholder="(00) 00000-0000"
+                          className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
+                          value={formData.phone}
+                          onChange={e => setFormData({...formData, phone: e.target.value})}
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">E-mail de Contato</label>
+                        <input 
+                          type="email"
+                          placeholder="contato@empresa.com.br"
+                          className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
+                          value={formData.email}
+                          onChange={e => setFormData({...formData, email: e.target.value})}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-4 sticky bottom-0 bg-white pb-2">
+                      <button 
+                        type="submit"
+                        className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-xl shadow-blue-200 active:scale-[0.98]"
+                      >
+                        {editingCompany ? 'Salvar Alterações' : 'Cadastrar Empresa'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
               </div>
             </motion.div>
           </div>
