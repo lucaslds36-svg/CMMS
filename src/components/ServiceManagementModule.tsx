@@ -564,7 +564,11 @@ export const ServiceManagementModule = ({
                         >
                           <Eye className="w-4 h-4" />
                         </button>
-                        {(userProfile?.role === 'admin' || demand.requesterUid === userProfile?.uid || demand.responsibleId === userProfile?.uid || userProfile?.workOrderRole === 'planner') && (
+                        {(userProfile?.role === 'admin' || 
+                          demand.requesterUid === userProfile?.uid || 
+                          employees.find(emp => emp.ID === demand.responsibleId)?.userUid === userProfile?.uid || 
+                          demand.responsibleId === userProfile?.uid ||
+                          userProfile?.workOrderRole === 'planner') && (
                           <>
                             <button 
                               onClick={() => {

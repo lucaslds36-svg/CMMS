@@ -5388,13 +5388,18 @@ export default function App() {
         
         // Notify responsible if assigned
         if (mergedDemand.responsibleId && mergedDemand.responsibleId !== user?.uid) {
-          await createDocument('notifications', {
-            userId: mergedDemand.responsibleId,
-            message: notificationMessage,
-            read: false,
-            createdAt: new Date().toISOString(),
-            demandId: demand.id
-          });
+          const responsibleEmployee = employees.find(emp => emp.ID === mergedDemand.responsibleId);
+          const targetUid = responsibleEmployee?.userUid || mergedDemand.responsibleId;
+          
+          if (targetUid !== user?.uid) {
+            await createDocument('notifications', {
+              userId: targetUid,
+              message: notificationMessage,
+              read: false,
+              createdAt: new Date().toISOString(),
+              demandId: demand.id
+            });
+          }
         }
         
         // Notify requester if not the one who updated
@@ -5417,14 +5422,19 @@ export default function App() {
 
         // Notify responsible about new demand
         if (newDemand.responsibleId && newDemand.responsibleId !== user?.uid) {
-          const truncatedDesc = newDemand.description.length > 100 ? newDemand.description.substring(0, 100) + '...' : newDemand.description;
-          await createDocument('notifications', {
-            userId: newDemand.responsibleId,
-            message: `Uma nova demanda foi atribuída a você: "${truncatedDesc}"`,
-            read: false,
-            createdAt: new Date().toISOString(),
-            demandId: id
-          });
+          const responsibleEmployee = employees.find(emp => emp.ID === newDemand.responsibleId);
+          const targetUid = responsibleEmployee?.userUid || newDemand.responsibleId;
+          
+          if (targetUid !== user?.uid) {
+            const truncatedDesc = newDemand.description.length > 100 ? newDemand.description.substring(0, 100) + '...' : newDemand.description;
+            await createDocument('notifications', {
+              userId: targetUid,
+              message: `Uma nova demanda foi atribuída a você: "${truncatedDesc}"`,
+              read: false,
+              createdAt: new Date().toISOString(),
+              demandId: id
+            });
+          }
         }
       }
       showToast('Demanda salva com sucesso!');
@@ -5486,13 +5496,18 @@ export default function App() {
 
       // Notify planner (if exists and different from requester and not the one who updated)
       if (demand.responsibleId && demand.responsibleId !== demand.requesterUid && demand.responsibleId !== user?.uid) {
-        await createDocument('notifications', {
-          userId: demand.responsibleId,
-          message: notificationMessage,
-          read: false,
-          createdAt: new Date().toISOString(),
-          demandId: demandId
-        });
+        const responsibleEmployee = employees.find(emp => emp.ID === demand.responsibleId);
+        const targetUid = responsibleEmployee?.userUid || demand.responsibleId;
+        
+        if (targetUid !== user?.uid && targetUid !== demand.requesterUid) {
+          await createDocument('notifications', {
+            userId: targetUid,
+            message: notificationMessage,
+            read: false,
+            createdAt: new Date().toISOString(),
+            demandId: demandId
+          });
+        }
       }
 
       showToast(`Status atualizado para ${status}`);
@@ -5533,13 +5548,18 @@ export default function App() {
       
       // Notify responsible if assigned and not the one who updated
       if (demand.responsibleId && demand.responsibleId !== user?.uid) {
-        await createDocument('notifications', {
-          userId: demand.responsibleId,
-          message: notificationMessage,
-          read: false,
-          createdAt: new Date().toISOString(),
-          demandId: demandId
-        });
+        const responsibleEmployee = employees.find(emp => emp.ID === demand.responsibleId);
+        const targetUid = responsibleEmployee?.userUid || demand.responsibleId;
+        
+        if (targetUid !== user?.uid) {
+          await createDocument('notifications', {
+            userId: targetUid,
+            message: notificationMessage,
+            read: false,
+            createdAt: new Date().toISOString(),
+            demandId: demandId
+          });
+        }
       }
       
       // Notify requester if not the one who updated

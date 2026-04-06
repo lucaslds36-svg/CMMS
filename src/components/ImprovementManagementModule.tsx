@@ -954,7 +954,10 @@ export const ImprovementManagementModule = ({
                     >
                       <Eye className="w-4 h-4" />
                     </button>
-                    {(userProfile?.role === 'admin' || project.createdBy === userProfile?.uid || project.responsibleId === userProfile?.uid) && (
+                    {(userProfile?.role === 'admin' || 
+                      project.createdBy === userProfile?.uid || 
+                      employees.find(emp => emp.ID === project.responsibleId)?.userUid === userProfile?.uid ||
+                      project.responsibleId === userProfile?.uid) && (
                       <>
                         <button 
                           className="p-1.5 bg-amber-500 text-white rounded hover:bg-amber-600"
