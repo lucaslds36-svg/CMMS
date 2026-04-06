@@ -4237,6 +4237,7 @@ export default function App() {
   const [loadingGlobalData, setLoadingGlobalData] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [selectedDemandId, setSelectedDemandId] = useState<string | null>(null);
 
   // Test connection to Firestore with retries
   useEffect(() => {
@@ -6309,6 +6310,8 @@ export default function App() {
                     onUpdateStatus={handleUpdateServiceDemandStatus}
                     onAddScopeChange={handleAddServiceDemandScopeChange}
                     showToast={showToast}
+                    selectedDemandId={selectedDemandId}
+                    onClearSelectedDemandId={() => setSelectedDemandId(null)}
                   />
                 )}
                 {activeTab === 'improvement-management' && (
@@ -7133,21 +7136,36 @@ export default function App() {
                   <div key={n.id} className={cn("p-3 rounded-xl border text-sm", n.read ? "bg-slate-50 border-slate-100" : "bg-blue-50 border-blue-100")}>
                     <p className="text-slate-700">{n.message}</p>
                     <p className="text-[10px] text-slate-400 mt-1">{new Date(n.createdAt).toLocaleString()}</p>
-                    {n.read ? (
-                      <button 
-                        onClick={() => deleteDocument('notifications', n.id)}
-                        className="text-[10px] font-bold text-red-600 mt-2"
-                      >
-                        Apagar
-                      </button>
-                    ) : (
-                      <button 
-                        onClick={() => updateDocument('notifications', n.id, { read: true })}
-                        className="text-[10px] font-bold text-blue-600 mt-2"
-                      >
-                        Marcar como lida
-                      </button>
-                    )}
+                    <div className="flex items-center gap-2 mt-3">
+                      {n.demandId && (
+                        <button 
+                          onClick={() => {
+                            setActiveTab('service-management');
+                            setSelectedDemandId(n.demandId);
+                            setShowNotifications(false);
+                            updateDocument('notifications', n.id, { read: true });
+                          }}
+                          className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-md text-[10px] font-bold hover:bg-emerald-200 transition-colors"
+                        >
+                          Ver Demanda
+                        </button>
+                      )}
+                      {n.read ? (
+                        <button 
+                          onClick={() => deleteDocument('notifications', n.id)}
+                          className="px-2 py-1 bg-red-100 text-red-700 rounded-md text-[10px] font-bold hover:bg-red-200 transition-colors"
+                        >
+                          Apagar
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => updateDocument('notifications', n.id, { read: true })}
+                          className="px-2 py-1 bg-blue-100 text-blue-700 rounded-md text-[10px] font-bold hover:bg-blue-200 transition-colors"
+                        >
+                          Marcar como lida
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

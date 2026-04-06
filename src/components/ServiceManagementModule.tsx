@@ -54,6 +54,8 @@ interface ServiceManagementModuleProps {
   onUpdateStatus: (demandId: string, status: ServiceDemand['status']) => Promise<void>;
   onAddScopeChange: (demandId: string, description: string) => Promise<void>;
   showToast: (msg: string, type?: 'success' | 'error') => void;
+  selectedDemandId?: string | null;
+  onClearSelectedDemandId?: () => void;
 }
 
 export const ServiceManagementModule = ({
@@ -65,7 +67,9 @@ export const ServiceManagementModule = ({
   onDelete,
   onUpdateStatus,
   onAddScopeChange,
-  showToast
+  showToast,
+  selectedDemandId,
+  onClearSelectedDemandId
 }: ServiceManagementModuleProps) => {
   const [showModal, setShowModal] = useState(false);
   const [editingDemand, setEditingDemand] = useState<ServiceDemand | null>(null);
@@ -73,6 +77,19 @@ export const ServiceManagementModule = ({
   const [search, setSearch] = useState('');
   const [filterArea, setFilterArea] = useState<string>('Todas');
   const [filterStatus, setFilterStatus] = useState<string>('Todos');
+
+  useEffect(() => {
+    if (selectedDemandId) {
+      const demand = demands.find(d => d.id === selectedDemandId);
+      if (demand) {
+        setEditingDemand(demand);
+        setIsEditing(true);
+        if (onClearSelectedDemandId) {
+          onClearSelectedDemandId();
+        }
+      }
+    }
+  }, [selectedDemandId, demands, onClearSelectedDemandId]);
 
   useEffect(() => {
     if (editingDemand && !isEditing) {
