@@ -59,6 +59,27 @@
         "createdAt": { "type": "string" }
       },
       "required": ["id", "code", "item", "supplier", "requestDate", "deliveryDate", "status"]
+    },
+    "ThirdPartyCompany": {
+      "title": "ThirdPartyCompany",
+      "description": "Represents a third-party company.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "cnpj": { "type": "string" },
+        "contactName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "status": { "type": "string", "enum": ["Ativo", "Inativo"] },
+        "contractNumber": { "type": "string" },
+        "contractStartDate": { "type": "string" },
+        "contractEndDate": { "type": "string" },
+        "performanceRating": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "name", "status", "createdAt"]
     }
   },
   "firestore": {
@@ -73,6 +94,10 @@
     "requisitions/{id}": {
       "schema": "Requisition",
       "description": "Stores material requisitions."
+    },
+    "thirdPartyCompanies/{id}": {
+      "schema": "ThirdPartyCompany",
+      "description": "Stores third-party companies."
     }
   }
 }

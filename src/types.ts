@@ -48,6 +48,12 @@ export interface WorkOrder {
   dueDate?: string | null;
   scope?: string;
   needsMaterial?: boolean;
+  executorType?: 'Próprio' | 'Terceiro';
+  companyId?: string;
+  companyName?: string;
+  executorName?: string;
+  hourlyRate?: number;
+  totalCost?: number;
 }
 
 export interface PreventivePlanAsset {
@@ -96,6 +102,24 @@ export interface Employee {
   Type: 'Próprio' | 'Terceiro';
   userUid?: string;
   createdBy?: string;
+  companyId?: string;
+  hourlyRate?: number;
+}
+
+export interface ThirdPartyCompany {
+  id: string;
+  name: string;
+  cnpj?: string;
+  contactName?: string;
+  email?: string;
+  phone?: string;
+  status: 'Ativo' | 'Inativo';
+  createdAt: string;
+  createdBy?: string;
+  contractNumber?: string;
+  contractStartDate?: string;
+  contractEndDate?: string;
+  performanceRating?: number;
 }
 
 export interface ServiceDemandScopeChange {
@@ -217,17 +241,22 @@ export interface ServiceDemand {
   executorType: 'Próprio' | 'Terceiro';
   responsibleId: string;
   responsibleName: string;
+  responsibleHourlyRate?: number;
+  responsibleHoursWorked?: number;
   priority: 'Alta' | 'Média' | 'Baixa';
   estimatedDeliveryDate: string;
   startDate?: string;
   executorName?: string;
+  companyId?: string;
+  companyName?: string;
   status: 'Não Iniciado' | 'Em andamento' | 'Parado' | 'Cancelado' | 'Concluído';
   needsMaterial: boolean;
   materialRequisition?: MaterialRequisition;
-  collaborators?: { id: string, name: string }[];
+  collaborators?: { id: string, name: string, hourlyRate?: number, hoursWorked?: number }[];
   scopeChanges: ServiceDemandScopeChange[];
   statusHistory: ServiceDemandStatusChange[];
   closedAt?: string;
+  totalCost?: number;
 }
 
 export interface UserPermissions {
@@ -240,6 +269,7 @@ export interface UserPermissions {
   database: boolean;
   users: boolean;
   serviceManagement: boolean;
+  thirdParty: boolean;
 }
 
 export interface UserProfile {

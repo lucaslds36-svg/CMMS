@@ -133,12 +133,25 @@ service cloud.firestore {
     }
 
     function isValidEmployee(data) {
-      return hasOnlyAllowedFields(['ID', 'Name', 'Function', 'Status', 'Type', 'id', 'createdBy', 'userUid']) &&
+      return hasOnlyAllowedFields(['ID', 'Name', 'Function', 'Status', 'Type', 'id', 'createdBy', 'userUid', 'companyId', 'hourlyRate']) &&
              data.ID is string && data.Name is string &&
              data.Function in ['Mecânico', 'Eletrônico', 'Outro'] &&
              data.Status in ['Ativo', 'Férias', 'Afastado'] &&
              data.Type in ['Próprio', 'Terceiro'] &&
-             (!('userUid' in data) || data.userUid is string);
+             (!('userUid' in data) || data.userUid is string) &&
+             (!('companyId' in data) || data.companyId is string) &&
+             (!('hourlyRate' in data) || data.hourlyRate is number);
+    }
+
+    function isValidThirdPartyCompany(data) {
+      return hasOnlyAllowedFields(['id', 'name', 'cnpj', 'contactName', 'email', 'phone', 'status', 'contractNumber', 'contractStartDate', 'contractEndDate', 'performanceRating', 'createdAt', 'createdBy']) &&
+             data.id is string && data.name is string &&
+             data.status in ['Ativo', 'Inativo'] &&
+             (!('contractNumber' in data) || data.contractNumber is string) &&
+             (!('contractStartDate' in data) || data.contractStartDate is string) &&
+             (!('contractEndDate' in data) || data.contractEndDate is string) &&
+             (!('performanceRating' in data) || data.performanceRating is number) &&
+             data.createdAt is string;
     }
 
     function isValidFailureRecord(data) {
@@ -300,6 +313,13 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidEmployee(request.resource.data);
       allow update: if isMasterOrOwner('createdBy') && isValidEmployee(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /thirdPartyCompanies/{id} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidThirdPartyCompany(request.resource.data);
+      allow update: if isMasterOrOwner('createdBy') && isValidThirdPartyCompany(request.resource.data);
       allow delete: if isAdmin();
     }
 

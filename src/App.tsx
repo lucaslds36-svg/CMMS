@@ -42,7 +42,8 @@ import {
   Edit2,
   Trash2,
   Printer,
-  Check
+  Check,
+  Building2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
@@ -120,7 +121,8 @@ import { DatabaseModule } from './components/DatabaseModule';
 import { ServiceManagementModule } from './components/ServiceManagementModule';
 import { PasswordManagement } from './components/PasswordManagement';
 import { ServiceDemand } from './types';
-import { EngineeringProject } from './types';
+import { EngineeringProject, ThirdPartyCompany } from './types';
+import { ThirdPartyModule } from './components/ThirdPartyModule';
 
 // ... (inside App component)
 
@@ -1814,7 +1816,7 @@ const WorkOrderList = ({
   assets: Asset[],
   onAdd: () => void,
   onEdit: (wo: WorkOrder) => void,
-  onUpdateStatus: (id: string, status: string, completedAt?: string) => void,
+  onUpdateStatus: (id: string, status: string, completedAt?: string, duration?: number) => void,
   onUpdateChecklist?: (id: string, checklist: {text: string, completed: boolean}[]) => void,
   onDelete: (id: string) => void,
   isPlanner?: boolean,
@@ -1826,6 +1828,7 @@ const WorkOrderList = ({
   const [completingWO, setCompletingWO] = useState<WorkOrder | null>(null);
   const [viewingWO, setViewingWO] = useState<WorkOrder | null>(null);
   const [completedAt, setCompletedAt] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [actualDuration, setActualDuration] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   
@@ -1900,6 +1903,7 @@ const WorkOrderList = ({
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Prioridade</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Técnico</th>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Custo</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Ações</th>
             </tr>
           </thead>
@@ -1939,6 +1943,9 @@ const WorkOrderList = ({
                   </div>
                 </td>
                 <td className="px-6 py-4 text-sm text-slate-600">{wo.TechnicianID || wo.AssignedTo || '-'}</td>
+                <td className="px-6 py-4 text-sm font-bold text-slate-900">
+                  {wo.totalCost ? `R$ ${wo.totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'}
+                </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center space-x-2">
                     {wo.Status !== 'Concluída' && wo.Status !== 'Cancelada' && isPlanner && (isAdmin || wo.requestedBy === currentUserUid) && (
@@ -1947,6 +1954,7 @@ const WorkOrderList = ({
                           onClick={() => {
                             setCompletingWO(wo);
                             setCompletedAt(new Date().toISOString().split('T')[0]);
+                            setActualDuration(wo.Duration || wo.EstimatedTime || 0);
                           }}
                           className="p-1 text-emerald-500 hover:text-emerald-700 transition-colors"
                           title="Concluir O.S."
@@ -2214,13 +2222,32 @@ const WorkOrderList = ({
                 </p>
                 <p className="text-xs text-slate-500 mt-1">{completingWO.Description}</p>
               </div>
-              <p className="text-sm text-slate-500 mb-4">Informe a data de fechamento da O.S. para atualizar a próxima manutenção.</p>
-              <input 
-                type="date"
-                className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 mb-4"
-                value={completedAt}
-                onChange={e => setCompletedAt(e.target.value)}
-              />
+              <p className="text-sm text-slate-500 mb-4">Informe a data de fechamento e a duração real da O.S. para atualizar a próxima manutenção e os custos.</p>
+              
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Data de Conclusão</label>
+                  <input 
+                    type="date"
+                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    value={completedAt}
+                    onChange={e => setCompletedAt(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Duração Real (h)</label>
+                  <input 
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    value={actualDuration || ''}
+                    onChange={e => setActualDuration(parseFloat(e.target.value) || 0)}
+                    placeholder={completingWO?.EstimatedTime?.toString() || '0'}
+                  />
+                </div>
+              </div>
+
               <div className="flex justify-end space-x-2">
                 <button 
                   onClick={() => setCompletingWO(null)}
@@ -2230,7 +2257,7 @@ const WorkOrderList = ({
                 </button>
                 <button 
                   onClick={() => {
-                    onUpdateStatus(completingWO?.ID || '', 'Concluída', completedAt);
+                    onUpdateStatus(completingWO?.ID || '', 'Concluída', completedAt, actualDuration);
                     setCompletingWO(null);
                   }}
                   className="px-4 py-2 text-sm font-medium text-white bg-emerald-500 hover:bg-emerald-600 rounded-xl transition-colors"
@@ -2254,7 +2281,8 @@ const EmployeeModule = ({
   showToast,
   allUsers = [],
   isAdmin = false,
-  currentUserUid = ''
+  currentUserUid = '',
+  companies = []
 }: { 
   employees: Employee[], 
   onRefresh: () => void,
@@ -2262,7 +2290,8 @@ const EmployeeModule = ({
   showToast: (msg: string, type?: 'success' | 'error') => void,
   allUsers?: UserProfile[],
   isAdmin?: boolean,
-  currentUserUid?: string
+  currentUserUid?: string,
+  companies?: ThirdPartyCompany[]
 }) => {
   const [showModal, setShowModal] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -2273,7 +2302,9 @@ const EmployeeModule = ({
     Function: 'Mecânico' as 'Mecânico' | 'Eletrônico' | 'Outro',
     Status: 'Ativo' as 'Ativo' | 'Férias' | 'Afastado',
     Type: 'Próprio' as 'Próprio' | 'Terceiro',
-    userUid: ''
+    userUid: '',
+    companyId: '',
+    hourlyRate: 0
   });
 
   useEffect(() => {
@@ -2283,7 +2314,9 @@ const EmployeeModule = ({
         Function: editingEmployee.Function,
         Status: editingEmployee.Status,
         Type: editingEmployee.Type || 'Próprio',
-        userUid: editingEmployee.userUid || ''
+        userUid: editingEmployee.userUid || '',
+        companyId: editingEmployee.companyId || '',
+        hourlyRate: editingEmployee.hourlyRate || 0
       });
     } else {
       setFormData({
@@ -2291,7 +2324,9 @@ const EmployeeModule = ({
         Function: 'Mecânico',
         Status: 'Ativo',
         Type: 'Próprio',
-        userUid: ''
+        userUid: '',
+        companyId: '',
+        hourlyRate: 0
       });
     }
   }, [editingEmployee, showModal]);
@@ -2357,65 +2392,79 @@ const EmployeeModule = ({
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">ID</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Nome</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Função</th>
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Tipo</th>
+                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Tipo / Empresa</th>
+                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Vínculo</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredEmployees.map((emp) => (
-                <tr key={emp.ID} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-slate-900">{emp.ID}</td>
-                  <td className="px-6 py-4 text-sm text-slate-600">{emp.Name}</td>
-                  <td className="px-6 py-4 text-sm text-slate-600">{emp.Function}</td>
-                  <td className="px-6 py-4 text-sm text-slate-600">{emp.Type}</td>
-                  <td className="px-6 py-4 text-sm text-slate-600">
-                    {emp.userUid ? (
-                      <div className="flex items-center space-x-1 text-blue-600">
-                        <UserIcon className="w-3 h-3" />
-                        <span>Vinculado</span>
+              {filteredEmployees.map((emp) => {
+                const company = companies.find(c => c.id === emp.companyId);
+                return (
+                  <tr key={emp.ID} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-6 py-4 text-sm font-medium text-slate-900">{emp.ID}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{emp.Name}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{emp.Function}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">
+                      <div className="flex flex-col">
+                        <span>{emp.Type}</span>
+                        {emp.Type === 'Terceiro' && company && (
+                          <span className="text-[10px] text-blue-600 font-bold uppercase">{company.name}</span>
+                        )}
+                        {emp.Type === 'Terceiro' && emp.hourlyRate > 0 && (
+                          <span className="text-[10px] text-slate-400">R$ {emp.hourlyRate.toFixed(2)}/h</span>
+                        )}
                       </div>
-                    ) : (
-                      <span className="text-slate-400">Não vinculado</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={cn(
-                      "px-2.5 py-1 rounded-full text-xs font-medium",
-                      emp.Status === 'Ativo' ? "bg-emerald-50 text-emerald-700" : 
-                      emp.Status === 'Férias' ? "bg-amber-50 text-amber-700" :
-                      "bg-rose-50 text-rose-700"
-                    )}>
-                      {emp.Status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center space-x-2">
-                      {(isAdmin || emp.createdBy === currentUserUid) && (
-                        <button 
-                          onClick={() => {
-                            setEditingEmployee(emp);
-                            setShowModal(true);
-                          }}
-                          className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
-                          title="Editar"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-600">
+                      {emp.userUid ? (
+                        <div className="flex items-center space-x-1 text-blue-600">
+                          <UserIcon className="w-3 h-3" />
+                          <span>Vinculado</span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">Não vinculado</span>
                       )}
-                      {isAdmin && (
-                        <button 
-                          onClick={() => onDelete(emp.ID)}
-                          className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
-                          title="Excluir"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={cn(
+                        "px-2.5 py-1 rounded-full text-xs font-medium",
+                        emp.Status === 'Ativo' ? "bg-emerald-50 text-emerald-700" : 
+                        emp.Status === 'Férias' ? "bg-amber-50 text-amber-700" :
+                        "bg-rose-50 text-rose-700"
+                      )}>
+                        {emp.Status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center space-x-2">
+                        {(isAdmin || emp.createdBy === currentUserUid) && (
+                          <button 
+                            onClick={() => {
+                              setEditingEmployee(emp);
+                              setShowModal(true);
+                            }}
+                            className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                            title="Editar"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        )}
+                        {isAdmin && (
+                          <button 
+                            onClick={() => onDelete(emp.ID)}
+                            className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
+                            title="Excluir"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -2475,31 +2524,64 @@ const EmployeeModule = ({
                       <option value="Outro">Outro</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Tipo</label>
-                    <select 
-                      required
-                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                      value={formData.Type}
-                      onChange={e => setFormData({...formData, Type: e.target.value as any})}
-                    >
-                      <option value="Próprio">Próprio</option>
-                      <option value="Terceiro">Terceiro</option>
-                    </select>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Tipo</label>
+                      <select 
+                        required
+                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                        value={formData.Type}
+                        onChange={e => setFormData({...formData, Type: e.target.value as any, companyId: e.target.value === 'Próprio' ? '' : formData.companyId})}
+                      >
+                        <option value="Próprio">Próprio</option>
+                        <option value="Terceiro">Terceiro</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Status</label>
+                      <select 
+                        required
+                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                        value={formData.Status}
+                        onChange={e => setFormData({...formData, Status: e.target.value as any})}
+                      >
+                        <option value="Ativo">Ativo</option>
+                        <option value="Férias">Férias</option>
+                        <option value="Afastado">Afastado</option>
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Status</label>
-                    <select 
-                      required
-                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                      value={formData.Status}
-                      onChange={e => setFormData({...formData, Status: e.target.value as any})}
-                    >
-                      <option value="Ativo">Ativo</option>
-                      <option value="Férias">Férias</option>
-                      <option value="Afastado">Afastado</option>
-                    </select>
-                  </div>
+
+                  {formData.Type === 'Terceiro' && (
+                    <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 space-y-4">
+                      <div>
+                        <label className="block text-xs font-bold text-blue-600 uppercase mb-1">Empresa Terceira</label>
+                        <select 
+                          required
+                          className="w-full px-4 py-2 bg-white border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                          value={formData.companyId}
+                          onChange={e => setFormData({...formData, companyId: e.target.value})}
+                        >
+                          <option value="">Selecionar Empresa</option>
+                          {companies.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-blue-600 uppercase mb-1">Valor Homem-Hora (R$)</label>
+                        <input 
+                          required
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          className="w-full px-4 py-2 bg-white border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                          value={formData.hourlyRate || ''}
+                          onChange={e => setFormData({...formData, hourlyRate: parseFloat(e.target.value) || 0})}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   {isAdmin && (
                     <div className="pt-4 border-t border-slate-100">
@@ -4219,6 +4301,7 @@ export default function App() {
   const [indicators, setIndicators] = useState<any[]>([]);
   const [chartData, setChartData] = useState<any[]>(mockChartData);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [thirdPartyCompanies, setThirdPartyCompanies] = useState<ThirdPartyCompany[]>([]);
   const [serviceDemands, setServiceDemands] = useState<ServiceDemand[]>([]);
   const [engineeringProjects, setEngineeringProjects] = useState<EngineeringProject[]>([]);
 
@@ -4472,7 +4555,13 @@ export default function App() {
     requestedBy: '',
     dueDate: null,
     scope: '',
-    needsMaterial: false
+    needsMaterial: false,
+    executorType: 'Próprio',
+    companyId: '',
+    companyName: '',
+    executorName: '',
+    hourlyRate: 0,
+    totalCost: 0
   });
 
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
@@ -4578,7 +4667,7 @@ export default function App() {
             role: role,
             workOrderRole: 'requester',
             createdAt: new Date().toISOString(),
-            permissions: defaultPermissions
+            permissions: { ...defaultPermissions, thirdParty: false }
           };
           await setUserProfile(profile);
         }
@@ -4757,6 +4846,9 @@ export default function App() {
     const unsubServiceDemands = subscribeToCollection<ServiceDemand>('serviceDemands', (data) => {
       setServiceDemands(data);
     });
+    const unsubThirdPartyCompanies = subscribeToCollection<ThirdPartyCompany>('thirdPartyCompanies', (data) => {
+      setThirdPartyCompanies(data);
+    });
 
     return () => {
       unsubAssets();
@@ -4764,6 +4856,7 @@ export default function App() {
       unsubPlans();
       unsubEmployees();
       unsubServiceDemands();
+      unsubThirdPartyCompanies();
     };
   }, [authReady, user]);
 
@@ -4821,7 +4914,13 @@ export default function App() {
         requestedBy: newWO.requestedBy || user?.uid || '',
         dueDate: newWO.dueDate || null,
         scope: newWO.scope || '',
-        needsMaterial: newWO.needsMaterial || false
+        needsMaterial: newWO.needsMaterial || false,
+        executorType: newWO.executorType || 'Próprio',
+        companyId: newWO.companyId || '',
+        companyName: newWO.companyName || '',
+        executorName: newWO.executorName || '',
+        hourlyRate: newWO.hourlyRate || 0,
+        totalCost: (newWO.Duration || newWO.EstimatedTime || 0) * (newWO.hourlyRate || 0)
       };
 
       if (editingWO) {
@@ -4949,8 +5048,11 @@ export default function App() {
     });
   };
 
-  const handleUpdateWorkOrder = async (id: string, updates: Partial<WorkOrder>) => {
+  const handleUpdateWorkOrder = async (id: string, updates: Partial<WorkOrder>, durationOverride?: number) => {
     try {
+      const wo = wos.find(w => w.ID === id);
+      if (!wo) throw new Error('O.S. não encontrada');
+
       const isPlanner = userProfile?.workOrderRole === 'planner' || userProfile?.role === 'admin';
       
       if (!isPlanner) {
@@ -4962,14 +5064,24 @@ export default function App() {
 
       if (updates.Status === 'Concluída') {
         updates.CompletedAt = updates.CompletedAt || new Date().toISOString().split('T')[0];
+        if (durationOverride !== undefined) {
+          updates.Duration = durationOverride;
+        }
+      }
+
+      // Recalculate totalCost if Duration or hourlyRate changes, or if completing
+      const finalDuration = updates.Duration !== undefined ? updates.Duration : (wo.Duration || wo.EstimatedTime || 0);
+      const finalHourlyRate = updates.hourlyRate !== undefined ? updates.hourlyRate : (wo.hourlyRate || 0);
+      
+      if (updates.Duration !== undefined || updates.hourlyRate !== undefined || updates.Status === 'Concluída') {
+        updates.totalCost = finalDuration * finalHourlyRate;
       }
       
       await updateDocument('work-orders', id, updates);
       
       // If completed, update the corresponding plan if it exists
       if (updates.Status === 'Concluída') {
-        const wo = wos.find(w => w.ID === id);
-        if (wo && wo.PlanID) {
+        if (wo.PlanID) {
           const plan = plans.find(p => p.ID === wo.PlanID);
           if (plan) {
             const completedDate = updates.CompletedAt || new Date().toISOString().split('T')[0];
@@ -5173,6 +5285,7 @@ export default function App() {
       items: [
         { id: 'assets', label: 'Ativos', icon: Box, permission: 'assets' },
         { id: 'employees', label: 'Funcionários', icon: UserPlus, permission: 'employees' },
+        { id: 'third-party', label: 'Empresas', icon: Building2, permission: 'thirdParty' },
       ]
     },
     {
@@ -5186,8 +5299,8 @@ export default function App() {
     {
       title: 'Conta',
       items: [
-        { id: 'profile', label: 'Meu Perfil', icon: UserIcon },
-        { id: 'settings', label: 'Configurações', icon: Settings },
+        { id: 'profile', label: 'Meu Perfil', icon: UserIcon, permission: '' },
+        { id: 'settings', label: 'Configurações', icon: Settings, permission: '' },
       ]
     }
   ].map(group => ({
@@ -5226,7 +5339,13 @@ export default function App() {
         }
         
         // Filter to only include allowed fields
-        const allowedFields = ['id', 'openedAt', 'requesterUid', 'requesterName', 'description', 'area', 'executorType', 'responsibleId', 'responsibleName', 'priority', 'estimatedDeliveryDate', 'startDate', 'executorName', 'status', 'needsMaterial', 'materialRequisition', 'scopeChanges', 'statusHistory', 'closedAt'];
+        const allowedFields = [
+          'id', 'openedAt', 'requesterUid', 'requesterName', 'description', 
+          'area', 'executorType', 'responsibleId', 'responsibleName', 'responsibleHourlyRate', 'responsibleHoursWorked',
+          'priority', 'estimatedDeliveryDate', 'startDate', 'executorName', 
+          'companyId', 'companyName', 'status', 'needsMaterial', 'materialRequisition', 
+          'collaborators', 'scopeChanges', 'statusHistory', 'closedAt', 'totalCost'
+        ];
         const updatedDemand: any = {};
         allowedFields.forEach(field => {
           if (field in mergedDemand) {
@@ -6101,7 +6220,7 @@ export default function App() {
                       setSelectedModelForWO(asset?.Model || '');
                       setShowWOModal(true);
                     }}
-                    onUpdateStatus={(id, status, completedAt) => handleUpdateWorkOrder(id, { Status: status as any, CompletedAt: completedAt })}
+                    onUpdateStatus={(id, status, completedAt, duration) => handleUpdateWorkOrder(id, { Status: status as any, CompletedAt: completedAt }, duration)}
                     onUpdateChecklist={(id, checklist) => handleUpdateWorkOrder(id, { Checklist: checklist })}
                     onDelete={handleDeleteWorkOrder}
                   />
@@ -6139,6 +6258,7 @@ export default function App() {
                   <ServiceManagementModule 
                     demands={serviceDemands}
                     employees={employees}
+                    companies={thirdPartyCompanies}
                     userProfile={userProfile}
                     onSave={handleSaveServiceDemand}
                     onDelete={handleDeleteServiceDemand}
@@ -6180,8 +6300,19 @@ export default function App() {
                     allUsers={allUsers}
                     isAdmin={isAdmin}
                     currentUserUid={user?.uid}
+                    companies={thirdPartyCompanies}
                     onRefresh={() => {}} // Handled by real-time
                     onDelete={handleDeleteEmployee}
+                    showToast={showToast}
+                  />
+                )}
+                {activeTab === 'third-party' && (
+                  <ThirdPartyModule 
+                    companies={thirdPartyCompanies}
+                    employees={employees}
+                    isAdmin={isAdmin}
+                    currentUserUid={user?.uid}
+                    onRefresh={() => {}}
                     showToast={showToast}
                   />
                 )}
@@ -6646,27 +6777,94 @@ export default function App() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Técnico Responsável</label>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Tipo de Executor</label>
                       <select 
-                        required
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newWO.TechnicianID}
-                        onChange={e => {
-                          const emp = employees.find(emp => emp.ID === e.target.value);
-                          setNewWO({
-                            ...newWO, 
-                            TechnicianID: e.target.value,
-                            AssignedTo: emp ? emp.Name : e.target.value
-                          });
-                        }}
+                        value={newWO.executorType}
+                        onChange={e => setNewWO({...newWO, executorType: e.target.value as any})}
                       >
-                        <option value="">Selecione um técnico</option>
-                        {employees.filter(emp => emp.Status === 'Ativo').map(emp => (
-                          <option key={emp.ID} value={emp.ID}>{emp.Name} ({emp.Function})</option>
-                        ))}
+                        <option value="Próprio">Próprio</option>
+                        <option value="Terceiro">Terceiro</option>
                       </select>
                     </div>
                   </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    {newWO.executorType === 'Terceiro' ? (
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Empresa Terceira</label>
+                        <select 
+                          className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                          value={newWO.companyId}
+                          onChange={e => {
+                            const company = thirdPartyCompanies.find(c => c.id === e.target.value);
+                            setNewWO({
+                              ...newWO, 
+                              companyId: e.target.value,
+                              companyName: company?.name || ''
+                            });
+                          }}
+                        >
+                          <option value="">Selecione uma empresa</option>
+                          {thirdPartyCompanies.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Técnico Responsável</label>
+                        <select 
+                          required
+                          className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                          value={newWO.TechnicianID}
+                          onChange={e => {
+                            const emp = employees.find(emp => emp.ID === e.target.value);
+                            setNewWO({
+                              ...newWO, 
+                              TechnicianID: e.target.value,
+                              AssignedTo: emp ? emp.Name : e.target.value,
+                              hourlyRate: emp?.hourlyRate || 0
+                            });
+                          }}
+                        >
+                          <option value="">Selecione um técnico</option>
+                          {employees.filter(emp => emp.Status === 'Ativo').map(emp => (
+                            <option key={emp.ID} value={emp.ID}>{emp.Name} ({emp.Function})</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Custo Total Est./Real (R$)</label>
+                      <div className="w-full px-4 py-3 bg-slate-100 border-none rounded-xl text-sm font-bold text-blue-700">
+                        R$ {((newWO.Duration || newWO.EstimatedTime || 0) * (newWO.hourlyRate || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {newWO.executorType === 'Terceiro' && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Nome do Executor</label>
+                        <input 
+                          type="text"
+                          className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                          value={newWO.executorName || ''}
+                          onChange={e => setNewWO({...newWO, executorName: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Valor Hora (R$)</label>
+                        <input 
+                          type="number"
+                          className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                          value={newWO.hourlyRate || ''}
+                          onChange={e => setNewWO({...newWO, hourlyRate: parseFloat(e.target.value) || 0})}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>

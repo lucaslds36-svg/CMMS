@@ -18,7 +18,8 @@ import {
   Box,
   Eye,
   Trash2,
-  FileText
+  FileText,
+  DollarSign
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, parseISO, differenceInDays, isAfter, isBefore, addDays, startOfMonth, eachDayOfInterval, isToday } from 'date-fns';
@@ -26,7 +27,7 @@ import { ptBR } from 'date-fns/locale';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
-import type { ServiceDemand, Employee, UserProfile, MaterialRequisition, ServiceDemandScopeChange, ServiceDemandStatusChange } from '../types';
+import type { ServiceDemand, Employee, UserProfile, MaterialRequisition, ServiceDemandScopeChange, ServiceDemandStatusChange, ThirdPartyCompany } from '../types';
 
 const safeParseISO = (dateStr: string | undefined | null) => {
   if (!dateStr) return new Date();
@@ -46,6 +47,7 @@ function cn(...inputs: ClassValue[]) {
 interface ServiceManagementModuleProps {
   demands: ServiceDemand[];
   employees: Employee[];
+  companies: ThirdPartyCompany[];
   userProfile: UserProfile | null;
   onSave: (demand: Partial<ServiceDemand>) => Promise<void>;
   onDelete?: (demandId: string) => Promise<void>;
@@ -57,6 +59,7 @@ interface ServiceManagementModuleProps {
 export const ServiceManagementModule = ({
   demands,
   employees,
+  companies,
   userProfile,
   onSave,
   onDelete,
@@ -88,6 +91,8 @@ export const ServiceManagementModule = ({
     priority: 'Média',
     estimatedDeliveryDate: format(addDays(new Date(), 7), 'yyyy-MM-dd'),
     executorName: '',
+    companyId: '',
+    companyName: '',
     needsMaterial: false,
     materialRequisition: {
       item: '',
@@ -207,7 +212,6 @@ export const ServiceManagementModule = ({
     });
 
     const doc = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = doc.internal.pageSize.getWidth();
     
     // Header
     doc.setFontSize(18);
@@ -235,26 +239,19 @@ export const ServiceManagementModule = ({
 
     // Table
     autoTable(doc, {
-      head: [['ID', 'Descrição', 'Área', 'Vencimento', 'Responsável', 'Status']],
+      head: [['ID', 'Descrição', 'Área', 'Vencimento', 'Executor', 'Responsável', 'Status']],
       body: sortedDemands.map(demand => [
         `#${demand.id.replace('SD-', '')}`,
         demand.description,
         demand.area,
         format(safeParseISO(demand.estimatedDeliveryDate), 'dd/MM/yyyy'),
+        demand.executorType === 'Terceiro' ? (demand.companyName || 'Terceiro') : 'Próprio',
         demand.responsibleName || '-',
         demand.status
       ]),
       startY: 50,
       headStyles: { fillColor: [30, 64, 175] },
       styles: { fontSize: 8, cellPadding: 2 },
-      columnStyles: {
-        0: { cellWidth: 15 },
-        1: { cellWidth: 'auto' },
-        2: { cellWidth: 25 },
-        3: { cellWidth: 20 },
-        4: { cellWidth: 30 },
-        5: { cellWidth: 25 }
-      }
     });
     
     doc.save(`relatorio-servicos-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
@@ -662,7 +659,15 @@ export const ServiceManagementModule = ({
                         required
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
                         value={formData.executorType}
-                        onChange={e => setFormData({...formData, executorType: e.target.value as any})}
+                        onChange={e => setFormData({
+                          ...formData, 
+                          executorType: e.target.value as any,
+                          companyId: '',
+                          companyName: '',
+                          responsibleId: '',
+                          responsibleName: '',
+                          collaborators: []
+                        })}
                       >
                         <option value="Próprio">Próprio</option>
                         <option value="Terceiro">Terceiro</option>
@@ -671,30 +676,60 @@ export const ServiceManagementModule = ({
 
                     {formData.executorType === 'Terceiro' && (
                       <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Nome do Executante (Terceiro)</label>
-                        <input 
-                          type="text"
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Empresa Terceira</label>
+                        <select 
+                          required
                           className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
-                          placeholder="Nome do executante..."
-                          value={formData.executorName || ''}
-                          onChange={e => setFormData({...formData, executorName: e.target.value})}
-                        />
+                          value={formData.companyId}
+                          onChange={e => {
+                            const company = companies.find(c => c.id === e.target.value);
+                            setFormData({
+                              ...formData, 
+                              companyId: e.target.value,
+                              companyName: company?.name || '',
+                              responsibleId: '',
+                              responsibleName: '',
+                              collaborators: []
+                            });
+                          }}
+                        >
+                          <option value="">Selecione a Empresa</option>
+                          {companies.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
                       </div>
                     )}
 
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Responsável</label>
-                      <input 
+                      <select 
                         required
-                        type="text"
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
-                        placeholder="Nome do responsável..."
-                        value={formData.responsibleName || ''}
-                        onChange={e => setFormData({...formData, responsibleName: e.target.value, responsibleId: ''})}
-                      />
-                      <p className="text-[10px] text-slate-500 mt-1 italic px-1">
-                        * Digite o nome do responsável pela demanda.
-                      </p>
+                        value={formData.responsibleId}
+                        onChange={e => {
+                          const emp = employees.find(emp => emp.ID === e.target.value);
+                          setFormData({
+                            ...formData,
+                            responsibleId: e.target.value,
+                            responsibleName: emp?.Name || ''
+                          });
+                        }}
+                      >
+                        <option value="">Selecione o Responsável</option>
+                        {employees
+                          .filter(emp => {
+                            if (formData.executorType === 'Próprio') {
+                              return emp.Type === 'Próprio';
+                            } else {
+                              return emp.Type === 'Terceiro' && emp.companyId === formData.companyId;
+                            }
+                          })
+                          .map(emp => (
+                            <option key={emp.ID} value={emp.ID}>{emp.Name}</option>
+                          ))
+                        }
+                      </select>
                     </div>
 
                     <div>
@@ -704,7 +739,7 @@ export const ServiceManagementModule = ({
                           className="flex-1 px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
                           onChange={e => {
                             const emp = employees.find(emp => emp.ID === e.target.value);
-                            if (emp) {
+                            if (emp && !formData.collaborators?.find(c => c.id === emp.ID)) {
                               setFormData({
                                 ...formData,
                                 collaborators: [...(formData.collaborators || []), { id: emp.ID, name: emp.Name }]
@@ -714,7 +749,12 @@ export const ServiceManagementModule = ({
                         >
                           <option value="">Adicionar colaborador</option>
                           {employees
-                            .filter(emp => emp.Type === formData.executorType && emp.ID !== formData.responsibleId)
+                            .filter(emp => {
+                              const isRightType = formData.executorType === 'Próprio' 
+                                ? emp.Type === 'Próprio' 
+                                : (emp.Type === 'Terceiro' && emp.companyId === formData.companyId);
+                              return isRightType && emp.ID !== formData.responsibleId;
+                            })
                             .map(emp => (
                               <option key={emp.ID} value={emp.ID}>
                                 {emp.Name}
@@ -900,9 +940,58 @@ export const ServiceManagementModule = ({
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Executor</label>
-                        <p className="text-sm font-bold text-slate-900">{editingDemand.executorType}</p>
+                        {isEditing ? (
+                          <select 
+                            className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                            value={editingDemand.executorType}
+                            onChange={e => setEditingDemand({
+                              ...editingDemand, 
+                              executorType: e.target.value as any,
+                              companyId: '',
+                              companyName: '',
+                              responsibleId: '',
+                              responsibleName: '',
+                              collaborators: []
+                            })}
+                          >
+                            <option value="Próprio">Próprio</option>
+                            <option value="Terceiro">Terceiro</option>
+                          </select>
+                        ) : (
+                          <p className="text-sm font-bold text-slate-900">{editingDemand.executorType}</p>
+                        )}
                       </div>
                     </div>
+
+                    {editingDemand.executorType === 'Terceiro' && (
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Empresa Terceira</label>
+                        {isEditing ? (
+                          <select 
+                            className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                            value={editingDemand.companyId}
+                            onChange={e => {
+                              const company = companies.find(c => c.id === e.target.value);
+                              setEditingDemand({
+                                ...editingDemand, 
+                                companyId: e.target.value,
+                                companyName: company?.name || '',
+                                responsibleId: '',
+                                responsibleName: '',
+                                collaborators: []
+                              });
+                            }}
+                          >
+                            <option value="">Selecione a Empresa</option>
+                            {companies.map(c => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <p className="text-sm font-bold text-slate-900">{editingDemand.companyName || 'Não informada'}</p>
+                        )}
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -918,35 +1007,103 @@ export const ServiceManagementModule = ({
                       <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Responsável</label>
                         {isEditing ? (
-                          <input 
-                            type="text"
+                          <select 
                             className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                            value={editingDemand.responsibleName || ''}
-                            onChange={e => setEditingDemand({...editingDemand, responsibleName: e.target.value, responsibleId: ''})}
-                            placeholder="Nome do responsável..."
-                          />
+                            value={editingDemand.responsibleId}
+                            onChange={e => {
+                              const emp = employees.find(emp => emp.ID === e.target.value);
+                              setEditingDemand({
+                                ...editingDemand,
+                                responsibleId: e.target.value,
+                                responsibleName: emp?.Name || '',
+                                responsibleHourlyRate: emp?.hourlyRate || 0
+                              });
+                            }}
+                          >
+                            <option value="">Selecione o Responsável</option>
+                            {employees
+                              .filter(emp => {
+                                if (editingDemand.executorType === 'Próprio') {
+                                  return emp.Type === 'Próprio';
+                                } else {
+                                  return emp.Type === 'Terceiro' && emp.companyId === editingDemand.companyId;
+                                }
+                              })
+                              .map(emp => (
+                                <option key={emp.ID} value={emp.ID}>
+                                  {emp.Name} {emp.hourlyRate ? `(R$ ${emp.hourlyRate}/h)` : ''}
+                                </option>
+                              ))
+                            }
+                          </select>
                         ) : (
-                          <p className="text-sm font-bold text-slate-900">{editingDemand.responsibleName}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-bold text-slate-900">{editingDemand.responsibleName}</p>
+                            {editingDemand.responsibleHourlyRate && editingDemand.responsibleHourlyRate > 0 && (
+                              <span className="text-[10px] text-emerald-600 font-bold">R$ {editingDemand.responsibleHourlyRate}/h</span>
+                            )}
+                          </div>
                         )}
+                        {isEditing && (
+                          <div className="mt-2 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <label className="text-[10px] font-bold text-slate-400 uppercase">Horas do Responsável:</label>
+                              <input 
+                                type="number"
+                                step="0.5"
+                                className="w-20 px-2 py-1 bg-slate-50 border-none rounded-lg text-xs"
+                                value={editingDemand.responsibleHoursWorked || 0}
+                                onChange={e => setEditingDemand({...editingDemand, responsibleHoursWorked: parseFloat(e.target.value) || 0})}
+                              />
+                            </div>
+                          </div>
+                        )}
+                        {!isEditing && editingDemand.responsibleHoursWorked ? (
+                          <p className="text-xs text-slate-500 mt-1">Horas: {editingDemand.responsibleHoursWorked}h</p>
+                        ) : null}
                       </div>
-                      <div>
+                      <div className="col-span-2">
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Colaboradores</label>
-                        <div className="flex flex-wrap gap-2 mb-2">
+                        <div className="space-y-2 mb-2">
                           {(editingDemand.collaborators || []).map((collab, index) => (
-                            <span key={index} className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs">
-                              {collab.name}
-                              {isEditing && (
-                                <button 
-                                  type="button" 
-                                  onClick={() => setEditingDemand({
-                                    ...editingDemand,
-                                    collaborators: editingDemand.collaborators?.filter((_, i) => i !== index)
-                                  })}
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              )}
-                            </span>
+                            <div key={index} className="flex items-center justify-between p-2 bg-slate-50 rounded-xl border border-slate-100">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-slate-700">{collab.name}</span>
+                                {collab.hourlyRate && collab.hourlyRate > 0 && (
+                                  <span className="text-[10px] text-emerald-600 font-bold">R$ {collab.hourlyRate}/h</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {isEditing ? (
+                                  <>
+                                    <input 
+                                      type="number"
+                                      step="0.5"
+                                      placeholder="Hrs"
+                                      className="w-16 px-2 py-1 bg-white border border-slate-200 rounded-lg text-[10px]"
+                                      value={collab.hoursWorked || 0}
+                                      onChange={e => {
+                                        const newCollabs = [...(editingDemand.collaborators || [])];
+                                        newCollabs[index] = { ...collab, hoursWorked: parseFloat(e.target.value) || 0 };
+                                        setEditingDemand({ ...editingDemand, collaborators: newCollabs });
+                                      }}
+                                    />
+                                    <button 
+                                      type="button" 
+                                      onClick={() => setEditingDemand({
+                                        ...editingDemand,
+                                        collaborators: editingDemand.collaborators?.filter((_, i) => i !== index)
+                                      })}
+                                      className="p-1 text-rose-400 hover:bg-rose-50 rounded-lg"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span className="text-xs text-slate-500">{collab.hoursWorked || 0}h</span>
+                                )}
+                              </div>
+                            </div>
                           ))}
                         </div>
                         {isEditing && (
@@ -957,7 +1114,12 @@ export const ServiceManagementModule = ({
                               if (emp) {
                                 setEditingDemand({
                                   ...editingDemand,
-                                  collaborators: [...(editingDemand.collaborators || []), { id: emp.ID, name: emp.Name }]
+                                  collaborators: [...(editingDemand.collaborators || []), { 
+                                    id: emp.ID, 
+                                    name: emp.Name,
+                                    hourlyRate: emp.hourlyRate || 0,
+                                    hoursWorked: 0
+                                  }]
                                 });
                               }
                             }}
@@ -967,7 +1129,7 @@ export const ServiceManagementModule = ({
                               .filter(emp => emp.Type === editingDemand.executorType && emp.ID !== editingDemand.responsibleId && !(editingDemand.collaborators || []).find(c => c.id === emp.ID))
                               .map(emp => (
                                 <option key={emp.ID} value={emp.ID}>
-                                  {emp.Name}
+                                  {emp.Name} {emp.hourlyRate ? `(R$ ${emp.hourlyRate}/h)` : ''}
                                 </option>
                               ))
                             }
@@ -975,6 +1137,20 @@ export const ServiceManagementModule = ({
                         )}
                       </div>
                     </div>
+
+                    {editingDemand.executorType === 'Terceiro' && (
+                      <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center justify-between">
+                        <div>
+                          <h4 className="text-[10px] font-bold text-emerald-700 uppercase mb-1">Custo Estimado de Mão de Obra</h4>
+                          <p className="text-lg font-bold text-emerald-900">
+                            R$ {((editingDemand.responsibleHoursWorked || 0) * (editingDemand.responsibleHourlyRate || 0) + 
+                                (editingDemand.collaborators || []).reduce((acc, c) => acc + (c.hoursWorked || 0) * (c.hourlyRate || 0), 0))
+                                .toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <DollarSign className="w-8 h-8 text-emerald-200" />
+                      </div>
+                    )}
 
                     {editingDemand.executorType === 'Terceiro' && (
                       <div>
@@ -1169,7 +1345,9 @@ export const ServiceManagementModule = ({
                 {isEditing && (
                   <button 
                     onClick={async () => {
-                      await onSave(editingDemand);
+                      const totalCost = ((editingDemand.responsibleHoursWorked || 0) * (editingDemand.responsibleHourlyRate || 0) + 
+                                        (editingDemand.collaborators || []).reduce((acc, c) => acc + (c.hoursWorked || 0) * (c.hourlyRate || 0), 0));
+                      await onSave({ ...editingDemand, totalCost });
                       setEditingDemand(null);
                       setIsEditing(false);
                     }}
