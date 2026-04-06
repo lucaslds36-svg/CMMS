@@ -37,6 +37,81 @@ export const FailureAnalysisModule = ({
   });
   const [selectedRow, setSelectedRow] = useState<any | null>(null);
 
+  // Pre-calculate column names once when rawData changes
+  const colNames = useMemo(() => {
+    if (!rawData || rawData.length === 0) return {};
+    const keys = Object.keys(rawData[0]);
+    const findCol = (possibleNames: string[]) => {
+      const upperPossible = possibleNames.map(n => n.toUpperCase());
+      const exact = keys.find(k => upperPossible.includes(k.toUpperCase()));
+      if (exact) return exact;
+      const partial = keys.find(k => {
+        const s = k.toUpperCase();
+        return upperPossible.some(p => s.includes(p));
+      });
+      return partial || possibleNames[0];
+    };
+
+    return {
+      data: findCol(['Data', 'Dia', 'Date', 'Day']),
+      ano: findCol(['Ano', 'Year']),
+      mes: findCol(['Mês', 'Mes', 'Month']),
+      dia: findCol(['Dia', 'Day']),
+      grupo: findCol(['Grupo', 'Tipo', 'Tipo (Grupo)', 'Categoria']),
+      maquina: findCol(['Máquina', 'Maquina', 'Equipamento', 'Ativo']),
+      parte: findCol(['Parte', 'Componente', 'Subconjunto']),
+      causa: findCol(['Causa', 'Motivo', 'Falha']),
+      setor: findCol(['Setor', 'Área', 'Area', 'Departamento'])
+    };
+  }, [rawData]);
+
+  // Pre-parse dates for better performance
+  const rawDataWithDates = useMemo(() => {
+    if (!Array.isArray(rawData) || !colNames.data) return [];
+    
+    const months: Record<string, number> = {
+      'Janeiro': 0, 'Fevereiro': 1, 'Março': 2, 'Abril': 3, 'Maio': 4, 'Junho': 5,
+      'Julho': 6, 'Agosto': 7, 'Setembro': 8, 'Outubro': 9, 'Novembro': 10, 'Dezembro': 11
+    };
+
+    return rawData.map(row => {
+      let date: Date | null = null;
+      const val = row[colNames.data];
+      
+      if (val) {
+        if (typeof val === 'number') {
+          date = new Date((val - 25569) * 86400 * 1000);
+          if (val < 61) date.setDate(date.getDate() + 1);
+          date.setMinutes(date.getMinutes() + date.getTimezoneOffset());
+        } else if (typeof val === 'string') {
+          if (/^\d{4}-\d{2}-\d{2}/.test(val)) {
+            const [y, m, d] = val.split(/[-T ]/).map(Number);
+            date = new Date(y, m - 1, d);
+          } else if (/^\d{2}\/\d{2}\/\d{4}/.test(val)) {
+            const [d, m, y] = val.split('/').map(Number);
+            date = new Date(y, m - 1, d);
+          } else {
+            date = new Date(val);
+          }
+        } else {
+          date = new Date(val);
+        }
+      }
+
+      if ((!date || isNaN(date.getTime())) && row[colNames.ano] && row[colNames.mes] && row[colNames.dia]) {
+        const monthStr = String(row[colNames.mes]);
+        const month = months[monthStr] !== undefined ? months[monthStr] : (parseInt(monthStr) - 1);
+        date = new Date(parseInt(row[colNames.ano]), month, parseInt(row[colNames.dia]));
+      }
+
+      const normalizedDate = (date && !isNaN(date.getTime())) 
+        ? new Date(date.getFullYear(), date.getMonth(), date.getDate())
+        : null;
+
+      return { ...row, _parsedDate: normalizedDate };
+    });
+  }, [rawData, colNames]);
+
   // Helper to find the actual column name in the data
   const getColName = (possibleNames: string[]) => {
     if (rawData.length === 0) return possibleNames[0];
@@ -549,44 +624,31 @@ export const FailureAnalysisModule = ({
 
   // Filter data
   const filteredData = useMemo(() => {
-    if (!Array.isArray(rawData)) return [];
-    return rawData.filter(row => {
+    if (!Array.isArray(rawDataWithDates)) return [];
+    
+    const start = filters.startDate ? parseInputDate(filters.startDate) : null;
+    const end = filters.endDate ? parseInputDate(filters.endDate) : null;
+    if (end) end.setHours(23, 59, 59, 999);
+
+    const activeFilterEntries = Object.entries(filters).filter(([key, value]) => 
+      value !== '' && key !== 'startDate' && key !== 'endDate'
+    );
+
+    return rawDataWithDates.filter(row => {
       // Date range filter
-      if (filters.startDate || filters.endDate) {
-        const rowDate = parseToDate(row);
-        if (rowDate) {
-          if (filters.startDate) {
-            const start = parseInputDate(filters.startDate);
-            if (start && rowDate < start) return false;
-          }
-          if (filters.endDate) {
-            const end = parseInputDate(filters.endDate);
-            if (end) {
-              end.setHours(23, 59, 59, 999);
-              if (rowDate > end) return false;
-            }
-          }
-        } else {
-          // If we have a date filter but no date in row, exclude it
-          return false; 
-        }
+      if (start || end) {
+        const rowDate = row._parsedDate;
+        if (!rowDate) return false;
+        if (start && rowDate < start) return false;
+        if (end && rowDate > end) return false;
       }
 
-      return Object.entries(filters).every(([key, value]) => {
-        if (!value || key === 'startDate' || key === 'endDate') return true; // No filter selected or handled above
-        
-        let possibleNames = [key, key.toUpperCase(), key.toLowerCase()];
-        if (key === 'Grupo') possibleNames = ['Grupo', 'Tipo', 'Tipo (Grupo)', 'Categoria'];
-        if (key === 'Máquina') possibleNames = ['Máquina', 'Maquina', 'Equipamento', 'Ativo'];
-        if (key === 'Parte') possibleNames = ['Parte', 'Componente', 'Subconjunto'];
-        if (key === 'Causa') possibleNames = ['Causa', 'Motivo', 'Falha'];
-        if (key === 'Setor') possibleNames = ['Setor', 'Área', 'Area', 'Departamento'];
-
-        const actualKey = getColName(possibleNames);
+      return activeFilterEntries.every(([key, value]) => {
+        const actualKey = filterColMapping[key];
         return String(row[actualKey]) === String(value);
       });
     });
-  }, [rawData, filters]);
+  }, [rawDataWithDates, filters, filterColMapping]);
 
   const aggregateData = (groupBy: string, sumBy: string, countBy?: string) => {
     const result: Record<string, any> = {};

@@ -24,6 +24,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { format, parseISO, differenceInDays, isAfter, isBefore, addDays, startOfMonth, eachDayOfInterval, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import type { ServiceDemand, Employee, UserProfile, MaterialRequisition, ServiceDemandScopeChange, ServiceDemandStatusChange } from '../types';
 
@@ -209,58 +210,134 @@ export const ServiceManagementModule = ({
     const pageWidth = doc.internal.pageSize.getWidth();
     
     // Header
-    doc.setFillColor(30, 41, 59);
-    doc.rect(0, 0, pageWidth, 40, 'F');
-    
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(20);
-    doc.text('Relatório de Gestão de Serviços', 15, 20);
+    doc.setFontSize(18);
+    doc.setTextColor(30, 64, 175); // Blue-800
+    doc.text('Relatório de Gestão de Serviços', 15, 15);
     
     doc.setFontSize(10);
-    doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 15, 30);
+    doc.setTextColor(100, 116, 139); // Slate-500
+    doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 15, 22);
     
-    // Table Headers
-    let y = 50;
-    doc.setFillColor(241, 245, 249);
-    doc.rect(10, y - 5, pageWidth - 20, 10, 'F');
+    // Stats Summary
+    const total = sortedDemands.length;
+    const inProgress = sortedDemands.filter(d => d.status === 'Em andamento').length;
+    const completed = sortedDemands.filter(d => d.status === 'Concluído').length;
     
+    doc.setFontSize(12);
+    doc.setTextColor(30, 64, 175);
+    doc.text('Resumo Executivo', 15, 35);
+    
+    doc.setFontSize(10);
     doc.setTextColor(51, 65, 85);
-    doc.setFontSize(9);
-    doc.text('ID', 15, y);
-    doc.text('Descrição', 35, y);
-    doc.text('Vencimento', 110, y);
-    doc.text('Responsável', 140, y);
-    doc.text('Status', 180, y);
-    
-    y += 10;
-    
-    sortedDemands.forEach((demand) => {
-      if (y > 270) {
-        doc.addPage();
-        y = 20;
+    doc.text(`Total de Demandas: ${total}`, 15, 42);
+    doc.text(`Em Andamento: ${inProgress}`, 70, 42);
+    doc.text(`Concluídas: ${completed}`, 120, 42);
+
+    // Table
+    autoTable(doc, {
+      head: [['ID', 'Descrição', 'Área', 'Vencimento', 'Responsável', 'Status']],
+      body: sortedDemands.map(demand => [
+        `#${demand.id.replace('SD-', '')}`,
+        demand.description,
+        demand.area,
+        format(safeParseISO(demand.estimatedDeliveryDate), 'dd/MM/yyyy'),
+        demand.responsibleName || '-',
+        demand.status
+      ]),
+      startY: 50,
+      headStyles: { fillColor: [30, 64, 175] },
+      styles: { fontSize: 8, cellPadding: 2 },
+      columnStyles: {
+        0: { cellWidth: 15 },
+        1: { cellWidth: 'auto' },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 20 },
+        4: { cellWidth: 30 },
+        5: { cellWidth: 25 }
       }
-      
-      doc.setTextColor(51, 65, 85);
-      doc.setFontSize(8);
-      doc.text(`#${demand.id.replace('SD-', '')}`, 15, y);
-      
-      const desc = demand.description.length > 45 ? demand.description.substring(0, 42) + '...' : demand.description;
-      doc.text(desc, 35, y);
-      
-      doc.text(format(safeParseISO(demand.estimatedDeliveryDate), 'dd/MM/yyyy'), 110, y);
-      
-      const resp = (demand.responsibleName || '').length > 20 ? (demand.responsibleName || '').substring(0, 17) + '...' : (demand.responsibleName || '');
-      doc.text(resp, 140, y);
-      
-      doc.text(demand.status, 180, y);
-      
-      y += 8;
-      doc.setDrawColor(241, 245, 249);
-      doc.line(10, y - 4, pageWidth - 10, y - 4);
     });
     
     doc.save(`relatorio-servicos-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
-    showToast('Relatório gerado com sucesso!');
+    showToast('Relatório PDF gerado com sucesso!');
+  };
+
+  const generateIndividualReport = (demand: ServiceDemand) => {
+    const doc = new jsPDF();
+    
+    doc.setFontSize(18);
+    doc.setTextColor(30, 64, 175); // Blue-800
+    doc.text(`Relatório de Demanda: #${demand.id.replace('SD-', '')}`, 10, 15);
+    
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Responsável: ${demand.responsibleName || '-'}`, 10, 25);
+    doc.text(`Status: ${demand.status}`, 10, 32);
+    doc.text(`Área: ${demand.area}`, 10, 39);
+    doc.text(`Prioridade: ${demand.priority}`, 10, 46);
+    doc.text(`Data de Abertura: ${demand.openedAt ? format(safeParseISO(demand.openedAt), 'dd/MM/yyyy HH:mm') : '-'}`, 10, 53);
+    doc.text(`Previsão de Entrega: ${demand.estimatedDeliveryDate ? format(safeParseISO(demand.estimatedDeliveryDate), 'dd/MM/yyyy') : '-'}`, 10, 60);
+    
+    doc.setFontSize(14);
+    doc.setTextColor(30, 64, 175);
+    doc.text('Descrição da Demanda', 10, 75);
+    doc.setFontSize(10);
+    doc.setTextColor(51, 65, 85);
+    doc.text(demand.description || '-', 10, 82, { maxWidth: 180 });
+    
+    let y = 100;
+
+    // Status History Table
+    if (demand.statusHistory && demand.statusHistory.length > 0) {
+      doc.setFontSize(14);
+      doc.setTextColor(30, 64, 175);
+      doc.text('Histórico de Status', 10, y);
+      autoTable(doc, {
+        head: [['Data', 'Status', 'Usuário']],
+        body: demand.statusHistory.map(h => [
+          format(safeParseISO(h.date), 'dd/MM/yyyy HH:mm'),
+          h.status,
+          h.user
+        ]),
+        startY: y + 5,
+        headStyles: { fillColor: [30, 64, 175] }
+      });
+      y = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    // Scope Changes Table
+    if (demand.scopeChanges && demand.scopeChanges.length > 0) {
+      if (y > 250) { doc.addPage(); y = 20; }
+      doc.setFontSize(14);
+      doc.setTextColor(30, 64, 175);
+      doc.text('Alterações de Escopo', 10, y);
+      autoTable(doc, {
+        head: [['Data', 'Descrição', 'Usuário']],
+        body: demand.scopeChanges.map(s => [
+          format(safeParseISO(s.date), 'dd/MM/yyyy'),
+          s.description,
+          s.user
+        ]),
+        startY: y + 5,
+        headStyles: { fillColor: [30, 64, 175] }
+      });
+      y = (doc as any).lastAutoTable.finalY + 15;
+    }
+
+    // Material Requisition
+    if (demand.needsMaterial && demand.materialRequisition) {
+      if (y > 250) { doc.addPage(); y = 20; }
+      doc.setFontSize(14);
+      doc.setTextColor(30, 64, 175);
+      doc.text('Requisição de Material', 10, y);
+      doc.setFontSize(10);
+      doc.setTextColor(51, 65, 85);
+      doc.text(`Item: ${demand.materialRequisition.item}`, 10, y + 7);
+      doc.text(`Nº Requisição: ${demand.materialRequisition.requisitionNumber}`, 10, y + 14);
+      doc.text(`Data de Entrega: ${demand.materialRequisition.deliveryDate ? format(safeParseISO(demand.materialRequisition.deliveryDate), 'dd/MM/yyyy') : '-'}`, 10, y + 21);
+    }
+    
+    doc.save(`relatorio_demanda_${demand.id}.pdf`);
+    showToast('Relatório PDF gerado com sucesso!');
   };
 
   const GanttView = () => {
@@ -358,7 +435,7 @@ export const ServiceManagementModule = ({
             className="flex items-center justify-center space-x-2 px-6 py-3 bg-slate-100 text-slate-700 rounded-2xl font-bold hover:bg-slate-200 transition-all border border-slate-200"
           >
             <FileText className="w-5 h-5" />
-            <span>Relatório</span>
+            <span>Relatório PDF</span>
           </button>
           <button 
             onClick={() => setShowModal(true)}
@@ -794,9 +871,17 @@ export const ServiceManagementModule = ({
                     <h3 className="text-2xl font-bold text-slate-900">Detalhes da Demanda</h3>
                     <p className="text-slate-500 text-sm">ID: {editingDemand.id}</p>
                   </div>
-                  <button onClick={() => { setEditingDemand(null); setIsEditing(false); }} className="p-2 hover:bg-slate-100 rounded-full">
-                    <X className="w-6 h-6" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => generateIndividualReport(editingDemand)}
+                      className="px-4 py-2 bg-slate-800 text-white rounded-full text-xs font-bold flex items-center gap-2 hover:bg-slate-900 transition-all"
+                    >
+                      <FileText className="w-4 h-4" /> Relatório PDF
+                    </button>
+                    <button onClick={() => { setEditingDemand(null); setIsEditing(false); }} className="p-2 hover:bg-slate-100 rounded-full">
+                      <X className="w-6 h-6" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

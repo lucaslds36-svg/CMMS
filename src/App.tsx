@@ -2294,7 +2294,7 @@ const EmployeeModule = ({
         userUid: ''
       });
     }
-  }, [editingEmployee]);
+  }, [editingEmployee, showModal]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -5864,15 +5864,6 @@ export default function App() {
               >
                 {activeTab === 'dashboard' && (
                   <div className="space-y-6">
-                    <div className="flex justify-end">
-                      <button 
-                        onClick={handleExportExcel}
-                        className="flex items-center space-x-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-100"
-                      >
-                        <FileSpreadsheet className="w-4 h-4" />
-                        <span>Exportar para Excel</span>
-                      </button>
-                    </div>
                     <Dashboard 
                       assets={assets} 
                       wos={wos} 

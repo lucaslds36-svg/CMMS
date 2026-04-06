@@ -249,7 +249,24 @@ export const subscribeToGlobalData = (
     }
 
     const data = snapshot.data();
+    const updatedAt = data.updatedAt?.toMillis() || 0;
+    const cacheKey = `globalData_cache_${key}`;
+    const cachedUpdatedAt = parseInt(localStorage.getItem(`${cacheKey}_updatedAt`) || '0');
+
+    // If we have cached data and the updatedAt hasn't changed, use the cache
+    if (updatedAt !== 0 && cachedUpdatedAt === updatedAt) {
+      const cachedData = localStorage.getItem(cacheKey);
+      if (cachedData) {
+        callback(cachedData);
+        return;
+      }
+    }
+
     if (!data.isChunked) {
+      if (updatedAt !== 0) {
+        localStorage.setItem(cacheKey, data.data);
+        localStorage.setItem(`${cacheKey}_updatedAt`, updatedAt.toString());
+      }
       callback(data.data);
       return;
     }
@@ -257,14 +274,26 @@ export const subscribeToGlobalData = (
     // If chunked, we need to fetch all chunks
     try {
       const chunkCount = data.chunkCount;
-      let fullData = '';
+      const chunkPromises = [];
       for (let i = 0; i < chunkCount; i++) {
         const chunkRef = doc(db, 'globalData', `${key}_part_${i}`);
-        const chunkSnap = await getDoc(chunkRef);
-        if (chunkSnap.exists()) {
-          fullData += chunkSnap.data().data;
+        chunkPromises.push(getDoc(chunkRef));
+      }
+      
+      const chunkSnaps = await Promise.all(chunkPromises);
+      let fullData = '';
+      for (const snap of chunkSnaps) {
+        if (snap.exists()) {
+          fullData += (snap.data() as any).data;
         }
       }
+
+      // Save to cache
+      if (updatedAt !== 0) {
+        localStorage.setItem(cacheKey, fullData);
+        localStorage.setItem(`${cacheKey}_updatedAt`, updatedAt.toString());
+      }
+
       callback(fullData);
     } catch (error) {
       console.error(`Error loading chunked data for ${key}:`, error);
