@@ -361,6 +361,12 @@ export const ImprovementManagementModule = ({
     
     y = (doc as any).lastAutoTable.finalY + 10;
     
+    // Check for page break before summary box
+    if (y > 240) {
+      doc.addPage();
+      y = 20;
+    }
+
     // Investment Summary Box
     const summaryWidth = 85;
     const summaryX = 200 - summaryWidth; 
@@ -372,7 +378,7 @@ export const ImprovementManagementModule = ({
     doc.setFontSize(9);
     doc.setTextColor(100, 116, 139); // slate-500
     doc.setFont('helvetica', 'normal');
-    doc.text('Soma Unitária das Etapas:', summaryX + 5, y + 8);
+    doc.text('Soma das Etapas:', summaryX + 5, y + 8);
     doc.text('Quantidade de Equipamentos:', summaryX + 5, y + 16);
     
     doc.setTextColor(30, 41, 59); // slate-900
@@ -383,18 +389,19 @@ export const ImprovementManagementModule = ({
     doc.setDrawColor(241, 245, 249);
     doc.line(summaryX + 5, y + 20, 195, y + 20);
     
-    doc.setFontSize(11);
-    doc.setTextColor(37, 99, 235); // blue-600
-    doc.text('Investimento Total do Projeto:', summaryX + 5, y + 27);
+    doc.setFontSize(9);
+    doc.setTextColor(30, 41, 59); // slate-900
+    doc.text('Investimento Total:', summaryX + 5, y + 27);
     doc.text(`R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 195, y + 27, { align: 'right' });
     
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(0, 0, 0);
     
-    y += 42;
+    y += 45;
 
     // Indicators Table
     if (project.indicators && project.indicators.length > 0) {
+      if (y > 250) { doc.addPage(); y = 20; }
       doc.setFontSize(14);
       doc.text('Indicadores de Desempenho', 10, y);
       autoTable(doc, {
@@ -611,18 +618,18 @@ export const ImprovementManagementModule = ({
               </table>
             </div>
             
-            <div className="p-8 bg-white border-t border-slate-100 flex flex-col items-end space-y-4">
-              <div className="flex justify-between w-full max-w-sm items-center">
-                <span className="text-slate-500 font-medium">Soma das Etapas:</span>
-                <span className="font-bold text-slate-900 text-lg">R$ {sumTasksInvestment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            <div className="p-6 bg-slate-50/50 border-t border-slate-100 flex flex-col items-end space-y-3">
+              <div className="flex justify-between w-full max-w-xs text-sm">
+                <span className="text-slate-500">Soma das Etapas:</span>
+                <span className="font-bold text-slate-900">R$ {sumTasksInvestment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
               </div>
-              <div className="flex justify-between w-full max-w-sm items-center">
-                <span className="text-slate-500 font-medium">Quantidade de Equipamentos:</span>
-                <span className="font-bold text-slate-900 text-lg">{assetsCount}</span>
+              <div className="flex justify-between w-full max-w-xs text-sm">
+                <span className="text-slate-500">Quantidade de Equipamentos:</span>
+                <span className="font-bold text-slate-900">{assetsCount}</span>
               </div>
-              <div className="pt-6 mt-2 border-t border-slate-100 flex justify-between w-full max-w-sm items-center">
-                <span className="font-bold text-blue-600 text-lg uppercase tracking-wider">Investimento Total:</span>
-                <span className="font-bold text-3xl text-blue-600">R$ {totalInvestment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+              <div className="pt-4 mt-2 border-t border-slate-200 flex justify-between w-full max-w-xs">
+                <span className="font-bold text-slate-900">Investimento Total:</span>
+                <span className="font-bold text-slate-900">R$ {totalInvestment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
               </div>
             </div>
           </div>
