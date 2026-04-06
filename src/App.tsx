@@ -4720,11 +4720,15 @@ export default function App() {
       // bdData key in Firestore corresponds to the main dashboard base (BD sheet)
       if (data) {
         try {
-          localStorage.setItem('bdData', data);
           const parsed = JSON.parse(data);
           if (Array.isArray(parsed)) {
             setBditssData(parsed); // bditssData state is used for the main BD sheet
             updateFiltersFromData(parsed);
+            try {
+              localStorage.setItem('bdData', data);
+            } catch (e) {
+              console.warn("Failed to save bdData to localStorage", e);
+            }
           } else {
             console.warn("Parsed bdData is not an array:", parsed);
           }
@@ -4739,10 +4743,14 @@ export default function App() {
       // dinamicaData key in Firestore corresponds to the goals (PDG sheet)
       if (data) {
         try {
-          localStorage.setItem('dinamicaData', data);
           const parsed = JSON.parse(data);
           if (Array.isArray(parsed)) {
             setDinamicaData(parsed);
+            try {
+              localStorage.setItem('dinamicaData', data);
+            } catch (e) {
+              console.warn("Failed to save dinamicaData to localStorage", e);
+            }
           } else {
             console.warn("Parsed dinamicaData is not an array:", parsed);
           }
@@ -4756,11 +4764,15 @@ export default function App() {
       // bditssData key in Firestore corresponds to the failure analysis base (BDITSS sheet)
       if (data) {
         try {
-          localStorage.setItem('bditssData', data);
           const parsed = JSON.parse(data);
           if (Array.isArray(parsed)) {
             setFailureAnalysisData(parsed); // failureAnalysisData state is used for the BDITSS sheet
             window.dispatchEvent(new Event('failureAnalysisDataUpdated'));
+            try {
+              localStorage.setItem('bditssData', data);
+            } catch (e) {
+              console.warn("Failed to save bditssData to localStorage", e);
+            }
           } else {
             console.warn("Parsed bditssData is not an array:", parsed);
           }
