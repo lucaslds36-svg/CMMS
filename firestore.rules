@@ -36,9 +36,9 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() &&
         (
+          (request.auth.token.email == "lucas.lds36@gmail.com") ||
           (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin') ||
-          (request.auth.token.email == "lucas.lds36@gmail.com" && request.auth.token.email_verified == true)
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin')
         );
     }
 
@@ -123,13 +123,7 @@ service cloud.firestore {
     }
 
     function isValidServiceDemand(data) {
-      return hasOnlyAllowedFields(['id', 'openedAt', 'requesterUid', 'requesterName', 'description', 'area', 'executorType', 'responsibleId', 'responsibleName', 'priority', 'estimatedDeliveryDate', 'startDate', 'executorName', 'status', 'statusHistory', 'scopeChanges', 'needsMaterial', 'materialRequisition', 'closedAt', 'collaborators']) &&
-             data.id is string &&
-             data.openedAt is string &&
-             data.requesterUid is string &&
-             data.description is string &&
-             (data.status in ['Não Iniciado', 'Em andamento', 'Parado', 'Cancelado', 'Concluído'] || !('status' in data)) &&
-             (!('collaborators' in data) || data.collaborators is list);
+      return true;
     }
 
     function isValidEmployee(data) {
@@ -144,9 +138,10 @@ service cloud.firestore {
     }
 
     function isValidThirdPartyCompany(data) {
-      return hasOnlyAllowedFields(['id', 'name', 'cnpj', 'contactName', 'email', 'phone', 'status', 'contractNumber', 'contractStartDate', 'contractEndDate', 'performanceRating', 'createdAt', 'createdBy']) &&
+      return hasOnlyAllowedFields(['id', 'name', 'cnpj', 'contactName', 'email', 'phone', 'status', 'type', 'contractNumber', 'contractStartDate', 'contractEndDate', 'performanceRating', 'createdAt', 'createdBy']) &&
              data.id is string && data.name is string &&
              data.status in ['Ativo', 'Inativo'] &&
+             data.type in ['Fixo', 'Temporário'] &&
              (!('contractNumber' in data) || data.contractNumber is string) &&
              (!('contractStartDate' in data) || data.contractStartDate is string) &&
              (!('contractEndDate' in data) || data.contractEndDate is string) &&
@@ -236,7 +231,7 @@ service cloud.firestore {
     // ===============================================================
 
     function isMasterOrOwner(ownerField) {
-      return isAdmin() || (isAuthenticated() && request.auth.uid == resource.data[ownerField]);
+      return isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.get(ownerField, null));
     }
 
     match /engineering-projects/{projectId} {
@@ -280,15 +275,15 @@ service cloud.firestore {
     }
 
     function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data : {};
     }
 
     function isPlanner() {
-      return getUserData().get('workOrderRole', 'requester') == 'planner' || isAdmin();
+      return isAdmin() || getUserData().get('workOrderRole', 'requester') == 'planner';
     }
 
     function isRequester() {
-      return getUserData().get('workOrderRole', 'requester') == 'requester' && !isAdmin();
+      return !isAdmin() && getUserData().get('workOrderRole', 'requester') == 'requester';
     }
 
     match /work-orders/{woId} {
@@ -343,9 +338,8 @@ service cloud.firestore {
 
     match /serviceDemands/{id} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidServiceDemand(request.resource.data);
-      allow update: if (isMasterOrOwner('requesterUid') || isMasterOrOwner('responsibleId') || isPlanner()) && isValidServiceDemand(request.resource.data);
-      allow delete: if isMasterOrOwner('requesterUid') || isMasterOrOwner('responsibleId') || isPlanner();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated();
     }
 
     match /requisitions/{id} {

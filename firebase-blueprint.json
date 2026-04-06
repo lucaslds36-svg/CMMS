@@ -28,14 +28,22 @@
         "executorType": { "type": "string" },
         "responsibleId": { "type": "string" },
         "responsibleName": { "type": "string" },
+        "responsibleHourlyRate": { "type": "number" },
+        "responsibleHoursWorked": { "type": "number" },
         "priority": { "type": "string" },
         "estimatedDeliveryDate": { "type": "string" },
+        "startDate": { "type": "string" },
+        "executorName": { "type": "string" },
+        "companyId": { "type": "string" },
+        "companyName": { "type": "string" },
         "status": { "type": "string" },
         "needsMaterial": { "type": "boolean" },
         "materialRequisition": { "type": "object" },
+        "collaborators": { "type": "array" },
         "scopeChanges": { "type": "array" },
         "statusHistory": { "type": "array" },
-        "closedAt": { "type": "string" }
+        "closedAt": { "type": "string" },
+        "totalCost": { "type": "number" }
       },
       "required": ["id", "openedAt", "requesterUid", "description", "area", "executorType", "responsibleId", "priority", "estimatedDeliveryDate", "status"]
     },
@@ -76,10 +84,11 @@
         "contractStartDate": { "type": "string" },
         "contractEndDate": { "type": "string" },
         "performanceRating": { "type": "number" },
+        "type": { "type": "string", "enum": ["Fixo", "Temporário"] },
         "createdAt": { "type": "string" },
         "createdBy": { "type": "string" }
       },
-      "required": ["id", "name", "status", "createdAt"]
+      "required": ["id", "name", "status", "type", "createdAt"]
     }
   },
   "firestore": {

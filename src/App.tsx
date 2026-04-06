@@ -2377,7 +2377,7 @@ const EmployeeModule = ({
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-4 sm:p-6 border-b border-slate-100">
+        <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="relative w-full sm:max-w-md">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input 
@@ -2387,6 +2387,15 @@ const EmployeeModule = ({
               onChange={e => setSearch(e.target.value)}
               className="pl-10 pr-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 w-full"
             />
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 border border-emerald-100">
+              <DollarSign className="w-4 h-4" />
+              <span>Total H/H: R$ {filteredEmployees.reduce((sum, emp) => sum + (emp.hourlyRate || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl text-xs font-bold border border-blue-100">
+              {filteredEmployees.length} Funcionários
+            </div>
           </div>
         </div>
         <div className="overflow-x-auto">

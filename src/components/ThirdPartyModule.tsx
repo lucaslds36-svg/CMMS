@@ -56,6 +56,7 @@ export const ThirdPartyModule = ({
     email: '',
     phone: '',
     status: 'Ativo' as 'Ativo' | 'Inativo',
+    type: 'Fixo' as 'Fixo' | 'Temporário',
     contractNumber: '',
     contractStartDate: '',
     contractEndDate: '',
@@ -71,6 +72,7 @@ export const ThirdPartyModule = ({
         email: editingCompany.email || '',
         phone: editingCompany.phone || '',
         status: editingCompany.status,
+        type: editingCompany.type || 'Fixo',
         contractNumber: editingCompany.contractNumber || '',
         contractStartDate: editingCompany.contractStartDate || '',
         contractEndDate: editingCompany.contractEndDate || '',
@@ -84,6 +86,7 @@ export const ThirdPartyModule = ({
         email: '',
         phone: '',
         status: 'Ativo',
+        type: 'Fixo',
         contractNumber: '',
         contractStartDate: '',
         contractEndDate: '',
@@ -224,14 +227,19 @@ export const ThirdPartyModule = ({
                     )}
                   </div>
                 </div>
-                <div className="mt-3 flex items-center justify-between text-[10px]">
-                  <span className={cn(
-                    "px-2 py-0.5 rounded-full font-medium",
-                    company.status === 'Ativo' ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
-                  )}>
-                    {company.status}
-                  </span>
-                  <div className="flex items-center text-slate-400 space-x-1">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        "px-2 py-0.5 rounded-full font-medium",
+                        company.status === 'Ativo' ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
+                      )}>
+                        {company.status}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
+                        {company.type || 'Fixo'}
+                      </span>
+                    </div>
+                    <div className="flex items-center text-slate-400 space-x-1">
                     <Users className="w-3 h-3" />
                     <span>{getCompanyEmployees(company.id).length} colaboradores</span>
                   </div>
@@ -257,6 +265,15 @@ export const ThirdPartyModule = ({
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
+                      <div className="flex items-center space-x-3 text-sm">
+                        <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400">
+                          <Building2 className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase">Tipo</p>
+                          <p className="text-slate-700 font-medium">{companies.find(c => c.id === selectedCompanyId)?.type || 'Fixo'}</p>
+                        </div>
+                      </div>
                       <div className="flex items-center space-x-3 text-sm">
                         <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400">
                           <FileText className="w-4 h-4" />
@@ -363,8 +380,14 @@ export const ThirdPartyModule = ({
               <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm">
                 <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                   <h4 className="text-lg font-bold text-slate-900">Colaboradores Alocados</h4>
-                  <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">
-                    {getCompanyEmployees(selectedCompanyId).length} Total
+                  <div className="flex items-center gap-3">
+                    <div className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                      <DollarSign className="w-3 h-3" />
+                      Total H/H: R$ {getCompanyEmployees(selectedCompanyId).reduce((sum, emp) => sum + (emp.hourlyRate || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                    <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">
+                      {getCompanyEmployees(selectedCompanyId).length} Total
+                    </div>
                   </div>
                 </div>
                 <div className="overflow-x-auto">
@@ -503,6 +526,18 @@ export const ThirdPartyModule = ({
                           value={formData.cnpj}
                           onChange={e => setFormData({...formData, cnpj: e.target.value})}
                         />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Tipo de Terceiro</label>
+                        <select 
+                          required
+                          className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
+                          value={formData.type}
+                          onChange={e => setFormData({...formData, type: e.target.value as any})}
+                        >
+                          <option value="Fixo">Fixo</option>
+                          <option value="Temporário">Temporário</option>
+                        </select>
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Status</label>

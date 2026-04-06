@@ -120,6 +120,7 @@ export interface ThirdPartyCompany {
   contractStartDate?: string;
   contractEndDate?: string;
   performanceRating?: number;
+  type: 'Fixo' | 'Temporário';
 }
 
 export interface ServiceDemandScopeChange {

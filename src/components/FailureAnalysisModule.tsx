@@ -53,7 +53,7 @@ export const FailureAnalysisModule = ({
     };
 
     return {
-      data: findCol(['Data', 'Dia', 'Date', 'Day']),
+      data: findCol(['Data', 'Dia', 'Date', 'Day', 'Ocorrência', 'Ocorrencia', 'Início', 'Inicio']),
       ano: findCol(['Ano', 'Year']),
       mes: findCol(['Mês', 'Mes', 'Month']),
       dia: findCol(['Dia', 'Day']),
@@ -69,46 +69,65 @@ export const FailureAnalysisModule = ({
   const rawDataWithDates = useMemo(() => {
     if (!Array.isArray(rawData) || !colNames.data) return [];
     
-    const months: Record<string, number> = {
-      'Janeiro': 0, 'Fevereiro': 1, 'Março': 2, 'Abril': 3, 'Maio': 4, 'Junho': 5,
-      'Julho': 6, 'Agosto': 7, 'Setembro': 8, 'Outubro': 9, 'Novembro': 10, 'Dezembro': 11
-    };
+    const monthsNames = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    
+    const monthsMap: Record<string, number> = {};
+    monthsNames.forEach((name, i) => { monthsMap[name] = i; });
 
     return rawData.map(row => {
       let date: Date | null = null;
       const val = row[colNames.data];
       
       if (val) {
-        if (typeof val === 'number') {
+        if (val instanceof Date) {
+          date = val;
+        } else if (typeof val === 'number') {
+          // Excel serial date
           date = new Date((val - 25569) * 86400 * 1000);
           if (val < 61) date.setDate(date.getDate() + 1);
           date.setMinutes(date.getMinutes() + date.getTimezoneOffset());
         } else if (typeof val === 'string') {
-          if (/^\d{4}-\d{2}-\d{2}/.test(val)) {
-            const [y, m, d] = val.split(/[-T ]/).map(Number);
+          const s = val.trim();
+          if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+            const [y, m, d] = s.split(/[-T ]/).map(Number);
             date = new Date(y, m - 1, d);
-          } else if (/^\d{2}\/\d{2}\/\d{4}/.test(val)) {
-            const [d, m, y] = val.split('/').map(Number);
+          } else if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) {
+            const [d, m, y] = s.split('/').map(Number);
+            date = new Date(y, m - 1, d);
+          } else if (/^\d{2}-\d{2}-\d{4}/.test(s)) {
+            const [d, m, y] = s.split('-').map(Number);
             date = new Date(y, m - 1, d);
           } else {
-            date = new Date(val);
+            date = new Date(s);
           }
-        } else {
-          date = new Date(val);
         }
       }
 
-      if ((!date || isNaN(date.getTime())) && row[colNames.ano] && row[colNames.mes] && row[colNames.dia]) {
+      // Fallback to separate columns
+      if ((!date || isNaN(date.getTime())) && row[colNames.ano] && row[colNames.mes]) {
         const monthStr = String(row[colNames.mes]);
-        const month = months[monthStr] !== undefined ? months[monthStr] : (parseInt(monthStr) - 1);
-        date = new Date(parseInt(row[colNames.ano]), month, parseInt(row[colNames.dia]));
+        const month = monthsMap[monthStr] !== undefined ? monthsMap[monthStr] : (parseInt(monthStr) - 1);
+        const day = parseInt(row[colNames.dia]) || 1;
+        date = new Date(parseInt(row[colNames.ano]), month, day);
       }
 
       const normalizedDate = (date && !isNaN(date.getTime())) 
         ? new Date(date.getFullYear(), date.getMonth(), date.getDate())
         : null;
 
-      return { ...row, _parsedDate: normalizedDate };
+      // Derive year and month for filtering
+      const derivedYear = normalizedDate ? String(normalizedDate.getFullYear()) : String(row[colNames.ano] || '');
+      const derivedMonth = normalizedDate ? monthsNames[normalizedDate.getMonth()] : String(row[colNames.mes] || '');
+
+      return { 
+        ...row, 
+        _parsedDate: normalizedDate,
+        _derivedYear: derivedYear,
+        _derivedMonth: derivedMonth
+      };
     });
   }, [rawData, colNames]);
 
@@ -231,36 +250,31 @@ export const FailureAnalysisModule = ({
   };
 
   const parseToDate = (row: any) => {
-    const dataCol = getColName(['Data', 'Dia', 'Date', 'Day']);
+    const dataCol = getColName(['Data', 'Dia', 'Date', 'Day', 'Ocorrência', 'Ocorrencia', 'Início', 'Inicio']);
     const val = row[dataCol];
     if (!val) return null;
 
-    console.log("FailureAnalysisModule: Attempting to parse date:", val, "Type:", typeof val);
-
     let date: Date | null = null;
     
-    if (typeof val === 'number') {
-      // Excel serial date: 1900-01-01 is 1. 
-      // JavaScript Date(0) is 1970-01-01.
-      // Excel treats 1900 as a leap year (incorrectly), so we need to adjust for that.
-      const date = new Date((val - 25569) * 86400 * 1000);
-      
-      // Correcting for Excel's 1900 leap year bug if the date is before 1900-03-01
-      if (val < 61) {
-        date.setDate(date.getDate() + 1);
-      }
-      
+    if (val instanceof Date) {
+      date = val;
+    } else if (typeof val === 'number') {
+      date = new Date((val - 25569) * 86400 * 1000);
+      if (val < 61) date.setDate(date.getDate() + 1);
       date.setMinutes(date.getMinutes() + date.getTimezoneOffset());
-      return date;
     } else if (typeof val === 'string') {
-      if (/^\d{4}-\d{2}-\d{2}/.test(val)) {
-        const [y, m, d] = val.split(/[-T ]/).map(Number);
+      const s = val.trim();
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+        const [y, m, d] = s.split(/[-T ]/).map(Number);
         date = new Date(y, m - 1, d);
-      } else if (/^\d{2}\/\d{2}\/\d{4}/.test(val)) {
-        const [d, m, y] = val.split('/').map(Number);
+      } else if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) {
+        const [d, m, y] = s.split('/').map(Number);
+        date = new Date(y, m - 1, d);
+      } else if (/^\d{2}-\d{2}-\d{4}/.test(s)) {
+        const [d, m, y] = s.split('-').map(Number);
         date = new Date(y, m - 1, d);
       } else {
-        date = new Date(val);
+        date = new Date(s);
       }
     } else {
       date = new Date(val);
@@ -271,23 +285,25 @@ export const FailureAnalysisModule = ({
       const mesCol = getColName(['Mês', 'Mes', 'Month']);
       const diaCol = getColName(['Dia', 'Day']);
       
-      if (row[anoCol] && row[mesCol] && row[diaCol]) {
-        const months: Record<string, number> = {
-          'Janeiro': 0, 'Fevereiro': 1, 'Março': 2, 'Abril': 3, 'Maio': 4, 'Junho': 5,
-          'Julho': 6, 'Agosto': 7, 'Setembro': 8, 'Outubro': 9, 'Novembro': 10, 'Dezembro': 11
-        };
+      if (row[anoCol] && row[mesCol]) {
+        const monthsNames = [
+          'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+          'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+        ];
+        const monthsMap: Record<string, number> = {};
+        monthsNames.forEach((name, i) => { monthsMap[name] = i; });
+
         const monthStr = String(row[mesCol]);
-        const month = months[monthStr] !== undefined ? months[monthStr] : (parseInt(monthStr) - 1);
-        date = new Date(parseInt(row[anoCol]), month, parseInt(row[diaCol]));
+        const month = monthsMap[monthStr] !== undefined ? monthsMap[monthStr] : (parseInt(monthStr) - 1);
+        const day = parseInt(row[diaCol]) || 1;
+        date = new Date(parseInt(row[anoCol]), month, day);
       }
     }
 
     if (date && !isNaN(date.getTime())) {
-      // Normalize to midnight local time
       return new Date(date.getFullYear(), date.getMonth(), date.getDate());
     }
     
-    console.log("FailureAnalysisModule: Failed to parse date for row:", row);
     return null;
   };
 
@@ -601,24 +617,44 @@ export const FailureAnalysisModule = ({
   }, [rawData, filters]);
 
   const getUniqueValues = (key: string) => {
-    const actualKey = filterColMapping[key];
-    if (!actualKey || !Array.isArray(rawData)) return [];
+    if (!Array.isArray(rawDataWithDates)) return [];
     
-    // Filter rawData by other active filters to show only relevant options (cascading)
-    // This ensures that if "Tipo" is selected, only machines of that type appear, and vice versa.
-    const dataForOptions = rawData.filter(row => {
+    const actualKey = filterColMapping[key];
+    
+    // Filter rawDataWithDates by other active filters to show only relevant options (cascading)
+    const dataForOptions = rawDataWithDates.filter(row => {
       return Object.entries(filters).every(([fKey, fValue]) => {
         if (!fValue || fKey === key || fKey === 'startDate' || fKey === 'endDate') return true;
+        
+        if (fKey === 'Ano') return row._derivedYear === String(fValue);
+        if (fKey === 'Mês') return row._derivedMonth === String(fValue);
+        
         const fActualKey = filterColMapping[fKey];
         if (!fActualKey) return true;
         return String(row[fActualKey]) === String(fValue);
       });
     });
 
-    const values = dataForOptions.map(row => row[actualKey]).filter(val => val !== undefined && val !== null && val !== '');
-    return Array.from(new Set(values)).sort((a: any, b: any) => {
+    let values: any[] = [];
+    if (key === 'Ano') {
+      values = dataForOptions.map(row => row._derivedYear);
+    } else if (key === 'Mês') {
+      values = dataForOptions.map(row => row._derivedMonth);
+    } else if (actualKey) {
+      values = dataForOptions.map(row => row[actualKey]);
+    }
+
+    const cleanValues = values.filter(val => val !== undefined && val !== null && val !== '');
+    return Array.from(new Set(cleanValues)).sort((a: any, b: any) => {
+      if (key === 'Mês') {
+        const monthsOrder = [
+          'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+          'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+        ];
+        return monthsOrder.indexOf(a) - monthsOrder.indexOf(b);
+      }
       if (typeof a === 'number' && typeof b === 'number') return a - b;
-      return String(a).localeCompare(String(b));
+      return String(a).localeCompare(String(b), undefined, { numeric: true });
     });
   };
 
@@ -644,6 +680,9 @@ export const FailureAnalysisModule = ({
       }
 
       return activeFilterEntries.every(([key, value]) => {
+        if (key === 'Ano') return row._derivedYear === String(value);
+        if (key === 'Mês') return row._derivedMonth === String(value);
+        
         const actualKey = filterColMapping[key];
         return String(row[actualKey]) === String(value);
       });

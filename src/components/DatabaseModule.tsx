@@ -68,7 +68,7 @@ export const DatabaseModule: React.FC<DatabaseModuleProps> = ({ onDataImported, 
     setLoading(true);
     try {
       const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: 'array' });
+      const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
       
       console.log('Sheet names found:', workbook.SheetNames);
 
