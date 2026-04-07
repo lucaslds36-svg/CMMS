@@ -73,7 +73,7 @@ service cloud.firestore {
     }
 
     function isValidWorkOrder(data) {
-      return hasOnlyAllowedFields(['ID', 'AssetID', 'assetId', 'PlanID', 'planId', 'TechnicianID', 'technicianId', 'Description', 'Priority', 'priority', 'Type', 'type', 'Nature', 'nature', 'ActivityType', 'activityType', 'Status', 'AssignedTo', 'CreatedAt', 'CompletedAt', 'ScheduledDate', 'StartDate', 'EndDate', 'EstimatedTime', 'Collaborators', 'Duration', 'Cause', 'requestedBy', 'dueDate', 'scope', 'needsMaterial', 'id']) &&
+      return hasOnlyAllowedFields(['ID', 'AssetID', 'assetId', 'PlanID', 'planId', 'TechnicianID', 'technicianId', 'Description', 'Priority', 'priority', 'Type', 'type', 'Nature', 'nature', 'ActivityType', 'activityType', 'Status', 'AssignedTo', 'CreatedAt', 'CompletedAt', 'ScheduledDate', 'StartDate', 'EndDate', 'EstimatedTime', 'Collaborators', 'Duration', 'duration', 'Cause', 'requestedBy', 'dueDate', 'scope', 'needsMaterial', 'id', 'Checklist', 'startDate', 'endDate', 'executorType', 'companyId', 'companyName', 'executorName', 'hourlyRate', 'totalCost']) &&
              data.ID is string && (data.AssetID is string || data.assetId is string) &&
              (data.PlanID is string || !('PlanID' in data)) &&
              (data.TechnicianID is string || !('TechnicianID' in data)) &&
@@ -85,14 +85,24 @@ service cloud.firestore {
              (data.ScheduledDate is string || !('ScheduledDate' in data)) &&
              (data.StartDate is string || !('StartDate' in data)) &&
              (data.EndDate is string || !('EndDate' in data)) &&
+             (data.startDate is string || !('startDate' in data)) &&
+             (data.endDate is string || !('endDate' in data)) &&
              (data.EstimatedTime is number || !('EstimatedTime' in data)) &&
              (data.Collaborators is number || !('Collaborators' in data)) &&
              (data.Duration is number || !('Duration' in data)) &&
+             (data.duration is number || !('duration' in data)) &&
              (data.Cause is string || !('Cause' in data)) &&
              (data.requestedBy is string || !('requestedBy' in data)) &&
              (data.dueDate is string || data.dueDate == null || !('dueDate' in data)) &&
              (data.scope is string || !('scope' in data)) &&
-             (data.needsMaterial is bool || !('needsMaterial' in data));
+             (data.needsMaterial is bool || !('needsMaterial' in data)) &&
+             (data.Checklist is list || !('Checklist' in data)) &&
+             (data.executorType in ['Próprio', 'Terceiro'] || !('executorType' in data)) &&
+             (data.companyId is string || !('companyId' in data)) &&
+             (data.companyName is string || !('companyName' in data)) &&
+             (data.executorName is string || !('executorName' in data)) &&
+             (data.hourlyRate is number || !('hourlyRate' in data)) &&
+             (data.totalCost is number || !('totalCost' in data));
     }
 
     function isValidPreventivePlan(data) {
