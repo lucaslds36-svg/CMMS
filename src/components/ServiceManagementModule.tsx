@@ -657,7 +657,7 @@ export const ServiceManagementModule = ({
                         rows={3}
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 resize-none"
                         placeholder="Descreva detalhadamente o serviço necessário..."
-                        value={formData.description}
+                        value={formData.description || ''}
                         onChange={e => setFormData({...formData, description: e.target.value})}
                       />
                     </div>
@@ -667,7 +667,7 @@ export const ServiceManagementModule = ({
                       <select 
                         required
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={formData.area}
+                        value={formData.area || 'Trefila'}
                         onChange={e => setFormData({...formData, area: e.target.value as any})}
                       >
                         {areas.map(a => <option key={a} value={a}>{a}</option>)}
@@ -679,7 +679,7 @@ export const ServiceManagementModule = ({
                       <select 
                         required
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={formData.executorType}
+                        value={formData.executorType || 'Próprio'}
                         onChange={e => setFormData({
                           ...formData, 
                           executorType: e.target.value as any,
@@ -701,7 +701,7 @@ export const ServiceManagementModule = ({
                         <select 
                           required
                           className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
-                          value={formData.companyId}
+                          value={formData.companyId || ''}
                           onChange={e => {
                             const company = companies.find(c => c.id === e.target.value);
                             setFormData({
@@ -727,7 +727,7 @@ export const ServiceManagementModule = ({
                       <select 
                         required
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={formData.responsibleId}
+                        value={formData.responsibleId || ''}
                         onChange={e => {
                           const emp = employees.find(emp => emp.ID === e.target.value);
                           setFormData({
@@ -831,7 +831,7 @@ export const ServiceManagementModule = ({
                         required
                         type="date"
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={formData.estimatedDeliveryDate}
+                        value={formData.estimatedDeliveryDate || ''}
                         onChange={e => setFormData({...formData, estimatedDeliveryDate: e.target.value})}
                       />
                     </div>

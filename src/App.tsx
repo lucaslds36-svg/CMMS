@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ImprovementManagementModule } from './components/ImprovementManagementModule';
+import { PreventiveAssetsModule } from './components/PreventiveAssetsModule';
 // Version: 1.0.1 - Consolidated structure
 import { 
   LayoutDashboard, 
@@ -1553,7 +1554,7 @@ const AssetList = ({ assets, onAdd, onEdit, onDelete, onImport, isAdmin = false,
     (a.Model || '').toLowerCase().includes(search.toLowerCase()) ||
     (a.Description || '').toLowerCase().includes(search.toLowerCase()) ||
     (a.Location || '').toLowerCase().includes(search.toLowerCase())
-  );
+  ).sort((a, b) => (a.Description || '').localeCompare(b.Description || ''));
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -1635,9 +1636,9 @@ const AssetList = ({ assets, onAdd, onEdit, onDelete, onImport, isAdmin = false,
                   }}
                 />
               </th>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Descrição</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">TAG</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Modelo</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Descrição</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Localização</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Planta</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
@@ -1661,9 +1662,9 @@ const AssetList = ({ assets, onAdd, onEdit, onDelete, onImport, isAdmin = false,
                     }}
                   />
                 </td>
-                <td className="px-6 py-4 text-sm font-medium text-slate-900">{asset.Tag}</td>
+                <td className="px-6 py-4 text-sm font-medium text-slate-900">{asset.Description || 'Sem descrição'}</td>
+                <td className="px-6 py-4 text-sm text-slate-600">{asset.Tag}</td>
                 <td className="px-6 py-4 text-sm text-slate-600">{asset.Model}</td>
-                <td className="px-6 py-4 text-sm text-slate-600 max-w-xs truncate">{asset.Description}</td>
                 <td className="px-6 py-4 text-sm text-slate-600">{asset.Location}</td>
                 <td className="px-6 py-4 text-sm text-slate-600">{asset.Plant}</td>
                 <td className="px-6 py-4">
@@ -2597,7 +2598,7 @@ const EmployeeModule = ({
                             step="0.01"
                             placeholder="0,00"
                             className="w-full pl-10 pr-4 py-2 bg-white border-2 border-transparent rounded-xl text-sm focus:ring-0 focus:border-blue-500 transition-all"
-                            value={formData.hourlyRate || ''}
+                            value={Number.isNaN(formData.hourlyRate) || formData.hourlyRate === 0 ? '' : formData.hourlyRate}
                             onChange={e => setFormData({...formData, hourlyRate: parseFloat(e.target.value) || 0})}
                           />
                         </div>
@@ -2648,7 +2649,11 @@ export const calculateNextDue = (lastDone: string, frequency: string, freqType?:
   if (freqType === 'dias' && freqValue) {
     date.setDate(date.getDate() + freqValue);
   } else {
-    if (frequency === 'Mensal') date.setMonth(date.getMonth() + 1);
+    if (frequency === 'Diária') date.setDate(date.getDate() + 1);
+    else if (frequency === 'Semanal') date.setDate(date.getDate() + 7);
+    else if (frequency === 'Quinzenal') date.setDate(date.getDate() + 15);
+    else if (frequency === 'Mensal') date.setMonth(date.getMonth() + 1);
+    else if (frequency === 'Bimestral') date.setMonth(date.getMonth() + 2);
     else if (frequency === 'Trimestral') date.setMonth(date.getMonth() + 3);
     else if (frequency === 'Semestral') date.setMonth(date.getMonth() + 6);
     else if (frequency === 'Anual') date.setFullYear(date.getFullYear() + 1);
@@ -2976,6 +2981,9 @@ const PreventiveModule = ({
             CreatedAt: new Date().toISOString().split('T')[0],
             ScheduledDate: scheduledDate,
             CompletedAt: '',
+            Type: plan.Type || 'Preventiva',
+            Nature: 'Programada',
+            ActivityType: 'Inspeção',
             // Lowercase aliases and new fields
             assetId: assetId,
             planId: plan.ID || '',
@@ -3111,22 +3119,22 @@ const PreventiveModule = ({
                           setEditingPlan(plan);
                           setNewPlan({
                             AssetIDs: plan.AssetIDs || [],
-                            Task: plan.Task,
-                            Frequency: plan.Frequency,
+                            Task: plan.Task || '',
+                            Frequency: plan.Frequency || '',
                             FrequencyType: plan.FrequencyType || 'dias',
                             FrequencyValue: plan.FrequencyValue || 30,
-                            LastDone: plan.LastDone,
-                            Type: plan.Type,
-                            Criticality: plan.Criticality,
-                            AssetType: plan.AssetType,
-                            Location: plan.Location,
-                            Plant: plan.Plant,
-                            EstimatedTime: plan.EstimatedTime,
-                            Collaborators: plan.Collaborators,
+                            LastDone: plan.LastDone || '',
+                            Type: plan.Type || 'Preventiva',
+                            Criticality: plan.Criticality || 'Média',
+                            AssetType: plan.AssetType || '',
+                            Location: plan.Location || '',
+                            Plant: plan.Plant || '',
+                            EstimatedTime: plan.EstimatedTime || 0,
+                            Collaborators: plan.Collaborators || 0,
                             Checklist: plan.Checklist || [],
                             scheduleType: plan.scheduleType || 'global',
-                            globalDate: plan.globalDate || plan.NextDue,
-                            assets: plan.assets.map(a => ({ assetId: a.assetId, nextDate: a.nextDate, lastDate: a.lastDate }))
+                            globalDate: plan.globalDate || plan.NextDue || '',
+                            assets: (plan.assets || []).map(a => ({ assetId: a.assetId, nextDate: a.nextDate, lastDate: a.lastDate }))
                           });
                           setShowModal(true);
                         }}
@@ -3168,8 +3176,8 @@ const PreventiveModule = ({
                   <p className="text-[10px] font-bold text-slate-400 uppercase">Equipamentos ({planAssets.length})</p>
                   <div className="flex flex-wrap gap-1">
                     {planAssets.map(a => (
-                      <span key={a.ID} className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-medium border border-blue-100">
-                        {a.Tag}
+                      <span key={a.ID} className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-medium border border-blue-100" title={a.Description}>
+                        {a.Tag} {a.Description && ` - ${a.Description}`}
                       </span>
                     ))}
                     {planAssets.length === 0 && <span className="text-xs text-slate-400 italic">Nenhum equipamento</span>}
@@ -3216,9 +3224,10 @@ const PreventiveModule = ({
 
                         return (
                           <div key={assetId} className="flex justify-between items-center text-[10px] p-1.5 bg-slate-50 rounded-lg">
-                            <div className="flex flex-col">
-                              <span className="font-medium text-slate-600 truncate max-w-[100px]">{asset?.Tag}</span>
-                              {isAssetOverdue && <span className="text-red text-[8px]">Atrasado</span>}
+                            <div className="flex flex-col max-w-[150px]">
+                              <span className="font-bold text-slate-700 truncate">{asset?.Description || asset?.Tag}</span>
+                              <span className="text-[9px] text-slate-400 truncate">{asset?.Tag} • {asset?.Model}</span>
+                              {isAssetOverdue && <span className="text-rose-500 text-[8px] font-bold uppercase">Atrasado</span>}
                             </div>
                             <span className={cn("font-bold", isAssetOverdue ? "text-rose-600" : "text-blue-600")}>
                               {new Date(nextDue).toLocaleDateString('pt-BR')}
@@ -4586,7 +4595,9 @@ export default function App() {
     companyName: '',
     executorName: '',
     hourlyRate: 0,
-    totalCost: 0
+    totalCost: 0,
+    Status: 'Em Aberto',
+    CompletedAt: ''
   });
 
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
@@ -4931,7 +4942,7 @@ export default function App() {
   const handleCreateWorkOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const woData = {
+      const woData: any = {
         AssetID: newWO.AssetID || '',
         PlanID: newWO.PlanID || '',
         TechnicianID: newWO.TechnicianID || '',
@@ -4957,12 +4968,13 @@ export default function App() {
         companyName: newWO.companyName || '',
         executorName: newWO.executorName || '',
         hourlyRate: newWO.hourlyRate || 0,
-        totalCost: (newWO.Duration || newWO.EstimatedTime || 0) * (newWO.hourlyRate || 0)
+        totalCost: (newWO.Duration || newWO.EstimatedTime || 0) * (newWO.hourlyRate || 0),
+        Status: newWO.Status || 'Em Aberto',
+        CompletedAt: newWO.CompletedAt || ''
       };
 
       if (editingWO) {
-        await updateDocument('work-orders', editingWO.ID, woData);
-        showToast('Ordem de Serviço atualizada com sucesso!');
+        await handleUpdateWorkOrder(editingWO.ID, woData);
       } else {
         // Intelligent Automatic Closure: Close old open WOs of same type for this asset
         const existingOpenWOs = wos.filter(wo => 
@@ -4972,7 +4984,7 @@ export default function App() {
         );
 
         for (const oldWO of existingOpenWOs) {
-          await updateDocument('work-orders', oldWO.ID, { 
+          await handleUpdateWorkOrder(oldWO.ID, { 
             Status: 'Concluída', 
             CompletedAt: new Date().toISOString().split('T')[0],
             Cause: 'Fechamento automático por nova O.S. do mesmo tipo'
@@ -5009,7 +5021,9 @@ export default function App() {
         Collaborators: 0,
         Duration: 0,
         PlanID: '',
-        Cause: ''
+        Cause: '',
+        Status: 'Em Aberto',
+        CompletedAt: ''
       });
     } catch (error) {
       console.error('Error saving work order:', error);
@@ -5020,14 +5034,14 @@ export default function App() {
   const handleEditAsset = (asset: Asset) => {
     setEditingAsset(asset);
     setNewAsset({
-      Tag: asset.Tag,
-      Model: asset.Model,
-      Description: asset.Description,
-      Manufacturer: asset.Manufacturer,
-      Location: asset.Location,
-      Plant: asset.Plant,
-      Status: asset.Status,
-      InstallDate: asset.InstallDate
+      Tag: asset.Tag || '',
+      Model: asset.Model || '',
+      Description: asset.Description || '',
+      Manufacturer: asset.Manufacturer || '',
+      Location: asset.Location || '',
+      Plant: asset.Plant || '',
+      Status: asset.Status || 'Ativo',
+      InstallDate: asset.InstallDate || ''
     });
     setShowAssetModal(true);
   };
@@ -5050,7 +5064,9 @@ export default function App() {
       Collaborators: wo.Collaborators || 0,
       Duration: wo.Duration || 0,
       PlanID: wo.PlanID || '',
-      Cause: wo.Cause || ''
+      Cause: wo.Cause || '',
+      Status: wo.Status || 'Em Aberto',
+      CompletedAt: wo.CompletedAt || ''
     });
     setShowWOModal(true);
   };
@@ -5118,33 +5134,57 @@ export default function App() {
       
       // If completed, update the corresponding plan if it exists
       if (updates.Status === 'Concluída') {
-        if (wo.PlanID) {
-          const plan = plans.find(p => p.ID === wo.PlanID);
-          if (plan) {
-            const completedDate = updates.CompletedAt || new Date().toISOString().split('T')[0];
-            const nextDue = calculateNextDue(completedDate, plan.Frequency);
-            
-            const newAssetLastDones = { ...(plan.AssetLastDones || {}) };
-            const newAssetNextDues = { ...(plan.AssetNextDues || {}) };
-            
-            newAssetLastDones[wo.AssetID] = completedDate;
-            newAssetNextDues[wo.AssetID] = nextDue;
-            
-            // Update global NextDue to the earliest of all assets
-            const allNextDues = Object.values(newAssetNextDues);
-            const earliestNextDue = allNextDues.length > 0 ? allNextDues.sort()[0] : nextDue;
+        const planId = updates.PlanID || wo.PlanID;
+        let plan = planId ? plans.find(p => p.ID === planId) : null;
+        
+        // Fallback for OS-PREV prefix if PlanID is missing
+        if (!plan && (id.startsWith('OS-PREV-') || wo.ID.startsWith('OS-PREV-'))) {
+          plan = plans.find(p => p.AssetIDs.includes(wo.AssetID) && (p.Type === wo.Type || p.Type === wo.type || !wo.Type));
+        }
 
-            await updateDocument('preventive-plans', plan.ID, {
-              LastDone: completedDate,
-              NextDue: earliestNextDue,
-              AssetLastDones: newAssetLastDones,
-              AssetNextDues: newAssetNextDues,
-              EstimatedTime: plan.EstimatedTime !== undefined ? Number(plan.EstimatedTime) : 1,
-              Collaborators: plan.Collaborators !== undefined ? Number(plan.Collaborators) : 1,
-              lastExecutionDate: completedDate,
-              nextExecutionDate: earliestNextDue
-            });
+        if (plan) {
+          const completedDate = updates.CompletedAt || new Date().toISOString().split('T')[0];
+          const nextDue = calculateNextDue(
+            completedDate, 
+            plan.Frequency, 
+            plan.FrequencyType || (plan as any).frequencyType, 
+            plan.FrequencyValue || (plan as any).frequencyValue
+          );
+          
+          const newAssetLastDones = { ...(plan.AssetLastDones || {}) };
+          const newAssetNextDues = { ...(plan.AssetNextDues || {}) };
+          
+          newAssetLastDones[wo.AssetID] = completedDate;
+          newAssetNextDues[wo.AssetID] = nextDue;
+          
+          // Update global NextDue to the earliest of all assets
+          const allNextDues = Object.values(newAssetNextDues);
+          const earliestNextDue = allNextDues.length > 0 ? allNextDues.sort()[0] : nextDue;
+
+          // Also update the new assets array format
+          let assetFound = false;
+          const newAssets = (plan.assets || []).map(a => {
+            if (a.assetId === wo.AssetID) {
+              assetFound = true;
+              return { ...a, lastDate: completedDate, nextDate: nextDue };
+            }
+            return a;
+          });
+          if (!assetFound && plan.AssetIDs?.includes(wo.AssetID)) {
+            newAssets.push({ assetId: wo.AssetID, lastDate: completedDate, nextDate: nextDue });
           }
+
+          await updateDocument('preventive-plans', plan.ID, {
+            LastDone: completedDate,
+            NextDue: earliestNextDue,
+            AssetLastDones: newAssetLastDones,
+            AssetNextDues: newAssetNextDues,
+            assets: newAssets,
+            EstimatedTime: plan.EstimatedTime !== undefined ? Number(plan.EstimatedTime) : 1,
+            Collaborators: plan.Collaborators !== undefined ? Number(plan.Collaborators) : 1,
+            lastExecutionDate: completedDate,
+            nextExecutionDate: earliestNextDue
+          });
         }
       }
       
@@ -5306,6 +5346,7 @@ export default function App() {
       items: [
         { id: 'wos', label: 'Ordens de Serviço', icon: Wrench, permission: 'workOrders' },
         { id: 'preventive', label: 'Preventivas', icon: Calendar, permission: 'preventive' },
+        { id: 'preventive-assets', label: 'Status por Ativo', icon: Activity, permission: 'preventive' },
         { id: 'gantt', label: 'Planejamento (Gantt)', icon: GanttChart, permission: 'workOrders' },
         { id: 'service-management', label: 'Gestão de Serviços', icon: ClipboardList, permission: 'serviceManagement' },
       ]
@@ -6265,14 +6306,45 @@ export default function App() {
                         requestedBy: user?.uid || '',
                         dueDate: null,
                         scope: '',
-                        needsMaterial: false
+                        needsMaterial: false,
+                        executorType: 'Próprio',
+                        companyId: '',
+                        companyName: '',
+                        executorName: '',
+                        hourlyRate: 0,
+                        Status: 'Em Aberto'
                       });
                       setSelectedModelForWO('');
                       setShowWOModal(true);
                     }} 
                     onEdit={(wo) => {
                       setEditingWO(wo);
-                      setNewWO(wo);
+                      setNewWO({
+                        AssetID: wo.AssetID || '',
+                        Description: wo.Description || '',
+                        Priority: wo.Priority || 'Média',
+                        AssignedTo: wo.AssignedTo || '',
+                        TechnicianID: wo.TechnicianID || '',
+                        Type: wo.Type || 'Corretiva',
+                        Nature: wo.Nature || 'Programada',
+                        ActivityType: wo.ActivityType || 'Reparo',
+                        ScheduledDate: wo.ScheduledDate || new Date().toISOString().split('T')[0],
+                        StartDate: wo.StartDate || '',
+                        EndDate: wo.EndDate || '',
+                        EstimatedTime: wo.EstimatedTime || 0,
+                        Collaborators: wo.Collaborators || 0,
+                        Cause: wo.Cause || '',
+                        requestedBy: wo.requestedBy || '',
+                        dueDate: wo.dueDate || null,
+                        scope: wo.scope || '',
+                        needsMaterial: wo.needsMaterial || false,
+                        executorType: wo.executorType || 'Próprio',
+                        companyId: wo.companyId || '',
+                        companyName: wo.companyName || '',
+                        executorName: wo.executorName || '',
+                        hourlyRate: wo.hourlyRate || 0,
+                        Status: wo.Status || 'Em Aberto'
+                      });
                       const asset = assets.find(a => a.ID === wo.AssetID);
                       setSelectedModelForWO(asset?.Model || '');
                       setShowWOModal(true);
@@ -6292,6 +6364,12 @@ export default function App() {
                     onRefresh={() => {}} // Handled by real-time
                     onDelete={handleDeletePreventive}
                     showToast={showToast}
+                  />
+                )}
+                {activeTab === 'preventive-assets' && (
+                  <PreventiveAssetsModule 
+                    plans={plans} 
+                    assets={assets} 
                   />
                 )}
                 {activeTab === 'gantt' && (
@@ -6918,7 +6996,7 @@ export default function App() {
                         <input 
                           type="number"
                           className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                          value={newWO.hourlyRate || ''}
+                          value={Number.isNaN(newWO.hourlyRate) || newWO.hourlyRate === 0 ? '' : newWO.hourlyRate}
                           onChange={e => setNewWO({...newWO, hourlyRate: parseFloat(e.target.value) || 0})}
                         />
                       </div>
@@ -6941,7 +7019,7 @@ export default function App() {
                         type="date"
                         required
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newWO.ScheduledDate}
+                        value={newWO.ScheduledDate || ''}
                         onChange={e => setNewWO({...newWO, ScheduledDate: e.target.value})}
                       />
                     </div>
@@ -6953,7 +7031,7 @@ export default function App() {
                       <input 
                         type="date"
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newWO.StartDate}
+                        value={newWO.StartDate || ''}
                         onChange={e => setNewWO({...newWO, StartDate: e.target.value})}
                       />
                     </div>
@@ -6962,7 +7040,7 @@ export default function App() {
                       <input 
                         type="date"
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newWO.EndDate}
+                        value={newWO.EndDate || ''}
                         onChange={e => setNewWO({...newWO, EndDate: e.target.value})}
                       />
                     </div>
@@ -6975,7 +7053,7 @@ export default function App() {
                         required
                         placeholder="Descreva a causa da falha..."
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newWO.Cause}
+                        value={newWO.Cause || ''}
                         onChange={e => setNewWO({...newWO, Cause: e.target.value})}
                       />
                     </div>
