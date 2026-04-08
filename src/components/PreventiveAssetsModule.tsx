@@ -26,7 +26,16 @@ interface PreventiveAssetsModuleProps {
 
 export const PreventiveAssetsModule: React.FC<PreventiveAssetsModuleProps> = ({ plans, assets }) => {
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'overdue' | 'upcoming'>('all');
+
+  // Debounce search input
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const getAssetStatus = (nextDate: string) => {
     if (!nextDate) return 'upcoming';
@@ -35,8 +44,18 @@ export const PreventiveAssetsModule: React.FC<PreventiveAssetsModuleProps> = ({ 
     try {
       const next = parseISO(nextDate);
       if (isNaN(next.getTime())) return 'upcoming';
-      if (isBefore(next, today)) return 'overdue';
-      if (format(next, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')) return 'today';
+      
+      const nextTime = next.getTime();
+      const todayTime = today.getTime();
+
+      if (nextTime < todayTime) return 'overdue';
+      
+      // Check if it's today without using format()
+      const isToday = next.getFullYear() === today.getFullYear() &&
+                      next.getMonth() === today.getMonth() &&
+                      next.getDate() === today.getDate();
+      
+      if (isToday) return 'today';
     } catch (e) {
       return 'upcoming';
     }
@@ -44,10 +63,12 @@ export const PreventiveAssetsModule: React.FC<PreventiveAssetsModuleProps> = ({ 
   };
 
   const allAssetsByPlan = useMemo(() => {
+    // Create a map for O(1) asset lookup
+    const assetMap = new Map(assets.map(a => [a.ID, a]));
+
     return plans.flatMap(plan => {
       let planAssets = plan.assets || [];
       
-      // Fallback for older plans that only have AssetIDs
       if (planAssets.length === 0 && plan.AssetIDs && plan.AssetIDs.length > 0) {
         planAssets = plan.AssetIDs.map(id => ({
           assetId: id,
@@ -57,7 +78,7 @@ export const PreventiveAssetsModule: React.FC<PreventiveAssetsModuleProps> = ({ 
       }
 
       return planAssets.map(pa => {
-        const asset = assets.find(a => a.ID === pa.assetId);
+        const asset = assetMap.get(pa.assetId);
         return {
           planId: plan.ID,
           planTask: plan.Task,
@@ -75,12 +96,13 @@ export const PreventiveAssetsModule: React.FC<PreventiveAssetsModuleProps> = ({ 
   }, [plans, assets]);
 
   const filteredData = useMemo(() => {
+    const searchTerm = debouncedSearch.toLowerCase();
     return allAssetsByPlan.filter(item => {
-      const matchesSearch = 
-        item.assetTag.toLowerCase().includes(search.toLowerCase()) ||
-        item.assetDescription.toLowerCase().includes(search.toLowerCase()) ||
-        item.planTask.toLowerCase().includes(search.toLowerCase()) ||
-        item.assetModel.toLowerCase().includes(search.toLowerCase());
+      const matchesSearch = searchTerm === '' ||
+        item.assetTag.toLowerCase().includes(searchTerm) ||
+        item.assetDescription.toLowerCase().includes(searchTerm) ||
+        item.planTask.toLowerCase().includes(searchTerm) ||
+        item.assetModel.toLowerCase().includes(searchTerm);
       
       const matchesStatus = 
         filterStatus === 'all' || 
@@ -89,7 +111,7 @@ export const PreventiveAssetsModule: React.FC<PreventiveAssetsModuleProps> = ({ 
 
       return matchesSearch && matchesStatus;
     }).sort((a, b) => a.assetDescription.localeCompare(b.assetDescription));
-  }, [allAssetsByPlan, search, filterStatus]);
+  }, [allAssetsByPlan, debouncedSearch, filterStatus]);
 
   return (
     <div className="space-y-6">
@@ -126,11 +148,11 @@ export const PreventiveAssetsModule: React.FC<PreventiveAssetsModuleProps> = ({ 
         <AnimatePresence mode="popLayout">
           {filteredData.map((item, idx) => (
             <motion.div
-              layout
               key={`${item.planId}-${item.assetId}-${idx}`}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.2 }}
               className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-all group"
             >
               <div className="flex items-start justify-between mb-4">
