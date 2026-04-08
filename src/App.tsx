@@ -1549,12 +1549,14 @@ const AssetList = ({ assets, onAdd, onEdit, onDelete, onImport, isAdmin = false,
     reader.readAsArrayBuffer(file);
   };
   
-  const filteredAssets = assets.filter(a => 
-    (a.Tag || '').toLowerCase().includes(search.toLowerCase()) || 
-    (a.Model || '').toLowerCase().includes(search.toLowerCase()) ||
-    (a.Description || '').toLowerCase().includes(search.toLowerCase()) ||
-    (a.Location || '').toLowerCase().includes(search.toLowerCase())
-  ).sort((a, b) => (a.Description || '').localeCompare(b.Description || ''));
+  const filteredAssets = useMemo(() => {
+    return assets.filter(a => 
+      (a.Tag || '').toLowerCase().includes(search.toLowerCase()) || 
+      (a.Model || '').toLowerCase().includes(search.toLowerCase()) ||
+      (a.Description || '').toLowerCase().includes(search.toLowerCase()) ||
+      (a.Location || '').toLowerCase().includes(search.toLowerCase())
+    ).sort((a, b) => (a.Description || '').localeCompare(b.Description || ''));
+  }, [assets, search]);
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -1834,16 +1836,18 @@ const WorkOrderList = ({
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   
-  const filteredWos = wos.filter(w => {
-    const matchesSearch = (w.Description || '').toLowerCase().includes(search.toLowerCase()) || 
-      (w.ID || '').toLowerCase().includes(search.toLowerCase()) ||
-      (w.AssetID || '').toLowerCase().includes(search.toLowerCase()) ||
-      (w.AssignedTo || '').toLowerCase().includes(search.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'Todas' || w.Status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  });
+  const filteredWos = useMemo(() => {
+    return wos.filter(w => {
+      const matchesSearch = (w.Description || '').toLowerCase().includes(search.toLowerCase()) || 
+        (w.ID || '').toLowerCase().includes(search.toLowerCase()) ||
+        (w.AssetID || '').toLowerCase().includes(search.toLowerCase()) ||
+        (w.AssignedTo || '').toLowerCase().includes(search.toLowerCase());
+      
+      const matchesStatus = statusFilter === 'Todas' || w.Status === statusFilter;
+      
+      return matchesSearch && matchesStatus;
+    });
+  }, [wos, search, statusFilter]);
 
   const totalPages = Math.ceil(filteredWos.length / itemsPerPage);
   const paginatedWos = filteredWos.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -2353,10 +2357,12 @@ const EmployeeModule = ({
     }
   };
 
-  const filteredEmployees = employees.filter(emp => 
-    (emp.Name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (emp.Function || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredEmployees = useMemo(() => {
+    return employees.filter(emp => 
+      (emp.Name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (emp.Function || '').toLowerCase().includes(search.toLowerCase())
+    );
+  }, [employees, search]);
 
   return (
     <div className="space-y-6">
@@ -2717,62 +2723,72 @@ const PreventiveModule = ({
   };
   
   // Group assets by model for easier selection
-  const assetsByModel = assets.reduce((acc, asset) => {
-    if (!acc[asset.Model]) acc[asset.Model] = [];
-    acc[asset.Model].push(asset);
-    return acc;
-  }, {} as Record<string, Asset[]>);
+  const assetsByModel = useMemo(() => {
+    return assets.reduce((acc, asset) => {
+      if (!acc[asset.Model]) acc[asset.Model] = [];
+      acc[asset.Model].push(asset);
+      return acc;
+    }, {} as Record<string, Asset[]>);
+  }, [assets]);
 
   // Calendar Logic
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  const calendarDays = eachDayOfInterval({
+  const calendarDays = useMemo(() => eachDayOfInterval({
     start: startOfWeek(startOfMonth(currentMonth)),
     end: endOfWeek(endOfMonth(currentMonth))
-  });
+  }), [currentMonth]);
 
-  const getEventsForDay = (day: Date) => {
-    const dateStr = format(day, 'yyyy-MM-dd');
-    const dayWos = wos.filter(w => w.ScheduledDate === dateStr && w.Status !== 'Cancelada');
-    const dayPlans = plans.flatMap(p => {
-      const events: any[] = [];
+  const eventsByDate = useMemo(() => {
+    const events: Record<string, any[]> = {};
+    
+    wos.forEach(w => {
+      if (w.Status !== 'Cancelada' && w.ScheduledDate) {
+        if (!events[w.ScheduledDate]) events[w.ScheduledDate] = [];
+        const asset = assets.find(a => a.ID === w.AssetID);
+        events[w.ScheduledDate].push({ 
+          ...w, 
+          assetTag: asset?.Tag || w.AssetID, 
+          assetModel: asset?.Model || '',
+          type: 'wo', 
+          isCompleted: w.Status === 'Concluída' 
+        });
+      }
+    });
+
+    plans.forEach(p => {
       if (p.AssetNextDues) {
         Object.entries(p.AssetNextDues).forEach(([assetId, nextDue]) => {
-          if (nextDue === dateStr) {
+          if (nextDue) {
             const hasOpenWO = wos.some(w => w.PlanID === p.ID && w.AssetID === assetId && w.Status !== 'Concluída' && w.Status !== 'Cancelada');
             if (!hasOpenWO) {
+              if (!events[nextDue]) events[nextDue] = [];
               const asset = assets.find(a => a.ID === assetId);
-              events.push({ ...p, assetTag: asset?.Tag || assetId, type: 'plan' });
+              events[nextDue].push({ ...p, assetTag: asset?.Tag || assetId, type: 'plan' });
             }
           }
         });
-      } else if (p.NextDue === dateStr) {
+      } else if (p.NextDue) {
         const hasOpenWO = wos.some(w => w.PlanID === p.ID && w.Status !== 'Concluída' && w.Status !== 'Cancelada');
         if (!hasOpenWO) {
-          events.push({ ...p, type: 'plan' });
+          if (!events[p.NextDue]) events[p.NextDue] = [];
+          events[p.NextDue].push({ ...p, type: 'plan' });
         }
       }
-      return events;
     });
-    return [...dayWos.map(w => {
-      const asset = assets.find(a => a.ID === w.AssetID);
-      return { 
-        ...w, 
-        assetTag: asset?.Tag || w.AssetID, 
-        assetModel: asset?.Model || '',
-        type: 'wo', 
-        isCompleted: w.Status === 'Concluída' 
-      };
-    }), ...dayPlans];
+
+    return events;
+  }, [wos, plans, assets]);
+
+  const getEventsForDay = (day: Date) => {
+    const dateStr = format(day, 'yyyy-MM-dd');
+    return eventsByDate[dateStr] || [];
   };
 
+  const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
   const isOverdue = (date: string | null | undefined) => {
     if (!date) return false;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const dueDate = new Date(date);
-    dueDate.setHours(0, 0, 0, 0);
-    return dueDate < today;
+    return date < todayStr;
   };
 
   const [newPlan, setNewPlan] = useState({

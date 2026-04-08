@@ -243,6 +243,15 @@ export const ImprovementManagementModule = ({
     setSubItemData({});
   };
 
+  const filteredProjects = useMemo(() => {
+    return projects.filter(project => {
+      const matchesSearch = (project.title || '').toLowerCase().includes(search.toLowerCase()) || 
+                           (project.responsible || '').toLowerCase().includes(search.toLowerCase());
+      const matchesStatus = filterStatus === 'Todos' || project.status === filterStatus;
+      return matchesSearch && matchesStatus;
+    });
+  }, [projects, search, filterStatus]);
+
   const renderSubItemModal = () => {
     if (!activeSubModal) return null;
     const { type, mode, data } = activeSubModal;
@@ -936,7 +945,7 @@ export const ImprovementManagementModule = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {projects.map(project => (
+            {filteredProjects.map(project => (
               <tr key={project.id} className="hover:bg-slate-50">
                 <td className="px-6 py-4 font-bold text-slate-900">{project.title}</td>
                 <td className="px-6 py-4">

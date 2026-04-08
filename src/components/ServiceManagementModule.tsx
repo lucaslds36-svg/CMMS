@@ -136,13 +136,15 @@ export const ServiceManagementModule = ({
     return { label: 'No prazo', color: 'bg-blue-100 text-blue-700' };
   };
 
-  const filteredDemands = demands.filter(d => {
-    const matchesSearch = (d.description || '').toLowerCase().includes(search.toLowerCase()) || 
-                         (d.responsibleName || '').toLowerCase().includes(search.toLowerCase());
-    const matchesArea = filterArea === 'Todas' || d.area === filterArea;
-    const matchesStatus = filterStatus === 'Todos' || d.status === filterStatus;
-    return matchesSearch && matchesArea && matchesStatus;
-  });
+  const filteredDemands = useMemo(() => {
+    return demands.filter(d => {
+      const matchesSearch = (d.description || '').toLowerCase().includes(search.toLowerCase()) || 
+                           (d.responsibleName || '').toLowerCase().includes(search.toLowerCase());
+      const matchesArea = filterArea === 'Todas' || d.area === filterArea;
+      const matchesStatus = filterStatus === 'Todos' || d.status === filterStatus;
+      return matchesSearch && matchesArea && matchesStatus;
+    });
+  }, [demands, search, filterArea, filterStatus]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

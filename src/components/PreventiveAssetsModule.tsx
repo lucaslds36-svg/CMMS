@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Search, 
   Calendar, 
@@ -43,49 +43,53 @@ export const PreventiveAssetsModule: React.FC<PreventiveAssetsModuleProps> = ({ 
     return 'upcoming';
   };
 
-  const allAssetsByPlan = plans.flatMap(plan => {
-    let planAssets = plan.assets || [];
-    
-    // Fallback for older plans that only have AssetIDs
-    if (planAssets.length === 0 && plan.AssetIDs && plan.AssetIDs.length > 0) {
-      planAssets = plan.AssetIDs.map(id => ({
-        assetId: id,
-        nextDate: plan.AssetNextDues?.[id] || plan.NextDue || '',
-        lastDate: plan.AssetLastDones?.[id] || plan.LastDone || null
-      }));
-    }
+  const allAssetsByPlan = useMemo(() => {
+    return plans.flatMap(plan => {
+      let planAssets = plan.assets || [];
+      
+      // Fallback for older plans that only have AssetIDs
+      if (planAssets.length === 0 && plan.AssetIDs && plan.AssetIDs.length > 0) {
+        planAssets = plan.AssetIDs.map(id => ({
+          assetId: id,
+          nextDate: plan.AssetNextDues?.[id] || plan.NextDue || '',
+          lastDate: plan.AssetLastDones?.[id] || plan.LastDone || null
+        }));
+      }
 
-    return planAssets.map(pa => {
-      const asset = assets.find(a => a.ID === pa.assetId);
-      return {
-        planId: plan.ID,
-        planTask: plan.Task,
-        assetId: pa.assetId,
-        assetTag: asset?.Tag || pa.assetId,
-        assetDescription: asset?.Description || 'Sem descrição',
-        assetModel: asset?.Model || 'N/A',
-        assetLocation: asset?.Location || 'N/A',
-        lastDate: pa.lastDate,
-        nextDate: pa.nextDate,
-        status: getAssetStatus(pa.nextDate)
-      };
+      return planAssets.map(pa => {
+        const asset = assets.find(a => a.ID === pa.assetId);
+        return {
+          planId: plan.ID,
+          planTask: plan.Task,
+          assetId: pa.assetId,
+          assetTag: asset?.Tag || pa.assetId,
+          assetDescription: asset?.Description || 'Sem descrição',
+          assetModel: asset?.Model || 'N/A',
+          assetLocation: asset?.Location || 'N/A',
+          lastDate: pa.lastDate,
+          nextDate: pa.nextDate,
+          status: getAssetStatus(pa.nextDate)
+        };
+      });
     });
-  });
+  }, [plans, assets]);
 
-  const filteredData = allAssetsByPlan.filter(item => {
-    const matchesSearch = 
-      item.assetTag.toLowerCase().includes(search.toLowerCase()) ||
-      item.assetDescription.toLowerCase().includes(search.toLowerCase()) ||
-      item.planTask.toLowerCase().includes(search.toLowerCase()) ||
-      item.assetModel.toLowerCase().includes(search.toLowerCase());
-    
-    const matchesStatus = 
-      filterStatus === 'all' || 
-      (filterStatus === 'overdue' && item.status === 'overdue') ||
-      (filterStatus === 'upcoming' && (item.status === 'upcoming' || item.status === 'today'));
+  const filteredData = useMemo(() => {
+    return allAssetsByPlan.filter(item => {
+      const matchesSearch = 
+        item.assetTag.toLowerCase().includes(search.toLowerCase()) ||
+        item.assetDescription.toLowerCase().includes(search.toLowerCase()) ||
+        item.planTask.toLowerCase().includes(search.toLowerCase()) ||
+        item.assetModel.toLowerCase().includes(search.toLowerCase());
+      
+      const matchesStatus = 
+        filterStatus === 'all' || 
+        (filterStatus === 'overdue' && item.status === 'overdue') ||
+        (filterStatus === 'upcoming' && (item.status === 'upcoming' || item.status === 'today'));
 
-    return matchesSearch && matchesStatus;
-  }).sort((a, b) => a.assetDescription.localeCompare(b.assetDescription));
+      return matchesSearch && matchesStatus;
+    }).sort((a, b) => a.assetDescription.localeCompare(b.assetDescription));
+  }, [allAssetsByPlan, search, filterStatus]);
 
   return (
     <div className="space-y-6">

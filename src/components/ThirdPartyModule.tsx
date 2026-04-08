@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Plus, 
   Search, 
@@ -135,10 +135,12 @@ export const ThirdPartyModule = ({
     }
   };
 
-  const filteredCompanies = companies.filter(c => 
-    (c.name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (c.cnpj || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredCompanies = useMemo(() => {
+    return companies.filter(c => 
+      (c.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.cnpj || '').toLowerCase().includes(search.toLowerCase())
+    );
+  }, [companies, search]);
 
   const getCompanyEmployees = (companyId: string) => {
     return employees.filter(emp => emp.companyId === companyId);
