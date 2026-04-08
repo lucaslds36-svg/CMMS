@@ -7,7 +7,9 @@ import {
   AlertCircle,
   Building2,
   Tag,
-  ArrowRight
+  ArrowRight,
+  X,
+  Pencil
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -22,12 +24,15 @@ function cn(...inputs: ClassValue[]) {
 interface PreventiveAssetsModuleProps {
   plans: PreventivePlan[];
   assets: Asset[];
+  onUpdateDate?: (planId: string, assetId: string, newDate: string) => Promise<void>;
 }
 
-export const PreventiveAssetsModule: React.FC<PreventiveAssetsModuleProps> = ({ plans, assets }) => {
+export const PreventiveAssetsModule: React.FC<PreventiveAssetsModuleProps> = ({ plans, assets, onUpdateDate }) => {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'overdue' | 'upcoming'>('all');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [tempDate, setTempDate] = useState('');
 
   // Debounce search input
   React.useEffect(() => {
@@ -36,6 +41,18 @@ export const PreventiveAssetsModule: React.FC<PreventiveAssetsModuleProps> = ({ 
     }, 300);
     return () => clearTimeout(timer);
   }, [search]);
+
+  const handleEditDate = (item: any) => {
+    setEditingId(`${item.planId}-${item.assetId}`);
+    setTempDate(item.nextDate);
+  };
+
+  const handleSaveDate = async (planId: string, assetId: string) => {
+    if (onUpdateDate) {
+      await onUpdateDate(planId, assetId, tempDate);
+    }
+    setEditingId(null);
+  };
 
   const getAssetStatus = (nextDate: string) => {
     if (!nextDate) return 'upcoming';
@@ -192,18 +209,47 @@ export const PreventiveAssetsModule: React.FC<PreventiveAssetsModuleProps> = ({ 
                       </p>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <Calendar className={cn(
-                          "w-3 h-3",
-                          item.status === 'overdue' ? "text-rose-400" : "text-slate-400"
-                        )} />
-                        <p className={cn(
-                          "text-xs font-bold",
-                          item.status === 'overdue' ? "text-rose-600" : "text-slate-900"
-                        )}>
-                          {item.nextDate && !isNaN(parseISO(item.nextDate).getTime()) ? format(parseISO(item.nextDate), 'dd/MM/yyyy') : '--/--/----'}
-                        </p>
-                      </div>
+                      {editingId === `${item.planId}-${item.assetId}` ? (
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="date" 
+                            value={tempDate}
+                            onChange={(e) => setTempDate(e.target.value)}
+                            className="text-xs p-1 border rounded bg-white"
+                            autoFocus
+                          />
+                          <button 
+                            onClick={() => handleSaveDate(item.planId, item.assetId)}
+                            className="p-1 bg-emerald-500 text-white rounded hover:bg-emerald-600"
+                          >
+                            <CheckCircle2 className="w-3 h-3" />
+                          </button>
+                          <button 
+                            onClick={() => setEditingId(null)}
+                            className="p-1 bg-slate-200 text-slate-600 rounded hover:bg-slate-300"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div 
+                          className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-1 rounded transition-colors"
+                          onClick={() => handleEditDate(item)}
+                          title="Clique para editar a data"
+                        >
+                          <Calendar className={cn(
+                            "w-3 h-3",
+                            item.status === 'overdue' ? "text-rose-400" : "text-slate-400"
+                          )} />
+                          <p className={cn(
+                            "text-xs font-bold",
+                            item.status === 'overdue' ? "text-rose-600" : "text-slate-900"
+                          )}>
+                            {item.nextDate && !isNaN(parseISO(item.nextDate).getTime()) ? format(parseISO(item.nextDate), 'dd/MM/yyyy') : '--/--/----'}
+                          </p>
+                          <Pencil className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex justify-center">

@@ -2813,6 +2813,11 @@ const PreventiveModule = ({
 
   const [editingPlan, setEditingPlan] = useState<PreventivePlan | null>(null);
   const [newChecklistItem, setNewChecklistItem] = useState('');
+  const [expandedPlans, setExpandedPlans] = useState<Record<string, boolean>>({});
+
+  const togglePlanExpand = (planId: string) => {
+    setExpandedPlans(prev => ({ ...prev, [planId]: !prev[planId] }));
+  };
 
   const handleAssetToggle = (assetId: string) => {
     setNewPlan(prev => {
@@ -3100,182 +3105,200 @@ const PreventiveModule = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {plansWithStatus.map((plan, i) => {
-          const planAssets = assets.filter(a => plan.AssetIDs?.includes(a.ID));
-          const overdue = isOverdue(plan.NextDue);
-          
-          return (
-            <motion.div 
-              key={i}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className={cn(
-                "bg-white p-6 rounded-2xl shadow-sm border transition-all",
-                overdue || plan.overdueCount > 0 ? "border-rose-200 bg-rose-50/30" : "border-slate-100"
-              )}
-            >
-              <div className="flex justify-between items-start mb-4">
-                <div className={cn(
-                  "p-2 rounded-lg",
-                  overdue || plan.overdueCount > 0 ? "bg-rose-100 text-rose-600" : "bg-blue-100 text-blue-600"
-                )}>
-                  <Calendar className="w-5 h-5" />
-                </div>
-                <div className="flex flex-col items-end space-y-1">
-                  <div className="flex items-center space-x-2">
-                    {plan.overdueCount > 0 && (
-                      <span className="badge-red">
-                        {plan.overdueCount} atrasadas
-                      </span>
-                    )}
-                    {(isAdmin || plan.createdBy === currentUserUid) && (
-                      <button 
-                        onClick={() => {
-                          setEditingPlan(plan);
-                          setNewPlan({
-                            AssetIDs: plan.AssetIDs || [],
-                            Task: plan.Task || '',
-                            Frequency: plan.Frequency || '',
-                            FrequencyType: plan.FrequencyType || 'dias',
-                            FrequencyValue: plan.FrequencyValue || 30,
-                            LastDone: plan.LastDone || '',
-                            Type: plan.Type || 'Preventiva',
-                            Criticality: plan.Criticality || 'Média',
-                            AssetType: plan.AssetType || '',
-                            Location: plan.Location || '',
-                            Plant: plan.Plant || '',
-                            EstimatedTime: plan.EstimatedTime || 0,
-                            Collaborators: plan.Collaborators || 0,
-                            Checklist: plan.Checklist || [],
-                            scheduleType: plan.scheduleType || 'global',
-                            globalDate: plan.globalDate || plan.NextDue || '',
-                            assets: (plan.assets || []).map(a => ({ assetId: a.assetId, nextDate: a.nextDate, lastDate: a.lastDate }))
-                          });
-                          setShowModal(true);
-                        }}
-                        className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                    )}
-                    {isAdmin && (
-                      <button 
-                        onClick={() => onDelete(plan.ID)}
-                        className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    )}
-                    <span className={cn(
-                      "px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider",
-                      overdue ? "bg-rose-600 text-white" : "bg-slate-100 text-slate-600"
-                    )}>
-                      {overdue ? 'Atrasada' : 'Em Dia'}
-                    </span>
-                  </div>
-                  <span className={cn(
-                    "px-2 py-0.5 rounded text-[9px] font-bold uppercase",
-                    plan.Criticality === 'Alta' ? "bg-rose-100 text-rose-700" :
-                    plan.Criticality === 'Média' ? "bg-amber-100 text-amber-700" :
-                    "bg-blue-100 text-blue-700"
-                  )}>
-                    {plan.Criticality}
-                  </span>
-                </div>
-              </div>
-              
-              <div className="mb-4">
-                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{plan.Type}</span>
-                <h4 className="font-bold text-slate-900 mt-0.5">{plan.Task}</h4>
-                <div className="mt-2 space-y-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Equipamentos ({planAssets.length})</p>
-                  <div className="flex flex-wrap gap-1">
-                    {planAssets.map(a => (
-                      <span key={a.ID} className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-medium border border-blue-100" title={a.Description}>
-                        {a.Tag} {a.Description && ` - ${a.Description}`}
-                      </span>
-                    ))}
-                    {planAssets.length === 0 && <span className="text-xs text-slate-400 italic">Nenhum equipamento</span>}
-                  </div>
-                </div>
+      <div className="bg-white rounded-3xl shadow-sm overflow-hidden border border-slate-100">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/50 border-b border-slate-100">
+                <th className="w-10 px-6 py-4"></th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Plano de Manutenção</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tipo / Frequência</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Criticidade</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Próxima (Geral)</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {plansWithStatus.map((plan, i) => {
+                const planAssets = assets.filter(a => plan.AssetIDs?.includes(a.ID));
+                const overdue = isOverdue(plan.NextDue);
+                const isExpanded = expandedPlans[plan.ID];
                 
-                {plan.Checklist && plan.Checklist.length > 0 && (
-                  <div className="mt-3 space-y-1">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Checklist ({plan.Checklist.length} itens)</p>
-                    <ul className="text-[10px] text-slate-600 space-y-1 list-disc list-inside">
-                      {plan.Checklist.slice(0, 3).map((item, i) => (
-                        <li key={i} className="truncate">{item}</li>
-                      ))}
-                      {plan.Checklist.length > 3 && (
-                        <li className="text-slate-400 italic">+{plan.Checklist.length - 3} itens...</li>
+                return (
+                  <React.Fragment key={plan.ID || i}>
+                    <motion.tr 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className={cn(
+                        "hover:bg-slate-50/50 transition-colors group",
+                        (overdue || plan.overdueCount > 0) && "bg-rose-50/20"
                       )}
-                    </ul>
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-2 mt-3">
-                  <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[9px] font-medium">{plan.AssetType}</span>
-                  <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[9px] font-medium">{plan.Location}</span>
-                  <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[9px] font-medium">{plan.Plant}</span>
-                </div>
-              </div>
-              
-              <div className="space-y-3 pt-4 border-t border-slate-100">
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-400">Frequência:</span>
-                  <span className="font-semibold text-slate-700">{plan.Frequency}</span>
-                </div>
-                
-                {plan.AssetIDs && plan.AssetIDs.length > 1 ? (
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status por Equipamento</p>
-                    <div className="max-h-32 overflow-y-auto space-y-1 pr-1">
-                      {plan.AssetIDs.map(assetId => {
-                        const asset = assets.find(a => a.ID === assetId);
-                        const nextDue = plan.AssetNextDues?.[assetId] || plan.NextDue;
-                        const overdue = isOverdue(nextDue);
-                        const assetInPlan = plan.assets?.find(a => a.assetId === assetId);
-                        const isAssetOverdue = assetInPlan?.isOverdue || overdue;
-
-                        return (
-                          <div key={assetId} className="flex justify-between items-center text-[10px] p-1.5 bg-slate-50 rounded-lg">
-                            <div className="flex flex-col max-w-[150px]">
-                              <span className="font-bold text-slate-700 truncate">{asset?.Description || asset?.Tag}</span>
-                              <span className="text-[9px] text-slate-400 truncate">{asset?.Tag} • {asset?.Model}</span>
-                              {isAssetOverdue && <span className="text-rose-500 text-[8px] font-bold uppercase">Atrasado</span>}
-                            </div>
-                            <span className={cn("font-bold", isAssetOverdue ? "text-rose-600" : "text-blue-600")}>
-                              {new Date(nextDue).toLocaleDateString('pt-BR')}
-                            </span>
+                    >
+                      <td className="px-6 py-4">
+                        <button 
+                          onClick={() => togglePlanExpand(plan.ID)}
+                          className="p-1 hover:bg-slate-100 rounded-lg transition-colors text-slate-400"
+                        >
+                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </button>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                            overdue || plan.overdueCount > 0 ? "bg-rose-100 text-rose-600" : "bg-blue-100 text-blue-600"
+                          )}>
+                            <Calendar className="w-4 h-4" />
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-400">Última Realizada:</span>
-                      <span className="font-semibold text-slate-700">{new Date(plan.LastDone).toLocaleDateString('pt-BR')}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-400">Próximo Vencimento:</span>
-                      <span className={cn("font-bold", overdue ? "text-rose-600" : "text-blue-600")}>
-                        {new Date(plan.NextDue).toLocaleDateString('pt-BR')}
-                      </span>
-                    </div>
-                  </>
-                )}
-
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-400">Tempo Estimado:</span>
-                  <span className="font-semibold text-slate-700">{plan.EstimatedTime}h ({plan.Collaborators} colab.)</span>
-                </div>
-              </div>
-            </motion.div>
-          );
-        })}
+                          <div>
+                            <p className="text-sm font-bold text-slate-900">{plan.Task}</p>
+                            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">
+                              {planAssets.length} Equipamento(s) • {plan.Location}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-xs font-semibold text-blue-600 uppercase tracking-widest">{plan.Type}</p>
+                        <p className="text-[10px] text-slate-400 font-medium">{plan.Frequency}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={cn(
+                          "px-2 py-0.5 rounded text-[9px] font-bold uppercase",
+                          plan.Criticality === 'Alta' ? "bg-rose-100 text-rose-700" :
+                          plan.Criticality === 'Média' ? "bg-amber-100 text-amber-700" :
+                          "bg-blue-100 text-blue-700"
+                        )}>
+                          {plan.Criticality}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <p className={cn(
+                            "text-xs font-bold",
+                            overdue ? "text-rose-600" : "text-slate-900"
+                          )}>
+                            {plan.NextDue ? new Date(plan.NextDue).toLocaleDateString('pt-BR') : '--/--/----'}
+                          </p>
+                          {plan.overdueCount > 0 && (
+                            <span className="text-[9px] font-bold text-rose-500 uppercase">
+                              {plan.overdueCount} ativos atrasados
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end space-x-2">
+                          {(isAdmin || plan.createdBy === currentUserUid) && (
+                            <button 
+                              onClick={() => {
+                                setEditingPlan(plan);
+                                setNewPlan({
+                                  AssetIDs: plan.AssetIDs || [],
+                                  Task: plan.Task || '',
+                                  Frequency: plan.Frequency || '',
+                                  FrequencyType: plan.FrequencyType || 'dias',
+                                  FrequencyValue: plan.FrequencyValue || 30,
+                                  LastDone: plan.LastDone || '',
+                                  Type: plan.Type || 'Preventiva',
+                                  Criticality: plan.Criticality || 'Média',
+                                  AssetType: plan.AssetType || '',
+                                  Location: plan.Location || '',
+                                  Plant: plan.Plant || '',
+                                  EstimatedTime: plan.EstimatedTime || 0,
+                                  Collaborators: plan.Collaborators || 0,
+                                  Checklist: plan.Checklist || [],
+                                  scheduleType: plan.scheduleType || 'global',
+                                  globalDate: plan.globalDate || plan.NextDue || '',
+                                  assets: (plan.assets || []).map(a => ({ assetId: a.assetId, nextDate: a.nextDate, lastDate: a.lastDate }))
+                                });
+                                setShowModal(true);
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                              title="Editar Plano"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          )}
+                          {isAdmin && (
+                            <button 
+                              onClick={() => onDelete(plan.ID)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                              title="Excluir Plano"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </motion.tr>
+                    
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.tr
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="bg-slate-50/30"
+                        >
+                          <td colSpan={6} className="px-6 py-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                              {plan.AssetIDs?.map(assetId => {
+                                const asset = assets.find(a => a.ID === assetId);
+                                const nextDue = plan.AssetNextDues?.[assetId] || plan.NextDue;
+                                const assetOverdue = isOverdue(nextDue);
+                                
+                                return (
+                                  <div key={assetId} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
+                                    <div className="flex items-center gap-3">
+                                      <div className={cn(
+                                        "w-8 h-8 rounded-lg flex items-center justify-center",
+                                        assetOverdue ? "bg-rose-50 text-rose-500" : "bg-blue-50 text-blue-500"
+                                      )}>
+                                        <Box className="w-4 h-4" />
+                                      </div>
+                                      <div>
+                                        <p className="text-xs font-bold text-slate-900">{asset?.Tag}</p>
+                                        <p className="text-[10px] text-slate-500 line-clamp-1">{asset?.Description}</p>
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className={cn(
+                                        "text-[10px] font-bold",
+                                        assetOverdue ? "text-rose-600" : "text-slate-600"
+                                      )}>
+                                        {nextDue ? new Date(nextDue).toLocaleDateString('pt-BR') : '--/--/----'}
+                                      </p>
+                                      {assetOverdue && <p className="text-[8px] font-bold text-rose-500 uppercase">Atrasado</p>}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            
+                            {plan.Checklist && plan.Checklist.length > 0 && (
+                              <div className="mt-4 p-4 bg-white border border-slate-100 rounded-xl">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Checklist de Manutenção</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {plan.Checklist.map((item, idx) => (
+                                    <div key={idx} className="flex items-center gap-2 text-xs text-slate-600">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                                      <span>{item}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                        </motion.tr>
+                      )}
+                    </AnimatePresence>
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Generation Modal */}
@@ -5229,6 +5252,46 @@ export default function App() {
     });
   };
 
+  const handleUpdatePlanDate = async (planId: string, assetId: string, newDate: string) => {
+    const plan = plans.find(p => p.ID === planId);
+    if (!plan) return;
+
+    // Update the assets array inside the plan
+    let updatedAssets = [...(plan.assets || [])];
+    
+    // Fallback for older plans that only have AssetIDs
+    if (updatedAssets.length === 0 && plan.AssetIDs && plan.AssetIDs.length > 0) {
+      updatedAssets = plan.AssetIDs.map(id => ({
+        assetId: id,
+        nextDate: plan.AssetNextDues?.[id] || plan.NextDue || '',
+        lastDate: plan.AssetLastDones?.[id] || plan.LastDone || null
+      }));
+    }
+
+    updatedAssets = updatedAssets.map(a => 
+      a.assetId === assetId ? { ...a, nextDate: newDate } : a
+    );
+
+    // Update the AssetNextDues map
+    const updatedNextDues = { ...(plan.AssetNextDues || {}) };
+    updatedNextDues[assetId] = newDate;
+
+    try {
+      await updateDocument('preventive-plans', planId, {
+        assets: updatedAssets,
+        AssetNextDues: updatedNextDues,
+        // Also update the global NextDue if this was the primary asset or if it's a global plan
+        NextDue: updatedAssets[0]?.nextDate || newDate,
+        nextExecutionDate: updatedAssets[0]?.nextDate || newDate,
+        updatedAt: new Date().toISOString()
+      });
+      showToast('Data de manutenção atualizada!');
+    } catch (error) {
+      console.error('Error updating plan date:', error);
+      showToast('Erro ao atualizar data', 'error');
+    }
+  };
+
   const handleDeletePreventive = async (id: string) => {
     setConfirmState({
       show: true,
@@ -6386,6 +6449,7 @@ export default function App() {
                   <PreventiveAssetsModule 
                     plans={plans} 
                     assets={assets} 
+                    onUpdateDate={handleUpdatePlanDate}
                   />
                 )}
                 {activeTab === 'gantt' && (
