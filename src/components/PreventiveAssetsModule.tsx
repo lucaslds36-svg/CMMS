@@ -24,15 +24,26 @@ function cn(...inputs: ClassValue[]) {
 interface PreventiveAssetsModuleProps {
   plans: PreventivePlan[];
   assets: Asset[];
-  onUpdateDate?: (planId: string, assetId: string, newDate: string) => Promise<void>;
+  onUpdateDate?: (planId: string, assetId: string, newDate: string, type: 'last') => Promise<void>;
+  isAdmin?: boolean;
+  isPlanner?: boolean;
 }
 
-export const PreventiveAssetsModule: React.FC<PreventiveAssetsModuleProps> = ({ plans, assets, onUpdateDate }) => {
+export const PreventiveAssetsModule: React.FC<PreventiveAssetsModuleProps> = ({ 
+  plans, 
+  assets, 
+  onUpdateDate,
+  isAdmin,
+  isPlanner
+}) => {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'overdue' | 'upcoming'>('all');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingType, setEditingType] = useState<'last' | 'next' | null>(null);
   const [tempDate, setTempDate] = useState('');
+
+  const canEdit = isAdmin || isPlanner;
 
   // Debounce search input
   React.useEffect(() => {
@@ -42,16 +53,19 @@ export const PreventiveAssetsModule: React.FC<PreventiveAssetsModuleProps> = ({ 
     return () => clearTimeout(timer);
   }, [search]);
 
-  const handleEditDate = (item: any) => {
+  const handleEditDate = (item: any, type: 'last') => {
+    if (!canEdit) return;
     setEditingId(`${item.planId}-${item.assetId}`);
-    setTempDate(item.nextDate);
+    setEditingType(type);
+    setTempDate(item.lastDate);
   };
 
   const handleSaveDate = async (planId: string, assetId: string) => {
-    if (onUpdateDate) {
-      await onUpdateDate(planId, assetId, tempDate);
+    if (onUpdateDate && editingType === 'last') {
+      await onUpdateDate(planId, assetId, tempDate, 'last');
     }
     setEditingId(null);
+    setEditingType(null);
   };
 
   const getAssetStatus = (nextDate: string) => {
@@ -204,12 +218,7 @@ export const PreventiveAssetsModule: React.FC<PreventiveAssetsModuleProps> = ({ 
                       <p className="text-[10px] text-slate-400">{item.assetLocation}</p>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-xs font-bold text-slate-500">
-                        {item.lastDate && !isNaN(parseISO(item.lastDate).getTime()) ? format(parseISO(item.lastDate), 'dd/MM/yyyy') : '--/--/----'}
-                      </p>
-                    </td>
-                    <td className="px-6 py-4">
-                      {editingId === `${item.planId}-${item.assetId}` ? (
+                      {editingId === `${item.planId}-${item.assetId}` && editingType === 'last' ? (
                         <div className="flex items-center gap-2">
                           <input 
                             type="date" 
@@ -225,7 +234,10 @@ export const PreventiveAssetsModule: React.FC<PreventiveAssetsModuleProps> = ({ 
                             <CheckCircle2 className="w-3 h-3" />
                           </button>
                           <button 
-                            onClick={() => setEditingId(null)}
+                            onClick={() => {
+                              setEditingId(null);
+                              setEditingType(null);
+                            }}
                             className="p-1 bg-slate-200 text-slate-600 rounded hover:bg-slate-300"
                           >
                             <X className="w-3 h-3" />
@@ -233,23 +245,33 @@ export const PreventiveAssetsModule: React.FC<PreventiveAssetsModuleProps> = ({ 
                         </div>
                       ) : (
                         <div 
-                          className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-1 rounded transition-colors"
-                          onClick={() => handleEditDate(item)}
-                          title="Clique para editar a data"
+                          className={cn(
+                            "flex items-center gap-2 p-1 rounded transition-colors",
+                            canEdit ? "cursor-pointer hover:bg-slate-100" : ""
+                          )}
+                          onClick={() => canEdit && handleEditDate(item, 'last')}
+                          title={canEdit ? "Clique para editar a data da última manutenção" : ""}
                         >
-                          <Calendar className={cn(
-                            "w-3 h-3",
-                            item.status === 'overdue' ? "text-rose-400" : "text-slate-400"
-                          )} />
-                          <p className={cn(
-                            "text-xs font-bold",
-                            item.status === 'overdue' ? "text-rose-600" : "text-slate-900"
-                          )}>
-                            {item.nextDate && !isNaN(parseISO(item.nextDate).getTime()) ? format(parseISO(item.nextDate), 'dd/MM/yyyy') : '--/--/----'}
+                          <p className="text-xs font-bold text-slate-500">
+                            {item.lastDate && !isNaN(parseISO(item.lastDate).getTime()) ? format(parseISO(item.lastDate), 'dd/MM/yyyy') : '--/--/----'}
                           </p>
-                          <Pencil className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          {canEdit && <Pencil className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />}
                         </div>
                       )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2 p-1">
+                        <Calendar className={cn(
+                          "w-3 h-3",
+                          item.status === 'overdue' ? "text-rose-400" : "text-slate-400"
+                        )} />
+                        <p className={cn(
+                          "text-xs font-bold",
+                          item.status === 'overdue' ? "text-rose-600" : "text-slate-900"
+                        )}>
+                          {item.nextDate && !isNaN(parseISO(item.nextDate).getTime()) ? format(parseISO(item.nextDate), 'dd/MM/yyyy') : '--/--/----'}
+                        </p>
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex justify-center">

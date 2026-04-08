@@ -4732,7 +4732,8 @@ export default function App() {
             failureAnalysis: true,
             database: role === 'admin',
             users: role === 'admin',
-            serviceManagement: true
+            serviceManagement: true,
+            preventiveAssets: true
           };
           profile = {
             uid: user.uid,
@@ -5252,7 +5253,7 @@ export default function App() {
     });
   };
 
-  const handleUpdatePlanDate = async (planId: string, assetId: string, newDate: string) => {
+  const handleUpdatePlanDate = async (planId: string, assetId: string, newDate: string, type: 'last' | 'next' = 'next') => {
     const plan = plans.find(p => p.ID === planId);
     if (!plan) return;
 
@@ -5268,21 +5269,41 @@ export default function App() {
       }));
     }
 
+    let calculatedNextDate = newDate;
+    if (type === 'last') {
+      calculatedNextDate = calculateNextDue(newDate, plan.Frequency || 'Mensal', plan.FrequencyType, plan.FrequencyValue);
+    }
+
     updatedAssets = updatedAssets.map(a => 
-      a.assetId === assetId ? { ...a, nextDate: newDate } : a
+      a.assetId === assetId 
+        ? { 
+            ...a, 
+            nextDate: type === 'next' ? newDate : calculatedNextDate,
+            lastDate: type === 'last' ? newDate : a.lastDate
+          } 
+        : a
     );
 
-    // Update the AssetNextDues map
+    // Update the maps
     const updatedNextDues = { ...(plan.AssetNextDues || {}) };
-    updatedNextDues[assetId] = newDate;
+    const updatedLastDones = { ...(plan.AssetLastDones || {}) };
+    
+    if (type === 'next') {
+      updatedNextDues[assetId] = newDate;
+    } else {
+      updatedLastDones[assetId] = newDate;
+      updatedNextDues[assetId] = calculatedNextDate;
+    }
 
     try {
       await updateDocument('preventive-plans', planId, {
         assets: updatedAssets,
         AssetNextDues: updatedNextDues,
-        // Also update the global NextDue if this was the primary asset or if it's a global plan
-        NextDue: updatedAssets[0]?.nextDate || newDate,
-        nextExecutionDate: updatedAssets[0]?.nextDate || newDate,
+        AssetLastDones: updatedLastDones,
+        // Also update the global fields if this was the primary asset or if it's a global plan
+        NextDue: updatedAssets[0]?.nextDate || calculatedNextDate,
+        LastDone: updatedAssets[0]?.lastDate || (type === 'last' ? newDate : plan.LastDone),
+        nextExecutionDate: updatedAssets[0]?.nextDate || calculatedNextDate,
         updatedAt: new Date().toISOString()
       });
       showToast('Data de manutenção atualizada!');
@@ -5425,7 +5446,7 @@ export default function App() {
       items: [
         { id: 'wos', label: 'Ordens de Serviço', icon: Wrench, permission: 'workOrders' },
         { id: 'preventive', label: 'Preventivas', icon: Calendar, permission: 'preventive' },
-        { id: 'preventive-assets', label: 'Status por Ativo', icon: Activity, permission: 'preventive' },
+        { id: 'preventive-assets', label: 'Status por Ativo', icon: Activity, permission: 'preventiveAssets' },
         { id: 'gantt', label: 'Planejamento (Gantt)', icon: GanttChart, permission: 'workOrders' },
         { id: 'service-management', label: 'Gestão de Serviços', icon: ClipboardList, permission: 'serviceManagement' },
       ]
@@ -6221,7 +6242,8 @@ export default function App() {
                                     failureAnalysis: 'Análise de Falhas',
                                     database: 'Banco de Dados',
                                     users: 'Usuários',
-                                    serviceManagement: 'Solicitações'
+                                    serviceManagement: 'Solicitações',
+                                    preventiveAssets: 'Status Ativos'
                                   }) as [keyof UserPermissions, string][]).map(([key, label]) => {
                                     const val = u.permissions ? !!u.permissions[key] : false;
                                     return (
@@ -6450,6 +6472,8 @@ export default function App() {
                     plans={plans} 
                     assets={assets} 
                     onUpdateDate={handleUpdatePlanDate}
+                    isAdmin={isAdmin}
+                    isPlanner={userProfile?.workOrderRole === 'planner'}
                   />
                 )}
                 {activeTab === 'gantt' && (

@@ -271,6 +271,7 @@ export interface UserPermissions {
   users: boolean;
   serviceManagement: boolean;
   thirdParty: boolean;
+  preventiveAssets: boolean;
 }
 
 export interface UserProfile {
