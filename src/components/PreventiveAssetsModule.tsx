@@ -144,93 +144,84 @@ export const PreventiveAssetsModule: React.FC<PreventiveAssetsModuleProps> = ({ 
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <AnimatePresence mode="popLayout">
-          {filteredData.map((item, idx) => (
-            <motion.div
-              key={`${item.planId}-${item.assetId}-${idx}`}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ duration: 0.2 }}
-              className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition-all group"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  <div className={cn(
-                    "w-10 h-10 rounded-xl flex items-center justify-center",
-                    item.status === 'overdue' ? "bg-rose-50 text-rose-600" : 
-                    item.status === 'today' ? "bg-amber-50 text-amber-600" : "bg-blue-50 text-blue-600"
-                  )}>
-                    <Building2 className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-900 text-sm line-clamp-1">{item.assetDescription}</h4>
-                    <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{item.assetTag} • {item.assetModel}</p>
-                  </div>
-                </div>
-                <div className={cn(
-                  "px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider",
-                  item.status === 'overdue' ? "bg-rose-100 text-rose-700" : 
-                  item.status === 'today' ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
-                )}>
-                  {item.status === 'overdue' ? 'Atrasado' : item.status === 'today' ? 'Hoje' : 'Em Dia'}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Plano de Manutenção</p>
-                  <p className="text-xs font-semibold text-slate-700 line-clamp-1">{item.planTask}</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-white border border-slate-100 rounded-xl">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <Clock className="w-3 h-3 text-slate-400" />
-                      <p className="text-[9px] font-bold text-slate-400 uppercase">Última</p>
-                    </div>
-                    <p className="text-xs font-bold text-slate-600">
-                      {item.lastDate && !isNaN(parseISO(item.lastDate).getTime()) ? format(parseISO(item.lastDate), 'dd/MM/yyyy') : '--/--/----'}
-                    </p>
-                  </div>
-                  <div className={cn(
-                    "p-3 border rounded-xl",
-                    item.status === 'overdue' ? "bg-rose-50/30 border-rose-100" : "bg-white border-slate-100"
-                  )}>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <Calendar className={cn(
-                        "w-3 h-3",
-                        item.status === 'overdue' ? "text-rose-400" : "text-slate-400"
-                      )} />
-                      <p className={cn(
-                        "text-[9px] font-bold uppercase",
-                        item.status === 'overdue' ? "text-rose-400" : "text-slate-400"
-                      )}>Próxima</p>
-                    </div>
-                    <p className={cn(
-                      "text-xs font-bold",
-                      item.status === 'overdue' ? "text-rose-600" : "text-slate-900"
-                    )}>
-                      {item.nextDate && !isNaN(parseISO(item.nextDate).getTime()) ? format(parseISO(item.nextDate), 'dd/MM/yyyy') : '--/--/----'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-slate-50 flex items-center justify-between text-[10px]">
-                <div className="flex items-center text-slate-400">
-                  <Tag className="w-3 h-3 mr-1" />
-                  <span>ID: {item.assetId}</span>
-                </div>
-                <div className="flex items-center text-slate-400">
-                  <ArrowRight className="w-3 h-3 mr-1 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <span>{item.assetLocation}</span>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+      <div className="bg-white rounded-3xl shadow-sm overflow-hidden border border-slate-100">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/50 border-b border-slate-100">
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Equipamento</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Plano / Tarefa</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Última</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Próxima</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              <AnimatePresence mode="popLayout">
+                {filteredData.map((item, idx) => (
+                  <motion.tr
+                    key={`${item.planId}-${item.assetId}-${idx}`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="hover:bg-slate-50/50 transition-colors group"
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                          item.status === 'overdue' ? "bg-rose-50 text-rose-600" : 
+                          item.status === 'today' ? "bg-amber-50 text-amber-600" : "bg-blue-50 text-blue-600"
+                        )}>
+                          <Building2 className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-900 line-clamp-1">{item.assetDescription}</p>
+                          <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{item.assetTag} • {item.assetModel}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-xs font-semibold text-slate-600 line-clamp-1">{item.planTask}</p>
+                      <p className="text-[10px] text-slate-400">{item.assetLocation}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-xs font-bold text-slate-500">
+                        {item.lastDate && !isNaN(parseISO(item.lastDate).getTime()) ? format(parseISO(item.lastDate), 'dd/MM/yyyy') : '--/--/----'}
+                      </p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <Calendar className={cn(
+                          "w-3 h-3",
+                          item.status === 'overdue' ? "text-rose-400" : "text-slate-400"
+                        )} />
+                        <p className={cn(
+                          "text-xs font-bold",
+                          item.status === 'overdue' ? "text-rose-600" : "text-slate-900"
+                        )}>
+                          {item.nextDate && !isNaN(parseISO(item.nextDate).getTime()) ? format(parseISO(item.nextDate), 'dd/MM/yyyy') : '--/--/----'}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex justify-center">
+                        <div className={cn(
+                          "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap",
+                          item.status === 'overdue' ? "bg-rose-100 text-rose-700" : 
+                          item.status === 'today' ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
+                        )}>
+                          {item.status === 'overdue' ? 'Atrasado' : item.status === 'today' ? 'Hoje' : 'Em Dia'}
+                        </div>
+                      </div>
+                    </td>
+                  </motion.tr>
+                ))}
+              </AnimatePresence>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {filteredData.length === 0 && (
