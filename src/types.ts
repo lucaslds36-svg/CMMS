@@ -9,6 +9,7 @@ export interface Asset {
   Plant: string;
   Manufacturer: string;
   InstallDate: string;
+  statusChangedAt?: string;
   createdBy?: string;
 }
 

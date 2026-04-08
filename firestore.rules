@@ -65,7 +65,7 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidAsset(data) {
-      return hasOnlyAllowedFields(['ID', 'Tag', 'Model', 'Description', 'Location', 'Plant', 'Manufacturer', 'Status', 'InstallDate', 'id', 'createdBy']) &&
+      return hasOnlyAllowedFields(['ID', 'Tag', 'Model', 'Description', 'Location', 'Plant', 'Manufacturer', 'Status', 'InstallDate', 'id', 'createdBy', 'statusChangedAt']) &&
              data.ID is string && data.ID.size() > 0 &&
              data.Tag is string && data.Tag.size() > 0 &&
              data.Model is string && data.Model.size() > 0 &&

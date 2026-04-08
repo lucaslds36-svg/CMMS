@@ -1396,7 +1396,7 @@ const Dashboard = ({
 };
 
 // --- Asset List Component ---
-const AssetList = ({ assets, onAdd, onEdit, onDelete, onImport, isAdmin = false, currentUserUid = '', showToast }: { assets: Asset[], onAdd: () => void, onEdit: (asset: Asset) => void, onDelete: (id: string) => void, onImport: (assets: any[]) => void, isAdmin?: boolean, currentUserUid?: string, showToast?: (msg: string, type?: 'success' | 'error') => void }) => {
+const AssetList = ({ assets, plans = [], onAdd, onEdit, onDelete, onImport, isAdmin = false, currentUserUid = '', showToast }: { assets: Asset[], plans?: PreventivePlan[], onAdd: () => void, onEdit: (asset: Asset) => void, onDelete: (id: string) => void, onImport: (assets: any[]) => void, isAdmin?: boolean, currentUserUid?: string, showToast?: (msg: string, type?: 'success' | 'error') => void }) => {
   const [search, setSearch] = useState('');
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [showMassEditModal, setShowMassEditModal] = useState(false);
@@ -1786,7 +1786,57 @@ const AssetList = ({ assets, onAdd, onEdit, onDelete, onImport, isAdmin = false,
                     
                     if (Object.keys(updates).length > 0) {
                       try {
-                        await Promise.all(selectedAssets.map(id => updateDocument('assets', id, updates)));
+                        await Promise.all(selectedAssets.map(async (id) => {
+                          const asset = assets.find(a => a.ID === id);
+                          if (!asset) return;
+
+                          let finalUpdates = { ...updates };
+                          const oldStatus = asset.Status;
+                          const newStatus = updates.Status;
+
+                          // Logic for "Parado" status in mass edit
+                          if (newStatus && oldStatus !== newStatus) {
+                            if (oldStatus !== 'Parado' && newStatus === 'Parado') {
+                              finalUpdates.statusChangedAt = new Date().toISOString();
+                            } else if (oldStatus === 'Parado' && newStatus !== 'Parado' && asset.statusChangedAt) {
+                              const stoppedAt = new Date(asset.statusChangedAt);
+                              const now = new Date();
+                              const diffMs = now.getTime() - stoppedAt.getTime();
+                              const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+                              if (diffDays > 0) {
+                                const relatedPlans = plans.filter(p => 
+                                  p.AssetID === asset.ID || 
+                                  (p.AssetIDs && p.AssetIDs.includes(asset.ID))
+                                );
+
+                                for (const plan of relatedPlans) {
+                                  const currentNextDue = plan.AssetNextDues?.[asset.ID] || plan.NextDue;
+                                  if (currentNextDue) {
+                                    const nextDueDate = new Date(currentNextDue);
+                                    nextDueDate.setDate(nextDueDate.getDate() + diffDays);
+                                    const newNextDue = nextDueDate.toISOString().split('T')[0];
+
+                                    const updatedNextDues = { ...(plan.AssetNextDues || {}) };
+                                    updatedNextDues[asset.ID] = newNextDue;
+
+                                    const allNextDues = Object.values(updatedNextDues);
+                                    const earliestNextDue = allNextDues.length > 0 ? allNextDues.sort()[0] : newNextDue;
+
+                                    await updateDocument('preventive-plans', plan.ID, {
+                                      AssetNextDues: updatedNextDues,
+                                      NextDue: earliestNextDue,
+                                      updatedAt: new Date().toISOString()
+                                    });
+                                  }
+                                }
+                              }
+                              finalUpdates.statusChangedAt = null;
+                            }
+                          }
+
+                          await updateDocument('assets', id, finalUpdates);
+                        }));
                         if (showToast) showToast(`${selectedAssets.length} ativos atualizados com sucesso!`);
                       } catch (error) {
                         console.error('Error in mass edit:', error);
@@ -4614,7 +4664,8 @@ export default function App() {
     Location: '',
     Plant: '',
     Status: 'Ativo' as any,
-    InstallDate: new Date().toISOString().split('T')[0]
+    InstallDate: new Date().toISOString().split('T')[0],
+    statusChangedAt: undefined as string | null | undefined
   });
 
   const [newWO, setNewWO] = useState<Partial<WorkOrder>>({
@@ -4985,11 +5036,62 @@ export default function App() {
     e.preventDefault();
     try {
       if (editingAsset) {
-        await updateDocument('assets', editingAsset.ID, newAsset);
+        const oldStatus = editingAsset.Status;
+        const newStatus = newAsset.Status;
+        let finalAsset = { ...newAsset };
+
+        // Logic for "Parado" status: postpone preventive maintenance
+        if (oldStatus !== 'Parado' && newStatus === 'Parado') {
+          // Entering "Parado" status - record the start time
+          finalAsset.statusChangedAt = new Date().toISOString();
+        } else if (oldStatus === 'Parado' && newStatus !== 'Parado' && editingAsset.statusChangedAt) {
+          // Leaving "Parado" status - calculate duration and postpone plans
+          const stoppedAt = new Date(editingAsset.statusChangedAt);
+          const now = new Date();
+          const diffMs = now.getTime() - stoppedAt.getTime();
+          const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+          if (diffDays > 0) {
+            const relatedPlans = plans.filter(p => 
+              p.AssetID === editingAsset.ID || 
+              (p.AssetIDs && p.AssetIDs.includes(editingAsset.ID))
+            );
+
+            for (const plan of relatedPlans) {
+              const currentNextDue = plan.AssetNextDues?.[editingAsset.ID] || plan.NextDue;
+              if (currentNextDue) {
+                const nextDueDate = new Date(currentNextDue);
+                nextDueDate.setDate(nextDueDate.getDate() + diffDays);
+                const newNextDue = nextDueDate.toISOString().split('T')[0];
+
+                const updatedNextDues = { ...(plan.AssetNextDues || {}) };
+                updatedNextDues[editingAsset.ID] = newNextDue;
+
+                const allNextDues = Object.values(updatedNextDues);
+                const earliestNextDue = allNextDues.length > 0 ? allNextDues.sort()[0] : newNextDue;
+
+                await updateDocument('preventive-plans', plan.ID, {
+                  AssetNextDues: updatedNextDues,
+                  NextDue: earliestNextDue,
+                  updatedAt: new Date().toISOString()
+                });
+              }
+            }
+            showToast(`Manutenção preventiva adiada em ${diffDays} dias devido ao tempo parado.`);
+          }
+          finalAsset.statusChangedAt = null; // Reset tracking
+        }
+
+        await updateDocument('assets', editingAsset.ID, finalAsset);
         showToast('Ativo atualizado com sucesso!');
       } else {
         const id = `A${(assets.length + 1).toString().padStart(3, '0')}`;
-        const assetToCreate = { ...newAsset, ID: id, createdBy: user?.uid };
+        let assetToCreate = { ...newAsset, ID: id, createdBy: user?.uid };
+        
+        if (assetToCreate.Status === 'Parado') {
+          assetToCreate.statusChangedAt = new Date().toISOString();
+        }
+        
         console.log('Creating asset:', assetToCreate);
         await createDocument('assets', assetToCreate, id);
         showToast('Ativo criado com sucesso!');
@@ -5003,8 +5105,9 @@ export default function App() {
         Manufacturer: '',
         Location: '',
         Plant: '',
-        Status: 'Ativo',
-        InstallDate: new Date().toISOString().split('T')[0]
+        Status: 'Ativo' as any,
+        InstallDate: new Date().toISOString().split('T')[0],
+        statusChangedAt: undefined
       });
     } catch (error) {
       console.error('Error saving asset:', error);
@@ -5114,7 +5217,8 @@ export default function App() {
       Location: asset.Location || '',
       Plant: asset.Plant || '',
       Status: asset.Status || 'Ativo',
-      InstallDate: asset.InstallDate || ''
+      InstallDate: asset.InstallDate || '',
+      statusChangedAt: asset.statusChangedAt
     });
     setShowAssetModal(true);
   };
@@ -6339,6 +6443,7 @@ export default function App() {
                 {activeTab === 'assets' && (
                   <AssetList 
                     assets={assets} 
+                    plans={plans}
                     isAdmin={isAdmin}
                     currentUserUid={user?.uid}
                     showToast={showToast}
@@ -6410,8 +6515,9 @@ export default function App() {
                         Manufacturer: '',
                         Location: '',
                         Plant: '',
-                        Status: 'Ativo',
-                        InstallDate: new Date().toISOString().split('T')[0]
+                        Status: 'Ativo' as any,
+                        InstallDate: new Date().toISOString().split('T')[0],
+                        statusChangedAt: undefined
                       });
                       setShowAssetModal(true);
                     }} 
