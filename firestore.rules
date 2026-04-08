@@ -106,19 +106,30 @@ service cloud.firestore {
     }
 
     function isValidPreventivePlan(data) {
-      return hasOnlyAllowedFields(['ID', 'AssetID', 'assetId', 'AssetIDs', 'AssetLastDones', 'AssetNextDues', 'Task', 'Frequency', 'FrequencyType', 'frequencyType', 'FrequencyValue', 'frequencyValue', 'LastDone', 'NextDue', 'lastExecutionDate', 'nextExecutionDate', 'Type', 'Criticality', 'AssetType', 'Location', 'Plant', 'EstimatedTime', 'Collaborators', 'Checklist', 'id', 'createdBy', 'scheduleType', 'globalDate', 'assets']) &&
-             data.ID is string && data.AssetIDs is list &&
-             (data.AssetID is string || !('AssetID' in data)) &&
-             (data.AssetLastDones is map || !('AssetLastDones' in data)) &&
-             (data.AssetNextDues is map || !('AssetNextDues' in data)) &&
-             data.Type in ['Preventiva', 'Inspeção', 'Lubrificação', 'Manutenção Programada'] &&
-             (data.FrequencyType in ['dias', 'horas'] || !('FrequencyType' in data)) &&
-             (data.FrequencyValue is number || !('FrequencyValue' in data)) &&
-             data.Criticality in ['Alta', 'Média', 'Baixa'] &&
-             data.EstimatedTime is number && data.Collaborators is number &&
+      return hasOnlyAllowedFields(['ID', 'AssetID', 'assetId', 'AssetIDs', 'AssetLastDones', 'AssetNextDues', 'Task', 'Frequency', 'FrequencyType', 'frequencyType', 'FrequencyValue', 'frequencyValue', 'LastDone', 'NextDue', 'lastExecutionDate', 'nextExecutionDate', 'Type', 'Criticality', 'AssetType', 'Location', 'Plant', 'EstimatedTime', 'Collaborators', 'Checklist', 'id', 'createdBy', 'scheduleType', 'globalDate', 'assets', 'updatedAt', 'lastDone', 'nextDue']) &&
+             (!('ID' in data) || data.ID is string) &&
+             (!('AssetIDs' in data) || data.AssetIDs is list) &&
+             (!('AssetID' in data) || data.AssetID is string) &&
+             (!('assetId' in data) || data.assetId is string) &&
+             (!('AssetLastDones' in data) || data.AssetLastDones is map) &&
+             (!('AssetNextDues' in data) || data.AssetNextDues is map) &&
+             (!('Type' in data) || data.Type is string) &&
+             (!('Frequency' in data) || data.Frequency is string) &&
+             (!('FrequencyType' in data) || data.FrequencyType is string) &&
+             (!('frequencyType' in data) || data.frequencyType is string) &&
+             (!('FrequencyValue' in data) || data.FrequencyValue is number) &&
+             (!('frequencyValue' in data) || data.frequencyValue is number) &&
+             (!('Criticality' in data) || data.Criticality is string) &&
+             (!('EstimatedTime' in data) || data.EstimatedTime is number) &&
+             (!('Collaborators' in data) || data.Collaborators is number) &&
              (!('scheduleType' in data) || data.scheduleType in ['global', 'individual']) &&
              (!('globalDate' in data) || data.globalDate is string || data.globalDate == null) &&
              (!('assets' in data) || data.assets is list) &&
+             (!('updatedAt' in data) || data.updatedAt is string) &&
+             (!('lastExecutionDate' in data) || data.lastExecutionDate is string) &&
+             (!('nextExecutionDate' in data) || data.nextExecutionDate is string) &&
+             (!('LastDone' in data) || data.LastDone is string) &&
+             (!('NextDue' in data) || data.NextDue is string) &&
              (!('Checklist' in data) || data.Checklist is list);
     }
 
@@ -310,7 +321,7 @@ service cloud.firestore {
     match /preventive-plans/{planId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidPreventivePlan(request.resource.data);
-      allow update: if isMasterOrOwner('createdBy') && isValidPreventivePlan(request.resource.data);
+      allow update: if isPlanner() && isValidPreventivePlan(request.resource.data);
       allow delete: if isAdmin();
     }
 

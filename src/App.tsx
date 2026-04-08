@@ -1396,7 +1396,7 @@ const Dashboard = ({
 };
 
 // --- Asset List Component ---
-const AssetList = ({ assets, onAdd, onEdit, onDelete, onImport, isAdmin = false, currentUserUid = '' }: { assets: Asset[], onAdd: () => void, onEdit: (asset: Asset) => void, onDelete: (id: string) => void, onImport: (assets: any[]) => void, isAdmin?: boolean, currentUserUid?: string }) => {
+const AssetList = ({ assets, onAdd, onEdit, onDelete, onImport, isAdmin = false, currentUserUid = '', showToast }: { assets: Asset[], onAdd: () => void, onEdit: (asset: Asset) => void, onDelete: (id: string) => void, onImport: (assets: any[]) => void, isAdmin?: boolean, currentUserUid?: string, showToast?: (msg: string, type?: 'success' | 'error') => void }) => {
   const [search, setSearch] = useState('');
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [showMassEditModal, setShowMassEditModal] = useState(false);
@@ -1467,11 +1467,17 @@ const AssetList = ({ assets, onAdd, onEdit, onDelete, onImport, isAdmin = false,
     printWindow.document.close();
   };
 
-  const handleMassDelete = () => {
+  const handleMassDelete = async () => {
     if (selectedAssets.length === 0) return;
     if (window.confirm(`Tem certeza que deseja excluir ${selectedAssets.length} ativos selecionados?`)) {
-      selectedAssets.forEach(id => onDelete(id));
-      setSelectedAssets([]);
+      try {
+        await Promise.all(selectedAssets.map(id => deleteDocument('assets', id)));
+        if (showToast) showToast(`${selectedAssets.length} ativos excluídos com sucesso!`);
+        setSelectedAssets([]);
+      } catch (error) {
+        console.error('Error in mass delete:', error);
+        if (showToast) showToast('Erro ao excluir ativos selecionados', 'error');
+      }
     }
   };
 
@@ -1772,19 +1778,20 @@ const AssetList = ({ assets, onAdd, onEdit, onDelete, onImport, isAdmin = false,
                   Cancelar
                 </button>
                 <button 
-                  onClick={() => {
+                  onClick={async () => {
                     const updates: any = {};
                     if (massEditData.Status) updates.Status = massEditData.Status;
                     if (massEditData.Plant) updates.Plant = massEditData.Plant;
                     if (massEditData.Location) updates.Location = massEditData.Location;
                     
                     if (Object.keys(updates).length > 0) {
-                      selectedAssets.forEach(id => {
-                        const asset = assets.find(a => a.ID === id);
-                        if (asset) {
-                          onEdit({ ...asset, ...updates });
-                        }
-                      });
+                      try {
+                        await Promise.all(selectedAssets.map(id => updateDocument('assets', id, updates)));
+                        if (showToast) showToast(`${selectedAssets.length} ativos atualizados com sucesso!`);
+                      } catch (error) {
+                        console.error('Error in mass edit:', error);
+                        if (showToast) showToast('Erro ao atualizar ativos selecionados', 'error');
+                      }
                     }
                     setShowMassEditModal(false);
                     setSelectedAssets([]);
@@ -4911,6 +4918,32 @@ export default function App() {
     }
   };
 
+  const handleDeleteUser = async (uid: string, userEmail: string) => {
+    if (!isAdmin) return;
+    if (userEmail === 'lucas.lds36@gmail.com') {
+      showToast('O administrador principal não pode ser excluído.', 'error');
+      return;
+    }
+
+    setConfirmState({
+      show: true,
+      title: 'Excluir Usuário',
+      message: `Tem certeza que deseja excluir o usuário ${userEmail}? Esta ação não pode ser desfeita.`,
+      onConfirm: async () => {
+        try {
+          await deleteDocument('users', uid);
+          setAllUsers(prev => prev.filter(u => u.uid !== uid));
+          showToast('Usuário excluído com sucesso!');
+        } catch (error) {
+          console.error('Error deleting user:', error);
+          showToast('Erro ao excluir usuário', 'error');
+        } finally {
+          setConfirmState(prev => ({ ...prev, show: false }));
+        }
+      }
+    });
+  };
+
   useEffect(() => {
     if (!authReady || !user) {
       setLoading(false);
@@ -6285,6 +6318,13 @@ export default function App() {
                                       <option value="requester">O.S. Solicitante</option>
                                       <option value="planner">O.S. Planejador</option>
                                     </select>
+                                    <button
+                                      onClick={() => handleDeleteUser(u.uid, u.email)}
+                                      className="flex items-center justify-center w-full gap-2 px-3 py-1.5 text-xs font-bold text-rose-600 bg-rose-50 rounded-lg hover:bg-rose-100 transition-colors"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                      Excluir Usuário
+                                    </button>
                                   </>
                                 )}
                               </td>
@@ -6301,6 +6341,7 @@ export default function App() {
                     assets={assets} 
                     isAdmin={isAdmin}
                     currentUserUid={user?.uid}
+                    showToast={showToast}
                     onImport={async (importedAssets) => {
                       if (!user) {
                         showToast('Faça login para importar ativos', 'error');
