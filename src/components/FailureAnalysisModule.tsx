@@ -1196,7 +1196,9 @@ export const FailureAnalysisModule = ({
                           radius={[0, 4, 4, 0]} 
                           onClick={(data) => handleChartClick('Máquina', String(data.name))}
                           style={{ cursor: 'pointer' }}
-                        />
+                        >
+                          <LabelList dataKey="totalFalhas" position="right" fontSize={10} fill="#64748b" />
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -1216,7 +1218,9 @@ export const FailureAnalysisModule = ({
                           radius={[0, 4, 4, 0]} 
                           onClick={(data) => handleChartClick('Máquina', String(data.name))}
                           style={{ cursor: 'pointer' }}
-                        />
+                        >
+                          <LabelList dataKey="tempoTotalReparo" position="right" fontSize={10} fill="#64748b" formatter={(val: number) => val.toFixed(1) + 'h'} />
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -1235,7 +1239,7 @@ export const FailureAnalysisModule = ({
                           data={advancedAnalysis.paretoCausas.slice(0, 5)} 
                           dataKey="value" 
                           nameKey="name" 
-                          cx="50%" cy="50%" outerRadius={60} label
+                          cx="50%" cy="50%" outerRadius={60} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                           onClick={(data) => handleChartClick('Causa', String(data.name))}
                           style={{ cursor: 'pointer' }}
                         >
@@ -1255,7 +1259,7 @@ export const FailureAnalysisModule = ({
                           data={advancedAnalysis.paretoProblemas.slice(0, 5)} 
                           dataKey="value" 
                           nameKey="name" 
-                          cx="50%" cy="50%" outerRadius={60} label
+                          cx="50%" cy="50%" outerRadius={60} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                           onClick={(data) => handleChartClick('Problema', String(data.name))}
                           style={{ cursor: 'pointer' }}
                         >
@@ -1275,7 +1279,7 @@ export const FailureAnalysisModule = ({
                           data={advancedAnalysis.paretoPartes.slice(0, 5)} 
                           dataKey="value" 
                           nameKey="name" 
-                          cx="50%" cy="50%" outerRadius={60} label
+                          cx="50%" cy="50%" outerRadius={60} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                           onClick={(data) => handleChartClick('Parte', String(data.name))}
                           style={{ cursor: 'pointer' }}
                         >
@@ -1309,7 +1313,9 @@ export const FailureAnalysisModule = ({
                           handleChartClick('Mês', monthsNames[monthIndex]);
                         }}
                         style={{ cursor: 'pointer' }}
-                      />
+                      >
+                        <LabelList dataKey="falhas" position="top" fontSize={10} fill="#64748b" />
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -1334,7 +1340,9 @@ export const FailureAnalysisModule = ({
                           radius={[0, 4, 4, 0]} 
                           onClick={(data) => handleChartClick('Executante', String(data.name))}
                           style={{ cursor: 'pointer' }}
-                        />
+                        >
+                          <LabelList dataKey="atendimentos" position="right" fontSize={10} fill="#64748b" />
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -1352,7 +1360,9 @@ export const FailureAnalysisModule = ({
                           radius={[0, 4, 4, 0]} 
                           onClick={(data) => handleChartClick('Executante', String(data.name))}
                           style={{ cursor: 'pointer' }}
-                        />
+                        >
+                          <LabelList dataKey="tempoMedio" position="right" fontSize={10} fill="#64748b" formatter={(val: number) => val.toFixed(1) + 'h'} />
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -1378,7 +1388,9 @@ export const FailureAnalysisModule = ({
                           radius={[4, 4, 0, 0]} 
                           onClick={(data) => handleChartClick('Turno', String(data.name))}
                           style={{ cursor: 'pointer' }}
-                        />
+                        >
+                          <LabelList dataKey="totalFalhas" position="top" fontSize={10} fill="#64748b" />
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -1396,7 +1408,9 @@ export const FailureAnalysisModule = ({
                           radius={[4, 4, 0, 0]} 
                           onClick={(data) => handleChartClick('Turno', String(data.name))}
                           style={{ cursor: 'pointer' }}
-                        />
+                        >
+                          <LabelList dataKey="tempoMedio" position="top" fontSize={10} fill="#64748b" formatter={(val: number) => val.toFixed(1) + 'h'} />
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
