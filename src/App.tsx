@@ -7499,12 +7499,28 @@ export default function App() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Nome do Executor</label>
-                        <input 
-                          type="text"
+                        <select 
                           className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                          value={newWO.executorName || ''}
-                          onChange={e => setNewWO({...newWO, executorName: e.target.value})}
-                        />
+                          value={newWO.TechnicianID || ''}
+                          onChange={e => {
+                            const emp = employees.find(emp => emp.ID === e.target.value);
+                            const company = emp?.companyId ? thirdPartyCompanies.find(c => c.id === emp.companyId) : null;
+                            setNewWO({
+                              ...newWO, 
+                              TechnicianID: e.target.value,
+                              executorName: emp ? emp.Name : '',
+                              AssignedTo: emp ? emp.Name : '',
+                              hourlyRate: emp?.hourlyRate || newWO.hourlyRate || 0,
+                              companyId: emp?.companyId || newWO.companyId || '',
+                              companyName: company?.name || newWO.companyName || ''
+                            });
+                          }}
+                        >
+                          <option value="">Selecione um executor</option>
+                          {employees.filter(emp => emp.Status === 'Ativo').map(emp => (
+                            <option key={emp.ID} value={emp.ID}>{emp.Name} ({emp.Type === 'Terceiro' ? 'Terceiro' : 'Próprio'})</option>
+                          ))}
+                        </select>
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Valor Hora (R$)</label>
