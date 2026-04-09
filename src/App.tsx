@@ -1082,49 +1082,6 @@ const Dashboard = ({
                 {months.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
             </div>
-
-            {/* Filtro combinado (tipo & máquina) */}
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <input 
-                type="text"
-                placeholder="Tipo"
-                value={filters.type}
-                onChange={(e) => setFilters({ ...filters, type: e.target.value })}
-                className="flex-1 sm:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
-              />
-              <input 
-                type="text"
-                placeholder="Máquina"
-                value={filters.machine}
-                onChange={(e) => setFilters({ ...filters, machine: e.target.value })}
-                className="flex-1 sm:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
-              />
-            </div>
-
-            {/* Turno, Setor, Parte */}
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <input 
-                type="text"
-                placeholder="Turno"
-                value={filters.shift}
-                onChange={(e) => setFilters({ ...filters, shift: e.target.value })}
-                className="flex-1 sm:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
-              />
-              <input 
-                type="text"
-                placeholder="Setor"
-                value={filters.sector}
-                onChange={(e) => setFilters({ ...filters, sector: e.target.value })}
-                className="flex-1 sm:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
-              />
-              <input 
-                type="text"
-                placeholder="Parte"
-                value={filters.part}
-                onChange={(e) => setFilters({ ...filters, part: e.target.value })}
-                className="flex-1 sm:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
-              />
-            </div>
           </div>
         )}
       </div>
