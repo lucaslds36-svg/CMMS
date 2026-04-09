@@ -840,80 +840,117 @@ export const FailureAnalysisModule = ({
               </button>
             </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              <div className="flex flex-col col-span-1 sm:col-span-2">
-                <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">
-                  Intervalo de Datas (Dia)
-                </label>
-                <div className="flex items-center space-x-2">
-                  <input 
-                    type="date"
-                    className="flex-1 text-xs border border-slate-200 rounded-lg p-2 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
-                    value={filters.startDate}
-                    onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                  />
-                  <span className="text-slate-400 text-xs">até</span>
-                  <input 
-                    type="date"
-                    className="flex-1 text-xs border border-slate-200 rounded-lg p-2 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
-                    value={filters.endDate}
-                    onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Filtro Agrupado: Tipo e Máquina */}
-              <div className="flex flex-col col-span-1 sm:col-span-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
-                <label className="text-[10px] font-bold text-slate-500 uppercase mb-2 ml-1 flex items-center">
-                  <Filter className="w-3 h-3 mr-1" /> Filtro Combinado (Tipo & Máquina)
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="flex flex-col">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Tipo (Grupo)</label>
-                    <select 
-                      className="text-xs border border-slate-200 rounded-lg p-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                      value={filters['Grupo']}
-                      onChange={(e) => handleFilterChange('Grupo', e.target.value)}
-                    >
-                      <option value="">Todos</option>
-                      {getUniqueValues('Grupo').map((val: any, idx) => (
-                        <option key={idx} value={val}>{val}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex flex-col">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Máquina</label>
-                    <select 
-                      className="text-xs border border-slate-200 rounded-lg p-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                      value={filters['Máquina']}
-                      onChange={(e) => handleFilterChange('Máquina', e.target.value)}
-                    >
-                      <option value="">Todas</option>
-                      {getUniqueValues('Máquina').map((val: any, idx) => (
-                        <option key={idx} value={val}>{val}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {Object.keys(filters).filter(k => k !== 'startDate' && k !== 'endDate' && k !== 'Grupo' && k !== 'Máquina').map(filterKey => (
-                <div key={filterKey} className="flex flex-col col-span-1">
+            <div className="space-y-3">
+              {/* Row 1 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="flex flex-col col-span-2">
                   <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">
-                    {filterKey}
+                    Intervalo de Datas (Dia)
                   </label>
+                  <div className="flex items-center space-x-2">
+                    <input 
+                      type="date"
+                      className="flex-1 text-xs border border-slate-200 rounded-lg p-2 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+                      value={filters.startDate}
+                      onChange={(e) => handleFilterChange('startDate', e.target.value)}
+                    />
+                    <span className="text-slate-400 text-xs">até</span>
+                    <input 
+                      type="date"
+                      className="flex-1 text-xs border border-slate-200 rounded-lg p-2 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+                      value={filters.endDate}
+                      onChange={(e) => handleFilterChange('endDate', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Ano */}
+                <div className="flex flex-col col-span-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Ano</label>
                   <select 
                     className="text-xs border border-slate-200 rounded-lg p-2 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
-                    value={filters[filterKey]}
-                    onChange={(e) => handleFilterChange(filterKey, e.target.value)}
+                    value={filters['Ano']}
+                    onChange={(e) => handleFilterChange('Ano', e.target.value)}
                   >
                     <option value="">Todos</option>
-                    {getUniqueValues(filterKey).map((val: any, idx) => (
+                    {getUniqueValues('Ano').map((val: any, idx) => (
                       <option key={idx} value={val}>{val}</option>
                     ))}
                   </select>
                 </div>
-              ))}
+
+                {/* Mês */}
+                <div className="flex flex-col col-span-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Mês</label>
+                  <select 
+                    className="text-xs border border-slate-200 rounded-lg p-2 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={filters['Mês']}
+                    onChange={(e) => handleFilterChange('Mês', e.target.value)}
+                  >
+                    <option value="">Todos</option>
+                    {getUniqueValues('Mês').map((val: any, idx) => (
+                      <option key={idx} value={val}>{val}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 2 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+                {/* Filtro Agrupado: Tipo e Máquina */}
+                <div className="flex flex-col col-span-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase mb-2 ml-1 flex items-center">
+                    <Filter className="w-3 h-3 mr-1" /> Filtro Combinado (Tipo & Máquina)
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-col">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Tipo (Grupo)</label>
+                      <select 
+                        className="text-xs border border-slate-200 rounded-lg p-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                        value={filters['Grupo']}
+                        onChange={(e) => handleFilterChange('Grupo', e.target.value)}
+                      >
+                        <option value="">Todos</option>
+                        {getUniqueValues('Grupo').map((val: any, idx) => (
+                          <option key={idx} value={val}>{val}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Máquina</label>
+                      <select 
+                        className="text-xs border border-slate-200 rounded-lg p-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                        value={filters['Máquina']}
+                        onChange={(e) => handleFilterChange('Máquina', e.target.value)}
+                      >
+                        <option value="">Todas</option>
+                        {getUniqueValues('Máquina').map((val: any, idx) => (
+                          <option key={idx} value={val}>{val}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Turno, Setor, Parte */}
+                {['Turno', 'Setor', 'Parte'].map(filterKey => (
+                  <div key={filterKey} className="flex flex-col col-span-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">
+                      {filterKey}
+                    </label>
+                    <select 
+                      className="text-xs border border-slate-200 rounded-lg p-2 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+                      value={filters[filterKey]}
+                      onChange={(e) => handleFilterChange(filterKey, e.target.value)}
+                    >
+                      <option value="">Todos</option>
+                      {getUniqueValues(filterKey).map((val: any, idx) => (
+                        <option key={idx} value={val}>{val}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="mt-3 text-xs text-slate-500 text-right">
               Mostrando {filteredData.length} de {rawData.length} registros

@@ -45,7 +45,8 @@ import {
   Printer,
   Check,
   Building2,
-  DollarSign
+  DollarSign,
+  Package
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
@@ -86,6 +87,9 @@ import {
   isWithinInterval
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { hasPermission, Action } from './lib/permissions';
+import { ChecklistModal } from './components/ChecklistModule/ChecklistModal';
+import { cn } from './lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -113,7 +117,10 @@ import {
   saveDatabaseEntry,
   saveGlobalData,
   loadGlobalData,
-  subscribeToGlobalData
+  subscribeToGlobalData,
+  collection,
+  query,
+  getDocs
 } from './firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged, type User } from 'firebase/auth';
@@ -129,10 +136,6 @@ import { ThirdPartyModule } from './components/ThirdPartyModule';
 // ... (inside App component)
 
 import { Database } from 'lucide-react';
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 const getMonthNumber = (val: any) => {
   if (!val) return null;
@@ -314,8 +317,8 @@ const Dashboard = ({
   setBditssData: React.Dispatch<React.SetStateAction<any[]>>,
   setDinamicaData: React.Dispatch<React.SetStateAction<any[]>>,
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void,
-  filters: { year: string, month: string, viewType: 'Acumulada' | 'Diária' },
-  setFilters: React.Dispatch<React.SetStateAction<{ year: string, month: string, viewType: 'Acumulada' | 'Diária' }>>,
+  filters: { year: string, month: string, viewType: 'Acumulada' | 'Diária', type: string, machine: string, shift: string, sector: string, part: string },
+  setFilters: React.Dispatch<React.SetStateAction<{ year: string, month: string, viewType: 'Acumulada' | 'Diária', type: string, machine: string, shift: string, sector: string, part: string }>>,
   isProcessingFile?: boolean
 }) => {
   const [loading, setLoading] = useState(false);
@@ -1040,7 +1043,7 @@ const Dashboard = ({
         
         {dashboardTab === 'excel' && (
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            {/* Filters */}
+            {/* Intervalo de datas (dia) */}
             <div className="flex items-center bg-slate-50 rounded-xl border border-slate-200 p-1 shadow-inner w-full sm:w-auto">
               <button 
                 onClick={() => setFilters({ ...filters, viewType: 'Acumulada' })}
@@ -1062,15 +1065,8 @@ const Dashboard = ({
               </button>
             </div>
 
+            {/* Ano e Mês */}
             <div className="flex items-center gap-2 w-full sm:w-auto">
-              <select 
-                value={filters.month}
-                onChange={(e) => setFilters({ ...filters, month: e.target.value })}
-                className="flex-1 sm:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
-              >
-                {months.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
-
               <select 
                 value={filters.year}
                 onChange={(e) => setFilters({ ...filters, year: e.target.value })}
@@ -1078,6 +1074,56 @@ const Dashboard = ({
               >
                 {years.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
+              <select 
+                value={filters.month}
+                onChange={(e) => setFilters({ ...filters, month: e.target.value })}
+                className="flex-1 sm:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
+              >
+                {months.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            </div>
+
+            {/* Filtro combinado (tipo & máquina) */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <input 
+                type="text"
+                placeholder="Tipo"
+                value={filters.type}
+                onChange={(e) => setFilters({ ...filters, type: e.target.value })}
+                className="flex-1 sm:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
+              />
+              <input 
+                type="text"
+                placeholder="Máquina"
+                value={filters.machine}
+                onChange={(e) => setFilters({ ...filters, machine: e.target.value })}
+                className="flex-1 sm:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
+              />
+            </div>
+
+            {/* Turno, Setor, Parte */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <input 
+                type="text"
+                placeholder="Turno"
+                value={filters.shift}
+                onChange={(e) => setFilters({ ...filters, shift: e.target.value })}
+                className="flex-1 sm:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
+              />
+              <input 
+                type="text"
+                placeholder="Setor"
+                value={filters.sector}
+                onChange={(e) => setFilters({ ...filters, sector: e.target.value })}
+                className="flex-1 sm:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
+              />
+              <input 
+                type="text"
+                placeholder="Parte"
+                value={filters.part}
+                onChange={(e) => setFilters({ ...filters, part: e.target.value })}
+                className="flex-1 sm:flex-none px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
+              />
             </div>
           </div>
         )}
@@ -1871,18 +1917,24 @@ const WorkOrderList = ({
   onDelete,
   isPlanner = false,
   isAdmin = false,
-  currentUserUid = ''
+  currentUserUid = '',
+  userRole,
+  plans,
+  showToast
 }: { 
   wos: WorkOrder[], 
   assets: Asset[],
   onAdd: () => void,
   onEdit: (wo: WorkOrder) => void,
   onUpdateStatus: (id: string, status: string, completedAt?: string, duration?: number) => void,
-  onUpdateChecklist?: (id: string, checklist: {text: string, completed: boolean}[]) => void,
+  onUpdateChecklist?: (id: string, checklist: {tarefa: string, completed: boolean}[]) => void,
   onDelete: (id: string) => void,
   isPlanner?: boolean,
   isAdmin?: boolean,
-  currentUserUid?: string
+  currentUserUid?: string,
+  userRole?: UserProfile['role'],
+  plans: PreventivePlan[],
+  showToast: (msg: string, type?: 'success' | 'error') => void
 }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('Todas');
@@ -1973,7 +2025,14 @@ const WorkOrderList = ({
           <tbody className="divide-y divide-slate-100">
             {paginatedWos.map((wo, i) => (
               <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                <td className="px-6 py-4 text-sm font-medium text-slate-900">{wo.ID}</td>
+                <td className="px-6 py-4 text-sm font-medium text-slate-900">
+                  <div className="flex items-center gap-2">
+                    {wo.ID}
+                    {wo.Checklist && wo.Checklist.length > 0 && (
+                      <ClipboardList className="w-3 h-3 text-blue-500" />
+                    )}
+                  </div>
+                </td>
                 <td className="px-6 py-4">
                   <div className="flex flex-col">
                     <span className="text-sm font-bold text-blue-600">{assets.find(a => a.ID === wo.AssetID)?.Tag || '-'}</span>
@@ -2195,46 +2254,175 @@ const WorkOrderList = ({
                   </div>
                 </div>
 
-                {viewingWO.Checklist && viewingWO.Checklist.length > 0 && (
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Checklist de Execução</label>
-                    <div className="bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden">
-                      {viewingWO.Checklist.map((item, index) => (
-                        <div 
-                          key={index} 
-                          className={cn(
-                            "flex items-center gap-3 p-4 border-b border-slate-100 last:border-0 transition-colors",
-                            item.completed ? "bg-emerald-50/50" : "hover:bg-slate-100/50"
+                {(() => {
+                  const pId = viewingWO.PlanID || viewingWO.planId || (viewingWO.ID.startsWith('OS-PREV-') ? viewingWO.ID.split('-')[2] : null);
+                  const hasPlan = !!pId;
+                  
+                  if (viewingWO.Checklist && viewingWO.Checklist.length > 0) {
+                    return (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Checklist de Execução</label>
+                          {hasPlan && (
+                            <button 
+                              onClick={async () => {
+                                const plan = plans.find(p => p.ID === pId);
+                                if (!plan) {
+                                  showToast('Plano não encontrado', 'error');
+                                  return;
+                                }
+                                // Fetch checklist from subcollection
+                                const q = query(collection(db, `preventive-plans/${plan.ID}/checklist_itens`));
+                                const snapshot = await getDocs(q);
+                                let items = snapshot.docs.map(doc => {
+                                  const data = doc.data();
+                                  return {
+                                    tarefa: data.tarefa || data.text || data.task || data.Description || data.Tarefa || data.Atividade || data.atividade || 'Atividade sem descrição',
+                                    completed: false,
+                                    grupo: data.grupo || 'Geral',
+                                    equipamento: data.equipamento || 'Geral'
+                                  };
+                                });
+                                
+                                if (items.length === 0 && plan.Checklist) {
+                                  items = plan.Checklist.map(t => ({ tarefa: t, completed: false, grupo: 'Geral', equipamento: 'Geral' }));
+                                }
+
+                                if (items.length > 0) {
+                                  await updateDocument('work-orders', viewingWO.ID, { Checklist: items });
+                                  setViewingWO({ ...viewingWO, Checklist: items });
+                                  showToast('Check-list sincronizado com sucesso!');
+                                } else {
+                                  showToast('O plano vinculado não possui itens de check-list', 'error');
+                                }
+                              }}
+                              className="text-[10px] font-bold text-blue-600 hover:text-blue-700 uppercase tracking-widest flex items-center gap-1 bg-blue-50 px-3 py-1 rounded-full border border-blue-100 transition-colors"
+                            >
+                              <RefreshCw className="w-3 h-3" />
+                              Sincronizar com Plano
+                            </button>
                           )}
-                        >
-                          <button
-                            onClick={() => {
-                              if (!onUpdateChecklist) return;
-                              const newChecklist = [...viewingWO.Checklist!];
-                              newChecklist[index].completed = !newChecklist[index].completed;
-                              onUpdateChecklist(viewingWO.ID, newChecklist);
-                              setViewingWO({...viewingWO, Checklist: newChecklist});
-                            }}
-                            className={cn(
-                              "w-6 h-6 rounded-md flex items-center justify-center border-2 transition-colors",
-                              item.completed 
-                                ? "bg-emerald-500 border-emerald-500 text-white" 
-                                : "border-slate-300 text-transparent hover:border-blue-500"
-                            )}
-                          >
-                            <Check className="w-4 h-4" />
-                          </button>
-                          <span className={cn(
-                            "text-sm font-medium transition-colors",
-                            item.completed ? "text-emerald-700 line-through opacity-70" : "text-slate-700"
-                          )}>
-                            {item.text}
-                          </span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                        
+                        {(() => {
+                          const grouped: Record<string, Record<string, typeof viewingWO.Checklist>> = {};
+                          viewingWO.Checklist!.forEach((item, idx) => {
+                            const g = item.grupo || 'Geral';
+                            const e = item.equipamento || 'Geral';
+                            if (!grouped[g]) grouped[g] = {};
+                            if (!grouped[g][e]) grouped[g][e] = [];
+                            (grouped[g][e] as any).push({ ...item, originalIndex: idx });
+                          });
+
+                          return Object.entries(grouped).map(([group, equipments]) => (
+                            <div key={group} className="space-y-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-1 h-3 bg-blue-600 rounded-full" />
+                                <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">{group}</h4>
+                              </div>
+                              
+                              <div className="space-y-4 ml-2">
+                                {Object.entries(equipments).map(([eq, tasks]) => (
+                                  <div key={eq} className="space-y-2">
+                                    {eq !== 'Geral' && (
+                                      <div className="flex items-center gap-2 ml-1">
+                                        <Package className="w-3 h-3 text-slate-400" />
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase">{eq}</span>
+                                      </div>
+                                    )}
+                                    
+                                    <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                                      {tasks.map((item: any) => (
+                                        <div 
+                                          key={item.originalIndex} 
+                                          className={cn(
+                                            "flex items-center gap-3 p-4 border-b border-slate-50 last:border-0 transition-colors",
+                                            item.completed ? "bg-emerald-50/30" : "hover:bg-slate-50/50"
+                                          )}
+                                        >
+                                          <button
+                                            onClick={() => {
+                                              if (!onUpdateChecklist) return;
+                                              if (!hasPermission(userRole, 'execute_checklist')) return;
+                                              const newChecklist = [...viewingWO.Checklist!];
+                                              newChecklist[item.originalIndex].completed = !newChecklist[item.originalIndex].completed;
+                                              onUpdateChecklist(viewingWO.ID, newChecklist);
+                                              setViewingWO({...viewingWO, Checklist: newChecklist});
+                                            }}
+                                            className={cn(
+                                              "w-6 h-6 rounded-md flex items-center justify-center border-2 transition-colors",
+                                              item.completed 
+                                                ? "bg-emerald-500 border-emerald-500 text-white" 
+                                                : "border-slate-300 text-transparent hover:border-blue-500"
+                                            )}
+                                          >
+                                            <Check className="w-4 h-4" />
+                                          </button>
+                                          <span className={cn(
+                                            "text-sm font-medium transition-colors",
+                                            item.completed ? "text-emerald-700 line-through opacity-70" : "text-slate-700"
+                                          )}>
+                                            {item.tarefa || item.text || item.task || item.Description || item.Tarefa || item.Atividade || item.atividade || 'Atividade sem descrição'}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    );
+                  } else if (hasPlan) {
+                    return (
+                      <div className="p-6 bg-blue-50 border border-blue-100 rounded-2xl flex flex-col items-center gap-4">
+                        <div className="flex items-center gap-3 text-blue-700">
+                          <AlertCircle className="w-5 h-5" />
+                          <p className="text-sm font-bold">Esta O.S. não possui check-list vinculado.</p>
+                        </div>
+                        <button 
+                          onClick={async () => {
+                            const plan = plans.find(p => p.ID === pId);
+                            if (!plan) {
+                              showToast('Plano não encontrado', 'error');
+                              return;
+                            }
+                            // Fetch checklist from subcollection
+                            const q = query(collection(db, `preventive-plans/${plan.ID}/checklist_itens`));
+                            const snapshot = await getDocs(q);
+                            let items = snapshot.docs.map(doc => {
+                              const data = doc.data();
+                              return {
+                                tarefa: data.tarefa || data.text || data.task || data.Description || data.Tarefa || data.Atividade || data.atividade || 'Atividade sem descrição',
+                                completed: false,
+                                grupo: data.grupo || 'Geral',
+                                equipamento: data.equipamento || 'Geral'
+                              };
+                            });
+                            
+                            if (items.length === 0 && plan.Checklist) {
+                              items = plan.Checklist.map(t => ({ tarefa: t, completed: false, grupo: 'Geral', equipamento: 'Geral' }));
+                            }
+
+                            if (items.length > 0) {
+                              await updateDocument('work-orders', viewingWO.ID, { Checklist: items });
+                              setViewingWO({ ...viewingWO, Checklist: items });
+                              showToast('Check-list sincronizado com sucesso!');
+                            } else {
+                              showToast('O plano vinculado não possui itens de check-list', 'error');
+                            }
+                          }}
+                          className="px-6 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+                        >
+                          Importar Check-list do Plano
+                        </button>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
 
                 {viewingWO.CompletedAt && (
                   <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center space-x-3">
@@ -2732,7 +2920,8 @@ const PreventiveModule = ({
   onDelete,
   showToast,
   isAdmin = false,
-  currentUserUid = ''
+  currentUserUid = '',
+  userRole
 }: { 
   plans: PreventivePlan[], 
   assets: Asset[],
@@ -2741,9 +2930,12 @@ const PreventiveModule = ({
   onDelete: (id: string) => void,
   showToast: (msg: string, type?: 'success' | 'error') => void,
   isAdmin?: boolean,
-  currentUserUid?: string
+  currentUserUid?: string,
+  userRole?: UserProfile['role']
 }) => {
   const [showModal, setShowModal] = useState(false);
+  const [showChecklistModal, setShowChecklistModal] = useState(false);
+  const [selectedPlanForChecklist, setSelectedPlanForChecklist] = useState<PreventivePlan | null>(null);
   const [showSummary, setShowSummary] = useState(false);
   const [showGenerationModal, setShowGenerationModal] = useState(false);
   const [selectedPlanAssets, setSelectedPlanAssets] = useState<Record<string, string[]>>({});
@@ -2875,6 +3067,8 @@ const PreventiveModule = ({
   const togglePlanExpand = (planId: string) => {
     setExpandedPlans(prev => ({ ...prev, [planId]: !prev[planId] }));
   };
+
+  const canManageStructure = hasPermission(userRole, 'manage_checklist_structure');
 
   const handleAssetToggle = (assetId: string) => {
     setNewPlan(prev => {
@@ -3081,8 +3275,24 @@ const PreventiveModule = ({
           if (plan.Collaborators !== undefined && plan.Collaborators !== null) {
             workOrder.Collaborators = Number(plan.Collaborators);
           }
-          if (plan.Checklist && plan.Checklist.length > 0) {
-            workOrder.Checklist = plan.Checklist.map(item => ({ text: item, completed: false }));
+          
+          // Fetch checklist from subcollection if array field is empty
+          let checklistItems = (plan.Checklist || []).map(t => ({ tarefa: t, completed: false }));
+          if (checklistItems.length === 0) {
+            const qCheck = query(collection(db, `preventive-plans/${plan.ID}/checklist_itens`));
+            const snapshot = await getDocs(qCheck);
+            checklistItems = snapshot.docs.map(doc => {
+              const data = doc.data();
+              return {
+                tarefa: data.tarefa || data.text || data.task || data.Description || data.Tarefa || data.Atividade || data.atividade || 'Atividade sem descrição',
+                completed: false,
+                grupo: data.grupo || 'Geral',
+                equipamento: data.equipamento || 'Geral'
+              };
+            });
+          }
+          if (checklistItems.length > 0) {
+            workOrder.Checklist = checklistItems;
           }
 
           count++;
@@ -3152,13 +3362,15 @@ const PreventiveModule = ({
             <Activity className="w-4 h-4" />
             <span>Cronograma</span>
           </button>
-          <button 
-            onClick={() => setShowModal(true)}
-            className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-xl text-xs sm:text-sm font-medium hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Novo</span>
-          </button>
+          {canManageStructure && (
+            <button 
+              onClick={() => setShowModal(true)}
+              className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-xl text-xs sm:text-sm font-medium hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Novo</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -3246,7 +3458,7 @@ const PreventiveModule = ({
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end space-x-2">
-                          {(isAdmin || plan.createdBy === currentUserUid) && (
+                          {canManageStructure && (isAdmin || plan.createdBy === currentUserUid) && (
                             <button 
                               onClick={() => {
                                 setEditingPlan(plan);
@@ -3277,7 +3489,7 @@ const PreventiveModule = ({
                               <Pencil className="w-4 h-4" />
                             </button>
                           )}
-                          {isAdmin && (
+                          {canManageStructure && isAdmin && (
                             <button 
                               onClick={() => onDelete(plan.ID)}
                               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
@@ -3286,6 +3498,16 @@ const PreventiveModule = ({
                               <Trash2 className="w-4 h-4" />
                             </button>
                           )}
+                          <button 
+                            onClick={() => {
+                              setSelectedPlanForChecklist(plan);
+                              setShowChecklistModal(true);
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                            title="Checklist de Manutenção"
+                          >
+                            <ClipboardList className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </motion.tr>
@@ -3522,7 +3744,8 @@ const PreventiveModule = ({
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <fieldset disabled={!canManageStructure} className="space-y-4 border-none p-0 m-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Tipo de Plano</label>
                       <select 
@@ -3852,12 +4075,16 @@ const PreventiveModule = ({
                     )}
                   </div>
 
-                  <button 
-                    type="submit"
-                    className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all mt-4 shadow-lg shadow-blue-200"
-                  >
-                    Salvar Plano
-                  </button>
+                  </fieldset>
+ 
+                  {canManageStructure && (
+                    <button 
+                      type="submit"
+                      className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all mt-4 shadow-lg shadow-blue-200"
+                    >
+                      Salvar Plano
+                    </button>
+                  )}
                 </form>
               </div>
             </motion.div>
@@ -3994,6 +4221,20 @@ const PreventiveModule = ({
           </div>
         )}
       </AnimatePresence>
+
+      {selectedPlanForChecklist && (
+        <ChecklistModal
+          plan={selectedPlanForChecklist}
+          assets={assets}
+          isOpen={showChecklistModal}
+          onClose={() => {
+            setShowChecklistModal(false);
+            setSelectedPlanForChecklist(null);
+          }}
+          userRole={userRole}
+          showToast={showToast}
+        />
+      )}
     </div>
   );
 };
@@ -4336,7 +4577,12 @@ export default function App() {
   const [filters, setFilters] = useState({
     year: new Date().getFullYear().toString(),
     month: (new Date().getMonth() + 1).toString(),
-    viewType: 'Acumulada' as 'Acumulada' | 'Diária'
+    viewType: 'Acumulada' as 'Acumulada' | 'Diária',
+    type: '',
+    machine: '',
+    shift: '',
+    sector: '',
+    part: ''
   });
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [loadingGlobalData, setLoadingGlobalData] = useState(false);
@@ -4694,7 +4940,8 @@ export default function App() {
     hourlyRate: 0,
     totalCost: 0,
     Status: 'Em Aberto',
-    CompletedAt: ''
+    CompletedAt: '',
+    Checklist: []
   });
 
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
@@ -4780,7 +5027,7 @@ export default function App() {
         console.log("User authenticated:", user.uid);
         let profile = await getUserProfile(user.uid);
         if (!profile) {
-          const role = user.email === 'lucas.lds36@gmail.com' ? 'admin' : 'user';
+          const role: UserProfile['role'] = user.email === 'lucas.lds36@gmail.com' ? 'admin' : 'visualizador';
           const defaultPermissions = {
             dashboard: true,
             assets: true,
@@ -4933,7 +5180,7 @@ export default function App() {
     }
   };
 
-  const handleUpdateUserRole = async (uid: string, newRole: 'admin' | 'user') => {
+  const handleUpdateUserRole = async (uid: string, newRole: UserProfile['role']) => {
     if (!isAdmin) return;
     try {
       await updateDocument('users', uid, { role: newRole });
@@ -5146,7 +5393,8 @@ export default function App() {
         hourlyRate: newWO.hourlyRate || 0,
         totalCost: (newWO.Duration || newWO.EstimatedTime || 0) * (newWO.hourlyRate || 0),
         Status: newWO.Status || 'Em Aberto',
-        CompletedAt: newWO.CompletedAt || ''
+        CompletedAt: newWO.CompletedAt || '',
+        Checklist: newWO.Checklist || []
       };
 
       if (editingWO) {
@@ -5199,7 +5447,8 @@ export default function App() {
         PlanID: '',
         Cause: '',
         Status: 'Em Aberto',
-        CompletedAt: ''
+        CompletedAt: '',
+        Checklist: []
       });
     } catch (error) {
       console.error('Error saving work order:', error);
@@ -5243,7 +5492,8 @@ export default function App() {
       PlanID: wo.PlanID || '',
       Cause: wo.Cause || '',
       Status: wo.Status || 'Em Aberto',
-      CompletedAt: wo.CompletedAt || ''
+      CompletedAt: wo.CompletedAt || '',
+      Checklist: wo.Checklist || []
     });
     setShowWOModal(true);
   };
@@ -6362,10 +6612,18 @@ export default function App() {
                               <td className="px-6 py-4">
                                 <div className={cn(
                                   "inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase",
-                                  u.role === 'admin' ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-600"
+                                  u.role === 'admin' ? "bg-indigo-100 text-indigo-700" : 
+                                  u.role === 'planejador' ? "bg-blue-100 text-blue-700" :
+                                  u.role === 'manutentor' ? "bg-emerald-100 text-emerald-700" :
+                                  "bg-slate-100 text-slate-600"
                                 )}>
                                   {u.role === 'admin' ? <ShieldCheck className="w-3 h-3" /> : <UserIcon className="w-3 h-3" />}
-                                  <span>{u.role === 'admin' ? 'Master' : 'Executante'}</span>
+                                  <span>
+                                    {u.role === 'admin' ? 'Administrador' : 
+                                     u.role === 'planejador' ? 'Planejador' :
+                                     u.role === 'manutentor' ? 'Manutentor' :
+                                     'Visualizador'}
+                                  </span>
                                 </div>
                               </td>
                               <td className="px-6 py-4">
@@ -6411,8 +6669,10 @@ export default function App() {
                                       value={u.role}
                                       onChange={(e) => handleUpdateUserRole(u.uid, e.target.value as any)}
                                     >
-                                      <option value="user">Tornar Executante</option>
-                                      <option value="admin">Tornar Master</option>
+                                      <option value="admin">Administrador</option>
+                                      <option value="planejador">Planejador</option>
+                                      <option value="manutentor">Manutentor</option>
+                                      <option value="visualizador">Visualizador</option>
                                     </select>
                                     <select 
                                       className="block w-full text-xs border-none bg-slate-100 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500"
@@ -6532,6 +6792,9 @@ export default function App() {
                     isPlanner={userProfile?.workOrderRole === 'planner' || userProfile?.role === 'admin'}
                     isAdmin={isAdmin}
                     currentUserUid={user?.uid}
+                    userRole={userProfile?.role}
+                    plans={plans}
+                    showToast={showToast}
                     onAdd={() => {
                       setEditingWO(null);
                       setNewWO({
@@ -6609,6 +6872,7 @@ export default function App() {
                     wos={wos}
                     isAdmin={isAdmin}
                     currentUserUid={user?.uid}
+                    userRole={userProfile?.role}
                     onRefresh={() => {}} // Handled by real-time
                     onDelete={handleDeletePreventive}
                     showToast={showToast}
@@ -7348,13 +7612,95 @@ export default function App() {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-1">ID do Plano (Opcional)</label>
-                      <input 
-                        type="text"
-                        placeholder="Ex: PLAN-123"
-                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newWO.PlanID || ''}
-                        onChange={e => setNewWO({...newWO, PlanID: e.target.value})}
-                      />
+                      <div className="flex gap-2">
+                        {newWO.Type === 'Preventiva' ? (
+                          <select 
+                            className="flex-1 px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                            value={newWO.PlanID || ''}
+                            onChange={async (e) => {
+                              const planId = e.target.value;
+                              const selectedPlan = plans.find(p => p.ID === planId);
+                              if (selectedPlan) {
+                                // Fetch checklist from subcollection
+                                const q = query(collection(db, `preventive-plans/${planId}/checklist_itens`));
+                                const snapshot = await getDocs(q);
+                                const items = snapshot.docs.map(doc => {
+                                  const data = doc.data();
+                                  return {
+                                    tarefa: data.tarefa || data.text || data.task || data.Description || data.Tarefa || data.Atividade || data.atividade || 'Atividade sem descrição',
+                                    completed: false,
+                                    grupo: data.grupo || 'Geral',
+                                    equipamento: data.equipamento || 'Geral'
+                                  };
+                                });
+                                
+                                setNewWO({
+                                  ...newWO,
+                                  PlanID: planId,
+                                  Description: `[PREVENTIVA] ${selectedPlan.Task}`,
+                                  Priority: selectedPlan.Criticality || 'Média',
+                                  EstimatedTime: selectedPlan.EstimatedTime || 0,
+                                  Collaborators: selectedPlan.Collaborators || 1,
+                                  Checklist: items.length > 0 ? items : (selectedPlan.Checklist || []).map(t => ({ tarefa: t, completed: false, grupo: 'Geral', equipamento: 'Geral' }))
+                                });
+                              } else {
+                                setNewWO({...newWO, PlanID: planId});
+                              }
+                            }}
+                          >
+                            <option value="">Selecionar Plano...</option>
+                            {plans.filter(p => !newWO.AssetID || p.AssetIDs?.includes(newWO.AssetID) || p.assets?.some(a => a.assetId === newWO.AssetID)).map(p => (
+                              <option key={p.ID} value={p.ID}>{p.ID} - {p.Task}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input 
+                            type="text"
+                            placeholder="Ex: PLAN-123"
+                            className="flex-1 px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                            value={newWO.PlanID || ''}
+                            onChange={e => setNewWO({...newWO, PlanID: e.target.value})}
+                          />
+                        )}
+                        
+                        {(newWO.PlanID || (editingWO && (editingWO as any).planId)) && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const pId = newWO.PlanID || (editingWO as any).planId;
+                              const plan = plans.find(p => p.ID === pId);
+                              if (!plan) {
+                                showToast('Plano não encontrado', 'error');
+                                return;
+                              }
+                              const q = query(collection(db, `preventive-plans/${plan.ID}/checklist_itens`));
+                              const snapshot = await getDocs(q);
+                              const items = snapshot.docs.map(doc => {
+                                const data = doc.data();
+                                return {
+                                  tarefa: data.tarefa || data.text || data.task || data.Description || data.Tarefa || data.Atividade || data.atividade || 'Atividade sem descrição',
+                                  completed: false,
+                                  grupo: data.grupo || 'Geral',
+                                  equipamento: data.equipamento || 'Geral'
+                                };
+                              });
+                              
+                              const finalItems = items.length > 0 ? items : (plan.Checklist || []).map(t => ({ tarefa: t, completed: false, grupo: 'Geral', equipamento: 'Geral' }));
+                              
+                              if (finalItems.length > 0) {
+                                setNewWO({ ...newWO, Checklist: finalItems });
+                                showToast('Check-list importado com sucesso!');
+                              } else {
+                                showToast('O plano não possui itens de check-list', 'error');
+                              }
+                            }}
+                            className="px-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors flex items-center justify-center"
+                            title="Importar Check-list"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -7410,6 +7756,57 @@ export default function App() {
                     <label htmlFor="needsMaterial" className="text-sm font-bold text-slate-700">
                       Necessita Material
                     </label>
+                  </div>
+
+                  {/* Checklist Section */}
+                  <div className="space-y-3 pt-4 border-t border-slate-100">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Checklist de Atividades</label>
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const newItem = { tarefa: '', completed: false };
+                          setNewWO({
+                            ...newWO,
+                            Checklist: [...(newWO.Checklist || []), newItem]
+                          });
+                        }}
+                        className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      {(newWO.Checklist || []).map((item, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <input 
+                            type="text"
+                            placeholder="Descreva a atividade..."
+                            className="flex-1 px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                            value={item.tarefa || (item as any).text || (item as any).task || (item as any).Description || ''}
+                            onChange={e => {
+                              const newList = [...(newWO.Checklist || [])];
+                              newList[index].tarefa = e.target.value;
+                              setNewWO({...newWO, Checklist: newList});
+                            }}
+                          />
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              const newList = (newWO.Checklist || []).filter((_, i) => i !== index);
+                              setNewWO({...newWO, Checklist: newList});
+                            }}
+                            className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                      {(newWO.Checklist || []).length === 0 && (
+                        <p className="text-center py-4 text-xs text-slate-400 italic">Nenhuma atividade adicionada.</p>
+                      )}
+                    </div>
                   </div>
 
                   <button 

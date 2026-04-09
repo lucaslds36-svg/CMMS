@@ -38,7 +38,7 @@ service cloud.firestore {
         (
           (request.auth.token.email == "lucas.lds36@gmail.com") ||
           (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin')
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'visualizador') == 'admin')
         );
     }
 
@@ -73,8 +73,8 @@ service cloud.firestore {
     }
 
     function isValidWorkOrder(data) {
-      return hasOnlyAllowedFields(['ID', 'AssetID', 'assetId', 'PlanID', 'planId', 'TechnicianID', 'technicianId', 'Description', 'Priority', 'priority', 'Type', 'type', 'Nature', 'nature', 'ActivityType', 'activityType', 'Status', 'AssignedTo', 'CreatedAt', 'CompletedAt', 'ScheduledDate', 'StartDate', 'EndDate', 'EstimatedTime', 'Collaborators', 'Duration', 'duration', 'Cause', 'requestedBy', 'dueDate', 'scope', 'needsMaterial', 'id', 'Checklist', 'startDate', 'endDate', 'executorType', 'companyId', 'companyName', 'executorName', 'hourlyRate', 'totalCost']) &&
-             data.ID is string && (data.AssetID is string || data.assetId is string) &&
+      return data.ID is string && data.ID.size() < 100 &&
+             (data.AssetID is string || data.assetId is string) &&
              (data.PlanID is string || !('PlanID' in data)) &&
              (data.TechnicianID is string || !('TechnicianID' in data)) &&
              (data.Priority in ['Baixa', 'Média', 'Alta', 'Crítica'] || data.priority in ['Baixa', 'Média', 'Alta', 'Crítica']) &&
@@ -82,6 +82,10 @@ service cloud.firestore {
              (data.Nature in ['Emergencial', 'Programada', 'Oportunidade'] || data.nature in ['Emergencial', 'Programada', 'Oportunidade'] || (!('Nature' in data) && !('nature' in data))) &&
              (data.ActivityType in ['Lubrificação', 'Inspeção', 'Ajuste', 'Reparo', 'Substituição'] || data.activityType in ['Lubrificação', 'Inspeção', 'Ajuste', 'Reparo', 'Substituição'] || (!('ActivityType' in data) && !('activityType' in data))) &&
              data.Status in ['Em Aberto', 'Em Execução', 'Concluída', 'Cancelada'] &&
+             (data.Description is string && data.Description.size() < 2000 || !('Description' in data)) &&
+             (data.Cause is string && data.Cause.size() < 2000 || !('Cause' in data)) &&
+             (data.scope is string && data.scope.size() < 5000 || !('scope' in data)) &&
+             (data.Checklist is list && data.Checklist.size() < 100 || !('Checklist' in data)) &&
              (data.ScheduledDate is string || !('ScheduledDate' in data)) &&
              (data.StartDate is string || !('StartDate' in data)) &&
              (data.EndDate is string || !('EndDate' in data)) &&
@@ -91,12 +95,9 @@ service cloud.firestore {
              (data.Collaborators is number || !('Collaborators' in data)) &&
              (data.Duration is number || !('Duration' in data)) &&
              (data.duration is number || !('duration' in data)) &&
-             (data.Cause is string || !('Cause' in data)) &&
              (data.requestedBy is string || !('requestedBy' in data)) &&
              (data.dueDate is string || data.dueDate == null || !('dueDate' in data)) &&
-             (data.scope is string || !('scope' in data)) &&
              (data.needsMaterial is bool || !('needsMaterial' in data)) &&
-             (data.Checklist is list || !('Checklist' in data)) &&
              (data.executorType in ['Próprio', 'Terceiro'] || !('executorType' in data)) &&
              (data.companyId is string || !('companyId' in data)) &&
              (data.companyName is string || !('companyName' in data)) &&
@@ -107,8 +108,11 @@ service cloud.firestore {
 
     function isValidPreventivePlan(data) {
       return hasOnlyAllowedFields(['ID', 'AssetID', 'assetId', 'AssetIDs', 'AssetLastDones', 'AssetNextDues', 'Task', 'Frequency', 'FrequencyType', 'frequencyType', 'FrequencyValue', 'frequencyValue', 'LastDone', 'NextDue', 'lastExecutionDate', 'nextExecutionDate', 'Type', 'Criticality', 'AssetType', 'Location', 'Plant', 'EstimatedTime', 'Collaborators', 'Checklist', 'id', 'createdBy', 'scheduleType', 'globalDate', 'assets', 'updatedAt', 'lastDone', 'nextDue']) &&
-             (!('ID' in data) || data.ID is string) &&
+             (!('ID' in data) || (data.ID is string && data.ID.size() < 100)) &&
+             (!('Task' in data) || (data.Task is string && data.Task.size() < 500)) &&
+             (!('Checklist' in data) || (data.Checklist is list && data.Checklist.size() < 100)) &&
              (!('AssetIDs' in data) || data.AssetIDs is list) &&
+             (!('assets' in data) || data.assets is list) &&
              (!('AssetID' in data) || data.AssetID is string) &&
              (!('assetId' in data) || data.assetId is string) &&
              (!('AssetLastDones' in data) || data.AssetLastDones is map) &&
@@ -124,19 +128,17 @@ service cloud.firestore {
              (!('Collaborators' in data) || data.Collaborators is number) &&
              (!('scheduleType' in data) || data.scheduleType in ['global', 'individual']) &&
              (!('globalDate' in data) || data.globalDate is string || data.globalDate == null) &&
-             (!('assets' in data) || data.assets is list) &&
              (!('updatedAt' in data) || data.updatedAt is string) &&
              (!('lastExecutionDate' in data) || data.lastExecutionDate is string) &&
              (!('nextExecutionDate' in data) || data.nextExecutionDate is string) &&
              (!('LastDone' in data) || data.LastDone is string) &&
-             (!('NextDue' in data) || data.NextDue is string) &&
-             (!('Checklist' in data) || data.Checklist is list);
+             (!('NextDue' in data) || data.NextDue is string);
     }
 
     function isValidUser(data) {
       return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'role', 'workOrderRole', 'createdAt', 'permissions']) &&
              data.uid is string && data.email is string &&
-             data.role in ['admin', 'user'] &&
+             data.role in ['admin', 'planejador', 'manutentor', 'visualizador'] &&
              (!('workOrderRole' in data) || data.workOrderRole in ['planner', 'requester']) &&
              (data.photoURL is string || data.photoURL == null) &&
              data.createdAt is string &&
@@ -300,7 +302,13 @@ service cloud.firestore {
     }
 
     function isPlanner() {
-      return isAdmin() || getUserData().get('workOrderRole', 'requester') == 'planner';
+      let role = getUserData().get('role', 'visualizador');
+      return isAdmin() || role == 'planejador' || getUserData().get('workOrderRole', 'requester') == 'planner';
+    }
+
+    function isMaintenanceWorker() {
+      let role = getUserData().get('role', 'visualizador');
+      return isAdmin() || role == 'planejador' || role == 'manutentor';
     }
 
     function isRequester() {
@@ -309,20 +317,24 @@ service cloud.firestore {
 
     match /work-orders/{woId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidWorkOrder(request.resource.data);
-      allow update: if isAdmin() && isValidWorkOrder(request.resource.data);
-      allow update: if isPlanner() && request.auth.uid == resource.data.requestedBy && isValidWorkOrder(request.resource.data);
-      allow update: if isRequester() && request.auth.uid == resource.data.requestedBy && isValidWorkOrder(request.resource.data) &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['Description', 'AssignedTo']);
-      allow update: if isAuthenticated() && request.auth.uid == resource.data.TechnicianID && isValidWorkOrder(request.resource.data);
-      allow delete: if isPlanner() && (isAdmin() || request.auth.uid == resource.data.requestedBy);
+      allow create: if isAdmin() || (isAuthenticated() && isValidWorkOrder(request.resource.data));
+      allow update: if isAdmin();
+      allow update: if isPlanner() && isValidWorkOrder(request.resource.data);
+      allow update: if isMaintenanceWorker() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['Checklist', 'Status', 'CompletedAt', 'Duration', 'duration']) && isValidWorkOrder(request.resource.data);
+      allow delete: if isPlanner();
     }
 
     match /preventive-plans/{planId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidPreventivePlan(request.resource.data);
+      allow create: if isPlanner() && isValidPreventivePlan(request.resource.data);
       allow update: if isPlanner() && isValidPreventivePlan(request.resource.data);
       allow delete: if isAdmin();
+
+      match /checklist_itens/{itemId} {
+        allow read: if isAuthenticated();
+        allow create, update: if (isPlanner() || isMaintenanceWorker()) && isValidChecklistItem(request.resource.data);
+        allow delete: if isPlanner();
+      }
     }
 
     match /employees/{employeeId} {
@@ -370,17 +382,31 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    function isValidChecklistItem(data) {
+      return hasOnlyAllowedFields(['id', 'planoId', 'grupo', 'equipamento', 'tarefa', 'sequencia', 'obrigatoria', 'executado', 'status', 'observacao', 'quantidade', 'material', 'createdAt', 'updatedAt']) &&
+             data.planoId is string &&
+             data.grupo is string && data.grupo.size() < 100 &&
+             data.equipamento is string && data.equipamento.size() < 100 &&
+             data.tarefa is string && data.tarefa.size() < 500 &&
+             data.sequencia is int &&
+             data.executado is bool &&
+             data.status in ['ok', 'regularizado', 'substituido'] &&
+             (!('observacao' in data) || (data.observacao is string && data.observacao.size() < 1000)) &&
+             (!('quantidade' in data) || (data.quantidade is string && data.quantidade.size() < 50)) &&
+             (!('material' in data) || (data.material is string && data.material.size() < 200));
+    }
+
     match /users/{userId} {
       allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
       
-      // Users can create their own profile. Role must be 'user' unless they are the bootstrap admin.
+      // Users can create their own profile. Role must be 'visualizador' unless they are the bootstrap admin.
       allow create: if isOwner(userId) && isValidUser(request.resource.data) &&
-                      (request.resource.data.role == 'user' || request.auth.token.email == "lucas.lds36@gmail.com");
+                      (request.resource.data.role == 'visualizador' || request.auth.token.email == "lucas.lds36@gmail.com");
       
       // Users can update their own profile but NOT their role.
       // Admins can update any user's role and permissions.
       allow update: if (isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role) ||
-                      (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'permissions', 'workOrderRole']) && request.resource.data.role in ['admin', 'user']);
+                      (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'permissions', 'workOrderRole']) && request.resource.data.role in ['admin', 'planejador', 'manutentor', 'visualizador']);
       
       allow delete: if isAdmin();
     }

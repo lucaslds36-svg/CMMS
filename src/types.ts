@@ -44,7 +44,7 @@ export interface WorkOrder {
   Duration?: number;
   duration?: number;
   Cause?: string;
-  Checklist?: { text: string; completed: boolean }[];
+  Checklist?: { tarefa: string; completed: boolean; grupo?: string; equipamento?: string }[];
   requestedBy?: string;
   dueDate?: string | null;
   scope?: string;
@@ -280,10 +280,27 @@ export interface UserProfile {
   email: string;
   displayName: string;
   photoURL: string | null;
-  role: 'admin' | 'user';
+  role: 'admin' | 'planejador' | 'manutentor' | 'visualizador';
   workOrderRole?: 'planner' | 'requester';
   createdAt: string;
   permissions?: UserPermissions;
+}
+
+export interface ChecklistItem {
+  id: string;
+  planoId: string;
+  grupo: string;
+  equipamento: string;
+  tarefa: string;
+  sequencia: number;
+  obrigatoria?: boolean;
+  executado: boolean;
+  status: 'ok' | 'regularizado' | 'substituido';
+  observacao: string;
+  quantidade?: string;
+  material?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Notification {

@@ -89,6 +89,46 @@
         "createdBy": { "type": "string" }
       },
       "required": ["id", "name", "status", "type", "createdAt"]
+    },
+    "ChecklistItem": {
+      "title": "ChecklistItem",
+      "description": "Represents a checklist item for a preventive plan.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "planoId": { "type": "string" },
+        "grupo": { "type": "string" },
+        "equipamento": { "type": "string" },
+        "tarefa": { "type": "string" },
+        "sequencia": { "type": "integer" },
+        "obrigatoria": { "type": "boolean" },
+        "executado": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["ok", "regularizado", "substituido"] },
+        "observacao": { "type": "string" },
+        "quantidade": { "type": "string" },
+        "material": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["planoId", "grupo", "equipamento", "tarefa", "sequencia", "executado", "status"]
+    },
+    "PreventivePlan": {
+      "title": "PreventivePlan",
+      "description": "Represents a preventive maintenance plan.",
+      "type": "object",
+      "properties": {
+        "ID": { "type": "string" },
+        "AssetIDs": { "type": "array" },
+        "Task": { "type": "string" },
+        "Frequency": { "type": "string" },
+        "LastDone": { "type": "string" },
+        "NextDue": { "type": "string" },
+        "Type": { "type": "string" },
+        "Criticality": { "type": "string" },
+        "EstimatedTime": { "type": "number" },
+        "Collaborators": { "type": "number" }
+      },
+      "required": ["ID", "AssetIDs", "Task", "Frequency", "LastDone", "NextDue", "Type", "Criticality"]
     }
   },
   "firestore": {
@@ -107,6 +147,14 @@
     "thirdPartyCompanies/{id}": {
       "schema": "ThirdPartyCompany",
       "description": "Stores third-party companies."
+    },
+    "preventive-plans/{planId}": {
+      "schema": "PreventivePlan",
+      "description": "Stores preventive maintenance plans."
+    },
+    "preventive-plans/{planId}/checklist_itens/{itemId}": {
+      "schema": "ChecklistItem",
+      "description": "Stores checklist items for a specific preventive plan."
     }
   }
 }
