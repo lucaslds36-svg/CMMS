@@ -3,12 +3,16 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   PieChart, Pie, Cell, LabelList 
 } from 'recharts';
-import { Upload, FileSpreadsheet, Filter, X, Eye, Clock, User, Settings, Info, Download, Printer } from 'lucide-react';
+import { Upload, FileSpreadsheet, Filter, X, Eye, Clock, User, Settings, Info, Download, Printer, TrendingUp, Award, PieChart as PieChartIcon, Users, ListFilter, Activity, AlertTriangle as AlertIcon, ArrowUp, ArrowDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
 import { toPng } from 'html-to-image';
 import autoTable from 'jspdf-autotable';
+import { processarAnaliseFalhas, FailureAnalysisOutput } from '../services/failureAnalysisService';
+import { db, createDocument } from '../firebase';
+import { serverTimestamp } from 'firebase/firestore';
+import { cn } from '../lib/utils';
 
 export const FailureAnalysisModule = ({ 
   showToast, 
@@ -36,6 +40,8 @@ export const FailureAnalysisModule = ({
     endDate: ''
   });
   const [selectedRow, setSelectedRow] = useState<any | null>(null);
+  const [activeSubTab, setActiveSubTab] = useState<'resumo' | 'indicadores' | 'ranking' | 'pareto' | 'tendencia' | 'tecnicos' | 'turno'>('resumo');
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
   // Pre-calculate column names once when rawData changes
   const colNames = useMemo(() => {
@@ -61,7 +67,9 @@ export const FailureAnalysisModule = ({
       maquina: findCol(['Máquina', 'Maquina', 'Equipamento', 'Ativo']),
       parte: findCol(['Parte', 'Componente', 'Subconjunto']),
       causa: findCol(['Causa', 'Motivo', 'Falha']),
-      setor: findCol(['Setor', 'Área', 'Area', 'Departamento'])
+      setor: findCol(['Setor', 'Área', 'Area', 'Departamento']),
+      executante: findCol(['Executante', 'Técnico', 'Tecnico', 'Nome', 'Pessoa']),
+      problema: findCol(['Problema', 'Defeito', 'Sintoma'])
     };
   }, [rawData]);
 
@@ -684,10 +692,66 @@ export const FailureAnalysisModule = ({
         if (key === 'Mês') return row._derivedMonth === String(value);
         
         const actualKey = filterColMapping[key];
+        if (!actualKey) return true;
         return String(row[actualKey]) === String(value);
       });
     });
   }, [rawDataWithDates, filters, filterColMapping]);
+
+  // Advanced Analysis
+  const advancedAnalysis = useMemo(() => {
+    return processarAnaliseFalhas(filteredData);
+  }, [filteredData]);
+
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'desc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = 'asc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedIndicadores = useMemo(() => {
+    let sortableItems = [...advancedAnalysis.indicadoresEquipamentos];
+    if (sortConfig !== null) {
+      sortableItems.sort((a: any, b: any) => {
+        let aVal = a[sortConfig.key];
+        let bVal = b[sortConfig.key];
+        
+        if (typeof aVal === 'string' && !isNaN(Number(aVal))) aVal = Number(aVal);
+        if (typeof bVal === 'string' && !isNaN(Number(bVal))) bVal = Number(bVal);
+
+        if (aVal < bVal) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (aVal > bVal) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [advancedAnalysis.indicadoresEquipamentos, sortConfig]);
+
+  // Save indicators to Firestore when data changes
+  useEffect(() => {
+    if (advancedAnalysis.indicadoresEquipamentos.length > 0) {
+      const saveIndicators = async () => {
+        try {
+          const indicadoresToSave = advancedAnalysis.indicadoresEquipamentos.map(({ falhas, ...rest }) => rest);
+          await createDocument('indicadores_manutencao', {
+            indicadores: indicadoresToSave,
+            resumo: advancedAnalysis.resumo,
+            updatedAt: serverTimestamp(),
+            timestamp: new Date().toISOString()
+          });
+        } catch (error) {
+          console.error('Error saving indicators to Firestore:', error);
+        }
+      };
+      saveIndicators();
+    }
+  }, [advancedAnalysis]);
 
   const aggregateData = (groupBy: string, sumBy: string, countBy?: string) => {
     const result: Record<string, any> = {};
@@ -818,6 +882,7 @@ export const FailureAnalysisModule = ({
         <>
           {/* Filtros Dinâmicos */}
           <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+            {/* ... existing filters ... */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-2 text-slate-700 font-medium text-sm">
                 <Filter className="w-4 h-4" />
@@ -957,8 +1022,393 @@ export const FailureAnalysisModule = ({
             </div>
           </div>
 
-          {/* Gráficos */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Sub-Tabs Navigation */}
+          <div className="flex flex-wrap gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm overflow-x-auto">
+            {[
+              { id: 'resumo', label: 'Resumo', icon: Activity },
+              { id: 'indicadores', label: 'Indicadores', icon: ListFilter },
+              { id: 'ranking', label: 'Ranking', icon: Award },
+              { id: 'pareto', label: 'Pareto', icon: PieChartIcon },
+              { id: 'tendencia', label: 'Tendência', icon: TrendingUp },
+              { id: 'tecnicos', label: 'Técnicos', icon: Users },
+              { id: 'turno', label: 'Turno', icon: Clock },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveSubTab(tab.id as any)}
+                className={cn(
+                  "flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all",
+                  activeSubTab === tab.id 
+                    ? "bg-blue-600 text-white shadow-lg shadow-blue-200" 
+                    : "text-slate-500 hover:bg-slate-50"
+                )}
+              >
+                <tab.icon className="w-3.5 h-3.5" />
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Sub-Tabs Content */}
+          <div className="space-y-6">
+            {activeSubTab === 'resumo' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Total de Falhas</p>
+                  <h4 className="text-2xl font-black text-slate-900">{advancedAnalysis.resumo.totalFalhas}</h4>
+                  <div className="mt-2 text-[10px] text-slate-500">Ocorrências no período</div>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Tempo Total Reparo</p>
+                  <h4 className="text-2xl font-black text-orange-600">{advancedAnalysis.resumo.tempoTotalReparo}h</h4>
+                  <div className="mt-2 text-[10px] text-slate-500">Horas paradas totais</div>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">MTBF Médio</p>
+                  <h4 className="text-2xl font-black text-blue-600">{advancedAnalysis.resumo.mtbfMedio}h</h4>
+                  <div className="mt-2 text-[10px] text-slate-500">Média entre equipamentos</div>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Equipamentos Críticos</p>
+                  <h4 className="text-2xl font-black text-rose-600">{advancedAnalysis.resumo.equipamentosCriticos}</h4>
+                  <div className="mt-2 text-[10px] text-slate-500">Mais de 6 falhas no período</div>
+                </div>
+              </div>
+            )}
+
+            {activeSubTab === 'indicadores' && (
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                  <h4 className="font-bold text-slate-700">Indicadores por Equipamento</h4>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        <th 
+                          className="px-4 py-3 font-bold text-slate-600 cursor-pointer hover:bg-slate-100 transition-colors"
+                          onClick={() => handleSort('name')}
+                        >
+                          <div className="flex items-center space-x-1">
+                            <span>Equipamento</span>
+                            {sortConfig?.key === 'name' && (
+                              sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                            )}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-4 py-3 font-bold text-slate-600 text-center cursor-pointer hover:bg-slate-100 transition-colors"
+                          onClick={() => handleSort('totalFalhas')}
+                        >
+                          <div className="flex items-center justify-center space-x-1">
+                            <span>Falhas</span>
+                            {sortConfig?.key === 'totalFalhas' && (
+                              sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                            )}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-4 py-3 font-bold text-slate-600 text-center cursor-pointer hover:bg-slate-100 transition-colors"
+                          onClick={() => handleSort('mtbf')}
+                        >
+                          <div className="flex items-center justify-center space-x-1">
+                            <span>MTBF</span>
+                            {sortConfig?.key === 'mtbf' && (
+                              sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                            )}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-4 py-3 font-bold text-slate-600 text-center cursor-pointer hover:bg-slate-100 transition-colors"
+                          onClick={() => handleSort('mttr')}
+                        >
+                          <div className="flex items-center justify-center space-x-1">
+                            <span>MTTR</span>
+                            {sortConfig?.key === 'mttr' && (
+                              sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                            )}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-4 py-3 font-bold text-slate-600 text-center cursor-pointer hover:bg-slate-100 transition-colors"
+                          onClick={() => handleSort('indiceFalha')}
+                        >
+                          <div className="flex items-center justify-center space-x-1">
+                            <span>Índice Falha</span>
+                            {sortConfig?.key === 'indiceFalha' && (
+                              sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                            )}
+                          </div>
+                        </th>
+                        <th 
+                          className="px-4 py-3 font-bold text-slate-600 text-center cursor-pointer hover:bg-slate-100 transition-colors"
+                          onClick={() => handleSort('status')}
+                        >
+                          <div className="flex items-center justify-center space-x-1">
+                            <span>Status</span>
+                            {sortConfig?.key === 'status' && (
+                              sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                            )}
+                          </div>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {sortedIndicadores.map((eq, i) => (
+                        <tr key={i} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3 font-bold text-slate-700">{eq.name}</td>
+                          <td className="px-4 py-3 text-center">{eq.totalFalhas}</td>
+                          <td className="px-4 py-3 text-center font-mono">{eq.mtbf}h</td>
+                          <td className="px-4 py-3 text-center font-mono">{eq.mttr}h</td>
+                          <td className="px-4 py-3 text-center font-mono">{eq.indiceFalha}</td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={cn(
+                              "px-2 py-1 rounded-md text-[10px] font-bold uppercase",
+                              eq.status === 'Crítico' ? "bg-rose-100 text-rose-600" :
+                              eq.status === 'Atenção' ? "bg-amber-100 text-amber-600" :
+                              "bg-emerald-100 text-emerald-600"
+                            )}>
+                              {eq.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeSubTab === 'ranking' && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                  <h4 className="font-bold text-slate-700 mb-4">Top 10 Mais Falhas</h4>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={advancedAnalysis.rankingFalhas.slice(0, 10)} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                        <XAxis type="number" />
+                        <YAxis dataKey="name" type="category" width={100} fontSize={10} />
+                        <Tooltip />
+                        <Bar 
+                          dataKey="totalFalhas" 
+                          fill="#1e3a8a" 
+                          radius={[0, 4, 4, 0]} 
+                          onClick={(data) => handleChartClick('Máquina', String(data.name))}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                  <h4 className="font-bold text-slate-700 mb-4">Top 10 Maior Tempo Parado</h4>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={[...advancedAnalysis.indicadoresEquipamentos].sort((a,b) => b.tempoTotalReparo - a.tempoTotalReparo).slice(0, 10)} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                        <XAxis type="number" />
+                        <YAxis dataKey="name" type="category" width={100} fontSize={10} />
+                        <Tooltip />
+                        <Bar 
+                          dataKey="tempoTotalReparo" 
+                          fill="#f97316" 
+                          radius={[0, 4, 4, 0]} 
+                          onClick={(data) => handleChartClick('Máquina', String(data.name))}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSubTab === 'pareto' && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                  <h4 className="font-bold text-slate-700 mb-4">Pareto por Causa</h4>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie 
+                          data={advancedAnalysis.paretoCausas.slice(0, 5)} 
+                          dataKey="value" 
+                          nameKey="name" 
+                          cx="50%" cy="50%" outerRadius={60} label
+                          onClick={(data) => handleChartClick('Causa', String(data.name))}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          {advancedAnalysis.paretoCausas.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                  <h4 className="font-bold text-slate-700 mb-4">Pareto por Problema</h4>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie 
+                          data={advancedAnalysis.paretoProblemas.slice(0, 5)} 
+                          dataKey="value" 
+                          nameKey="name" 
+                          cx="50%" cy="50%" outerRadius={60} label
+                          onClick={(data) => handleChartClick('Problema', String(data.name))}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          {advancedAnalysis.paretoProblemas.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                  <h4 className="font-bold text-slate-700 mb-4">Pareto por Parte</h4>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie 
+                          data={advancedAnalysis.paretoPartes.slice(0, 5)} 
+                          dataKey="value" 
+                          nameKey="name" 
+                          cx="50%" cy="50%" outerRadius={60} label
+                          onClick={(data) => handleChartClick('Parte', String(data.name))}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          {advancedAnalysis.paretoPartes.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSubTab === 'tendencia' && (
+              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <h4 className="font-bold text-slate-700 mb-4">Tendência Mensal de Falhas</h4>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={advancedAnalysis.tendenciaMensal}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="month" fontSize={10} />
+                      <YAxis fontSize={10} />
+                      <Tooltip />
+                      <Bar 
+                        dataKey="falhas" 
+                        fill="#3b82f6" 
+                        radius={[4, 4, 0, 0]} 
+                        onClick={(data: any) => {
+                          const monthIndex = parseInt(String(data.month).split('-')[1], 10) - 1;
+                          const monthsNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+                          handleChartClick('Mês', monthsNames[monthIndex]);
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {activeSubTab === 'tecnicos' && (
+              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <h4 className="font-bold text-slate-700 mb-4">Análise por Técnico</h4>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={advancedAnalysis.analiseTecnico.slice(0, 10)} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                        <XAxis type="number" />
+                        <YAxis dataKey="name" type="category" width={100} fontSize={10} />
+                        <Tooltip />
+                        <Bar 
+                          dataKey="atendimentos" 
+                          name="Atendimentos" 
+                          fill="#10b981" 
+                          radius={[0, 4, 4, 0]} 
+                          onClick={(data) => handleChartClick('Executante', String(data.name))}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={advancedAnalysis.analiseTecnico.slice(0, 10)} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                        <XAxis type="number" />
+                        <YAxis dataKey="name" type="category" width={100} fontSize={10} />
+                        <Tooltip />
+                        <Bar 
+                          dataKey="tempoMedio" 
+                          name="MTTR (h)" 
+                          fill="#f59e0b" 
+                          radius={[0, 4, 4, 0]} 
+                          onClick={(data) => handleChartClick('Executante', String(data.name))}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSubTab === 'turno' && (
+              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <h4 className="font-bold text-slate-700 mb-4">Análise por Turno</h4>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={advancedAnalysis.analiseTurno}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="name" fontSize={10} />
+                        <YAxis fontSize={10} />
+                        <Tooltip />
+                        <Bar 
+                          dataKey="totalFalhas" 
+                          name="Falhas" 
+                          fill="#6366f1" 
+                          radius={[4, 4, 0, 0]} 
+                          onClick={(data) => handleChartClick('Turno', String(data.name))}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={advancedAnalysis.analiseTurno}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="name" fontSize={10} />
+                        <YAxis fontSize={10} />
+                        <Tooltip />
+                        <Bar 
+                          dataKey="tempoMedio" 
+                          name="MTTR (h)" 
+                          fill="#ec4899" 
+                          radius={[4, 4, 0, 0]} 
+                          onClick={(data) => handleChartClick('Turno', String(data.name))}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Gráficos Originais (Ocultos ou Mantidos conforme regra de não alterar funcionalidade atual) */}
+          <div className="pt-12 border-t border-slate-200">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* ... existing charts ... */}
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
               <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Grupo (Tipo)</h4>
               <div className="h-96 failure-analysis-chart">
@@ -1064,7 +1514,15 @@ export const FailureAnalysisModule = ({
                     >
                       <LabelList dataKey={horasCol} position="right" fontSize={12} fontWeight="bold" formatter={(val: any) => `${val}h`} />
                     </Bar>
-                    <Bar dataKey="paradas" name="Número paradas" fill="#1e3a8a" barSize={20} isAnimationActive={false}>
+                    <Bar 
+                      dataKey="paradas" 
+                      name="Número paradas" 
+                      fill="#1e3a8a" 
+                      barSize={20} 
+                      isAnimationActive={false}
+                      onClick={(data) => handleChartClick('Máquina', String(data.name))}
+                      style={{ cursor: 'pointer' }}
+                    >
                       <LabelList dataKey="paradas" position="right" fontSize={12} fontWeight="bold" />
                     </Bar>
                   </BarChart>
@@ -1097,7 +1555,15 @@ export const FailureAnalysisModule = ({
                     >
                       <LabelList dataKey={horasCol} position="right" fontSize={12} fontWeight="bold" formatter={(val: any) => `${val}h`} />
                     </Bar>
-                    <Bar dataKey="paradas" name="Número Paradas" fill="#1e3a8a" barSize={20} isAnimationActive={false}>
+                    <Bar 
+                      dataKey="paradas" 
+                      name="Número Paradas" 
+                      fill="#1e3a8a" 
+                      barSize={20} 
+                      isAnimationActive={false}
+                      onClick={(data) => handleChartClick('Parte', String(data.name))}
+                      style={{ cursor: 'pointer' }}
+                    >
                       <LabelList dataKey="paradas" position="right" fontSize={12} fontWeight="bold" />
                     </Bar>
                   </BarChart>
@@ -1134,6 +1600,7 @@ export const FailureAnalysisModule = ({
               </div>
             </div>
           </div>
+        </div>
 
           {/* Histórico de Ações Table */}
           <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">

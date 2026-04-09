@@ -416,6 +416,11 @@ service cloud.firestore {
       allow write: if isAuthenticated();
     }
 
+    match /indicadores_manutencao/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
     match /test/connection {
       allow read: if true;
     }
