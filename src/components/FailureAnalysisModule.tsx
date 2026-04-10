@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
 import { toPng } from 'html-to-image';
 import autoTable from 'jspdf-autotable';
-import { processarAnaliseFalhas, FailureAnalysisOutput } from '../services/failureAnalysisService';
+import { processarAnaliseFalhas, FailureAnalysisOutput, parseHours } from '../services/failureAnalysisService';
 import { db, createDocument } from '../firebase';
 import { serverTimestamp } from 'firebase/firestore';
 import { cn } from '../lib/utils';
@@ -155,37 +155,6 @@ export const FailureAnalysisModule = ({
       return upperPossible.some(p => s.includes(p));
     });
     return partial || possibleNames[0];
-  };
-
-  const parseHours = (val: any) => {
-    if (val === undefined || val === null || val === '-' || val === '') return 0;
-    
-    // If it's a number, it's likely a decimal hour (e.g. 0.49)
-    if (typeof val === 'number') {
-      // Excel serial time check: if it's a fraction of a day and the column is likely Time formatted
-      // But based on user feedback, it's already decimal hours (0.49)
-      return val;
-    }
-    
-    if (typeof val === 'string') {
-      const s = val.trim().replace(',', '.');
-      
-      // Handle HH:MM or HH:MM:SS (e.g. "01:30" or "01:30:00")
-      if (s.includes(':')) {
-        const parts = s.split(':').map(Number);
-        if (parts.length >= 2 && !parts.some(isNaN)) {
-          const h = parts[0];
-          const m = parts[1];
-          const s = parts[2] || 0;
-          return h + (m / 60) + (s / 3600);
-        }
-      }
-      
-      const num = parseFloat(s);
-      return isNaN(num) ? 0 : num;
-    }
-    
-    return 0;
   };
 
   useEffect(() => {
@@ -698,10 +667,26 @@ export const FailureAnalysisModule = ({
     });
   }, [rawDataWithDates, filters, filterColMapping]);
 
+  // Prepare chart data
+  const horasCol = useMemo(() => {
+    if (rawData.length === 0) return 'Horas';
+    const keys = Object.keys(rawData[0]);
+    // Prioritize exact matches or common names
+    const priorityKeys = ['HORA', 'HORAS', 'DURAÇÃO', 'DURACAO', 'TEMPO', 'HR', 'HORA PARADA', 'HORA DE PARADA'];
+    const foundPriority = keys.find(k => priorityKeys.includes(k.toUpperCase()));
+    if (foundPriority) return foundPriority;
+
+    const found = keys.find(k => {
+      const s = k.toLowerCase();
+      return s.includes('hora') || s.includes('duração') || s.includes('duracao') || s.includes('tempo') || s.includes('parada');
+    });
+    return found || 'Horas';
+  }, [rawData]);
+
   // Advanced Analysis
   const advancedAnalysis = useMemo(() => {
-    return processarAnaliseFalhas(filteredData);
-  }, [filteredData]);
+    return processarAnaliseFalhas(filteredData, horasCol);
+  }, [filteredData, horasCol]);
 
   const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'desc';
@@ -776,22 +761,6 @@ export const FailureAnalysisModule = ({
       }))
       .sort((a, b) => b[sumBy] - a[sumBy]);
   };
-
-  // Prepare chart data
-  const horasCol = useMemo(() => {
-    if (rawData.length === 0) return 'Horas';
-    const keys = Object.keys(rawData[0]);
-    // Prioritize exact matches or common names
-    const priorityKeys = ['HORA', 'HORAS', 'DURAÇÃO', 'DURACAO', 'TEMPO', 'HR', 'HORA PARADA', 'HORA DE PARADA'];
-    const foundPriority = keys.find(k => priorityKeys.includes(k.toUpperCase()));
-    if (foundPriority) return foundPriority;
-
-    const found = keys.find(k => {
-      const s = k.toLowerCase();
-      return s.includes('hora') || s.includes('duração') || s.includes('duracao') || s.includes('tempo') || s.includes('parada');
-    });
-    return found || 'Horas';
-  }, [rawData]);
 
   const totalHoras = useMemo(() => {
     const total = filteredData.reduce((acc, row) => {

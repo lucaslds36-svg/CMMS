@@ -17,7 +17,34 @@ export interface FailureAnalysisOutput {
   };
 }
 
-export const processarAnaliseFalhas = (rawData: any[]): FailureAnalysisOutput => {
+export const parseHours = (val: any) => {
+  if (val === undefined || val === null || val === '-' || val === '') return 0;
+  
+  if (typeof val === 'number') {
+    return val;
+  }
+  
+  if (typeof val === 'string') {
+    const s = val.trim().replace(',', '.');
+    
+    if (s.includes(':')) {
+      const parts = s.split(':').map(Number);
+      if (parts.length >= 2 && !parts.some(isNaN)) {
+        const h = parts[0];
+        const m = parts[1];
+        const sec = parts[2] || 0;
+        return h + (m / 60) + (sec / 3600);
+      }
+    }
+    
+    const num = parseFloat(s);
+    return isNaN(num) ? 0 : num;
+  }
+  
+  return 0;
+};
+
+export const processarAnaliseFalhas = (rawData: any[], horasColName?: string): FailureAnalysisOutput => {
   if (!Array.isArray(rawData) || rawData.length === 0) {
     return {
       indicadoresEquipamentos: [],
@@ -102,21 +129,20 @@ export const processarAnaliseFalhas = (rawData: any[]): FailureAnalysisOutput =>
     dataFim = parseDateTime(dataStr, horaFimStr);
 
     let tempoReparo = 0;
-    if (dataInicio && dataFim && isValid(dataInicio) && isValid(dataFim) && horaInicioStr && horaFimStr) {
+    
+    // First try to use the explicit duration column if provided
+    let duracaoVal = horasColName ? row[horasColName] : null;
+    
+    // Fallback to searching for a duration column
+    if (duracaoVal === undefined || duracaoVal === null || duracaoVal === '') {
+      duracaoVal = getCol(row, ['hora', 'duração', 'duracao', 'tempo', 'hr', 'parada']);
+    }
+
+    if (duracaoVal !== undefined && duracaoVal !== null && duracaoVal !== '') {
+      tempoReparo = parseHours(duracaoVal);
+    } else if (dataInicio && dataFim && isValid(dataInicio) && isValid(dataFim) && horaInicioStr && horaFimStr) {
+      // If no duration column is found, calculate from start and end times
       tempoReparo = Math.max(0, differenceInHours(dataFim, dataInicio) + (dataFim.getMinutes() - dataInicio.getMinutes()) / 60);
-    } else {
-      // Fallback: check if there's a duration column
-      const duracao = getCol(row, ['hora', 'duração', 'duracao', 'tempo', 'hr', 'parada']);
-      if (typeof duracao === 'number') tempoReparo = duracao;
-      else if (typeof duracao === 'string') {
-        // Handle strings like "02:30" or "2,5"
-        if (duracao.includes(':')) {
-           const parts = duracao.split(':').map(Number);
-           tempoReparo = (parts[0] || 0) + (parts[1] || 0) / 60;
-        } else {
-           tempoReparo = parseFloat(duracao.replace(',', '.')) || 0;
-        }
-      }
     }
 
     return {
