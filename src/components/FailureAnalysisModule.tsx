@@ -43,6 +43,18 @@ export const FailureAnalysisModule = ({
   const [activeSubTab, setActiveSubTab] = useState<'resumo' | 'indicadores' | 'ranking' | 'pareto' | 'tendencia' | 'tecnicos' | 'turno'>('resumo');
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [showPdfModal, setShowPdfModal] = useState(false);
+  const [pdfConfig, setPdfConfig] = useState({
+    header: true,
+    filters: true,
+    currentTab: true,
+    chartGrupo: true,
+    chartSetor: true,
+    chartMaquina: true,
+    chartParte: true,
+    chartCausa: true,
+    history: true
+  });
 
   // Pre-calculate column names once when rawData changes
   const colNames = useMemo(() => {
@@ -395,7 +407,10 @@ export const FailureAnalysisModule = ({
       const element = document.getElementById('pdf-print-area');
       if (!element) throw new Error('Área de impressão não encontrada');
 
-      const blocks = Array.from(element.querySelectorAll('.pdf-block'));
+      const blocks = Array.from(element.querySelectorAll('.pdf-block')).filter(el => {
+        // Ignora blocos que estão explicitamente com 'display: none' via classe 'hidden'
+        return window.getComputedStyle(el).display !== 'none';
+      });
       
       if (blocks.length === 0) {
         // Fallback pra tela inteira se não houver blocos
@@ -732,6 +747,84 @@ export const FailureAnalysisModule = ({
 
   return (
     <>
+      {showPdfModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[99999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h3 className="font-bold text-slate-800">Configurar Impressão PDF</h3>
+              <button onClick={() => setShowPdfModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+              <p className="text-xs text-slate-500 mb-4">Selecione quais seções você deseja incluir no relatório.</p>
+              
+              <div className="space-y-3">
+                <label className="flex items-center space-x-3 cursor-pointer">
+                  <input type="checkbox" checked={pdfConfig.header} onChange={(e) => setPdfConfig({...pdfConfig, header: e.target.checked})} className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4" />
+                  <span className="text-sm font-medium text-slate-700">Cabeçalho (Resumo Global)</span>
+                </label>
+                <label className="flex items-center space-x-3 cursor-pointer">
+                  <input type="checkbox" checked={pdfConfig.filters} onChange={(e) => setPdfConfig({...pdfConfig, filters: e.target.checked})} className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4" />
+                  <span className="text-sm font-medium text-slate-700">Filtros Aplicados</span>
+                </label>
+                <label className="flex items-center space-x-3 cursor-pointer">
+                  <input type="checkbox" checked={pdfConfig.currentTab} onChange={(e) => setPdfConfig({...pdfConfig, currentTab: e.target.checked})} className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4" />
+                  <span className="text-sm font-medium text-slate-700">Aba Atual: <span className="capitalize">{activeSubTab}</span></span>
+                </label>
+              </div>
+
+              <div className="pt-3 pb-1 border-t border-slate-100">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Gráficos de Pareto</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex items-center space-x-3 cursor-pointer">
+                    <input type="checkbox" checked={pdfConfig.chartGrupo} onChange={(e) => setPdfConfig({...pdfConfig, chartGrupo: e.target.checked})} className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4" />
+                    <span className="text-sm text-slate-600">Por Grupo</span>
+                  </label>
+                  <label className="flex items-center space-x-3 cursor-pointer">
+                    <input type="checkbox" checked={pdfConfig.chartSetor} onChange={(e) => setPdfConfig({...pdfConfig, chartSetor: e.target.checked})} className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4" />
+                    <span className="text-sm text-slate-600">Por Setor</span>
+                  </label>
+                  <label className="flex items-center space-x-3 cursor-pointer">
+                    <input type="checkbox" checked={pdfConfig.chartMaquina} onChange={(e) => setPdfConfig({...pdfConfig, chartMaquina: e.target.checked})} className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4" />
+                    <span className="text-sm text-slate-600">Por Máquina</span>
+                  </label>
+                  <label className="flex items-center space-x-3 cursor-pointer">
+                    <input type="checkbox" checked={pdfConfig.chartParte} onChange={(e) => setPdfConfig({...pdfConfig, chartParte: e.target.checked})} className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4" />
+                    <span className="text-sm text-slate-600">Por Parte</span>
+                  </label>
+                  <label className="flex items-center space-x-3 cursor-pointer col-span-2">
+                    <input type="checkbox" checked={pdfConfig.chartCausa} onChange={(e) => setPdfConfig({...pdfConfig, chartCausa: e.target.checked})} className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4" />
+                    <span className="text-sm text-slate-600">Por Causa</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="pt-3 pb-1 border-t border-slate-100">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Tabela de Eventos</p>
+                <label className="flex items-center space-x-3 cursor-pointer">
+                  <input type="checkbox" checked={pdfConfig.history} onChange={(e) => setPdfConfig({...pdfConfig, history: e.target.checked})} className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4" />
+                  <span className="text-sm font-medium text-slate-700">Histórico de Ações (Últimos 50)</span>
+                </label>
+              </div>
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 shrink-0">
+              <button onClick={() => setShowPdfModal(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors">Cancelar</button>
+              <button 
+                onClick={() => {
+                  setShowPdfModal(false);
+                  generatePDF();
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-md shadow-blue-200 hover:bg-blue-700 hover:shadow-lg transition-all flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Gerar PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Loading Overlay for PDF Generation - MUST be outside the print area */}
       {isGeneratingPDF && (
         <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center">
@@ -743,7 +836,7 @@ export const FailureAnalysisModule = ({
 
       <div className="space-y-6 relative" id="pdf-print-area">
         {/* CABEÇALHO */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm pdf-block">
+        <div className={cn("flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm pdf-block", isGeneratingPDF && !pdfConfig.header && "hidden")}>
         <div className="flex-1">
           <h3 className="text-xl font-bold text-slate-900">Análise de Falhas (BI)</h3>
           {rawData.length > 0 && (
@@ -797,7 +890,7 @@ export const FailureAnalysisModule = ({
       ) : (
         <>
           {/* Filtros Dinâmicos */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm pdf-block">
+          <div className={cn("bg-white p-4 rounded-2xl border border-slate-100 shadow-sm pdf-block", isGeneratingPDF && !pdfConfig.filters && "hidden")}>
             {/* ... existing filters ... */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-2 text-slate-700 font-medium text-sm">
@@ -806,7 +899,7 @@ export const FailureAnalysisModule = ({
               </div>
             <div className="flex items-center space-x-4" data-html2canvas-ignore="true">
               <button 
-                onClick={generatePDF}
+                onClick={() => setShowPdfModal(true)}
                 className="text-xs text-emerald-600 hover:text-emerald-700 flex items-center space-x-1 font-bold bg-emerald-50 px-3 py-1.5 rounded-lg transition-all"
               >
                 <Download className="w-3.5 h-3.5" />
@@ -938,8 +1031,8 @@ export const FailureAnalysisModule = ({
             </div>
           </div>
 
-          {/* Sub-Tabs Navigation */}
-          <div className="flex flex-wrap gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm overflow-x-auto pdf-block">
+          {/* Sub-Tabs Navigation (Always hide during PDF to not clutter) */}
+          <div className="flex flex-wrap gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm overflow-x-auto pdf-block" data-html2canvas-ignore="true">
             {[
               { id: 'resumo', label: 'Resumo', icon: Activity },
               { id: 'indicadores', label: 'Indicadores', icon: ListFilter },
@@ -966,7 +1059,7 @@ export const FailureAnalysisModule = ({
           </div>
 
           {/* Sub-Tabs Content */}
-          <div className="space-y-6">
+          <div className={cn("space-y-6", isGeneratingPDF && !pdfConfig.currentTab && "hidden")}>
             {activeSubTab === 'resumo' && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pdf-block">
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
@@ -1349,208 +1442,216 @@ export const FailureAnalysisModule = ({
           <div className="pt-12 border-t border-slate-200 space-y-6">
             
             {/* Linha 1 */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pdf-block">
-              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Grupo (Tipo)</h4>
-                <div className="failure-analysis-chart min-h-[400px]" data-pdf-title="Hr. Parada / Grupo (Tipo)">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={400}>
-                  <BarChart 
-                    layout="vertical"
-                    data={grupoData}
-                    margin={{ top: 5, right: 40, left: 40, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                    <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={120} fontSize={12} interval={0} />
-                    <Tooltip cursor={{fill: 'transparent'}} />
-                    <Bar 
-                      dataKey={horasCol} 
-                      name="Horas Paradas" 
-                      fill="#f97316" 
-                      barSize={30} 
-                      isAnimationActive={false}
-                      onClick={(data) => handleChartClick('Grupo', String(data.name))}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <LabelList dataKey={horasCol} position="right" fontSize={12} fontWeight="bold" formatter={(val: any) => `${val}h`} />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+            <div className={cn("grid grid-cols-1 lg:grid-cols-2 gap-6 pdf-block", isGeneratingPDF && (!pdfConfig.chartGrupo && !pdfConfig.chartSetor) && "hidden")}>
+              {(!isGeneratingPDF || pdfConfig.chartGrupo) && (
+                <div className={cn("bg-white p-6 rounded-2xl border border-slate-100 shadow-sm", isGeneratingPDF && !pdfConfig.chartSetor && "lg:col-span-2")}>
+                  <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Grupo (Tipo)</h4>
+                  <div className="failure-analysis-chart min-h-[400px]" data-pdf-title="Hr. Parada / Grupo (Tipo)">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={400}>
+                      <BarChart 
+                        layout="vertical"
+                        data={grupoData}
+                        margin={{ top: 5, right: 40, left: 40, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                        <XAxis type="number" />
+                        <YAxis dataKey="name" type="category" width={120} fontSize={12} interval={0} />
+                        <Tooltip cursor={{fill: 'transparent'}} />
+                        <Bar 
+                          dataKey={horasCol} 
+                          name="Horas Paradas" 
+                          fill="#f97316" 
+                          barSize={30} 
+                          isAnimationActive={false}
+                          onClick={(data) => handleChartClick('Grupo', String(data.name))}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <LabelList dataKey={horasCol} position="right" fontSize={12} fontWeight="bold" formatter={(val: any) => `${val}h`} />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
 
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-              <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Setor (Elétrico vs Mecânico)</h4>
-              <div className="failure-analysis-chart min-h-[400px]" data-pdf-title="Hr. Parada / Setor (Elétrico vs Mecânico)">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={400}>
-                  <PieChart>
-                    <Pie
-                      data={setorData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={true}
-                      isAnimationActive={false}
-                      label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
-                        if (percent <= 0.05) return null;
-                        const RADIAN = Math.PI / 180;
-                        const radius = outerRadius * 1.1;
-                        const x = cx + radius * Math.cos(-midAngle * RADIAN);
-                        const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                        return (
-                          <text 
-                            x={x} 
-                            y={y} 
-                            fill="#334155" 
-                            textAnchor={x > cx ? 'start' : 'end'} 
-                            dominantBaseline="central"
-                            fontSize={12}
-                            fontWeight="bold"
-                          >
-                            {`${name}: ${(percent * 100).toFixed(0)}%`}
-                          </text>
-                        );
-                      }}
-                      outerRadius={120}
-                      fill="#8884d8"
-                      dataKey={horasCol}
-                      onClick={(data) => handleChartClick('Setor', String(data.name))}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      {setorData.map((entry, index) => (
-                        <Cell 
-                          key={`cell-${index}`} 
-                          fill={SECTOR_COLORS[String(entry.name)] || COLORS[index % COLORS.length]} 
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value: any) => [`${value}h`, 'Horas Paradas']} />
-                    <Legend verticalAlign="bottom" height={36}/>
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+              {(!isGeneratingPDF || pdfConfig.chartSetor) && (
+                <div className={cn("bg-white p-6 rounded-2xl border border-slate-100 shadow-sm", isGeneratingPDF && !pdfConfig.chartGrupo && "lg:col-span-2")}>
+                  <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Setor (Elétrico vs Mecânico)</h4>
+                  <div className="failure-analysis-chart min-h-[400px]" data-pdf-title="Hr. Parada / Setor (Elétrico vs Mecânico)">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={400}>
+                      <PieChart>
+                        <Pie
+                          data={setorData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={true}
+                          isAnimationActive={false}
+                          label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
+                            if (percent <= 0.05) return null;
+                            const RADIAN = Math.PI / 180;
+                            const radius = outerRadius * 1.1;
+                            const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                            const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                            return (
+                              <text 
+                                x={x} 
+                                y={y} 
+                                fill="#334155" 
+                                textAnchor={x > cx ? 'start' : 'end'} 
+                                dominantBaseline="central"
+                                fontSize={12}
+                                fontWeight="bold"
+                              >
+                                {`${name}: ${(percent * 100).toFixed(0)}%`}
+                              </text>
+                            );
+                          }}
+                          outerRadius={120}
+                          fill="#8884d8"
+                          dataKey={horasCol}
+                          onClick={(data) => handleChartClick('Setor', String(data.name))}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          {setorData.map((entry, index) => (
+                            <Cell 
+                              key={`cell-${index}`} 
+                              fill={SECTOR_COLORS[String(entry.name)] || COLORS[index % COLORS.length]} 
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value: any) => [`${value}h`, 'Horas Paradas']} />
+                        <Legend verticalAlign="bottom" height={36}/>
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Linha 2 */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pdf-block">
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-              <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Máquina</h4>
-              <div className="failure-analysis-chart min-h-[400px]" data-pdf-title="Hr. Parada / Máquina">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={400}>
-                  <BarChart 
-                    layout="vertical"
-                    data={maquinaData}
-                    margin={{ top: 5, right: 40, left: 40, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                    <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={120} fontSize={12} interval={0} />
-                    <Tooltip cursor={{fill: 'transparent'}} />
-                    <Legend />
-                    <Bar 
-                      dataKey={horasCol} 
-                      name="Hr. Total Parada" 
-                      fill="#f97316" 
-                      barSize={20} 
-                      isAnimationActive={false}
-                      onClick={(data) => handleChartClick('Máquina', String(data.name))}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <LabelList dataKey={horasCol} position="right" fontSize={12} fontWeight="bold" formatter={(val: any) => `${val}h`} />
-                    </Bar>
-                    <Bar 
-                      dataKey="paradas" 
-                      name="Número paradas" 
-                      fill="#1e3a8a" 
-                      barSize={20} 
-                      isAnimationActive={false}
-                      onClick={(data) => handleChartClick('Máquina', String(data.name))}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <LabelList dataKey="paradas" position="right" fontSize={12} fontWeight="bold" />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+            <div className={cn("grid grid-cols-1 lg:grid-cols-2 gap-6 pdf-block", isGeneratingPDF && (!pdfConfig.chartMaquina && !pdfConfig.chartParte) && "hidden")}>
+              {(!isGeneratingPDF || pdfConfig.chartMaquina) && (
+                <div className={cn("bg-white p-6 rounded-2xl border border-slate-100 shadow-sm", isGeneratingPDF && !pdfConfig.chartParte && "lg:col-span-2")}>
+                  <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Máquina</h4>
+                  <div className="failure-analysis-chart min-h-[400px]" data-pdf-title="Hr. Parada / Máquina">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={400}>
+                      <BarChart 
+                        layout="vertical"
+                        data={maquinaData}
+                        margin={{ top: 5, right: 40, left: 40, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                        <XAxis type="number" />
+                        <YAxis dataKey="name" type="category" width={120} fontSize={12} interval={0} />
+                        <Tooltip cursor={{fill: 'transparent'}} />
+                        <Legend />
+                        <Bar 
+                          dataKey={horasCol} 
+                          name="Hr. Total Parada" 
+                          fill="#f97316" 
+                          barSize={20} 
+                          isAnimationActive={false}
+                          onClick={(data) => handleChartClick('Máquina', String(data.name))}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <LabelList dataKey={horasCol} position="right" fontSize={12} fontWeight="bold" formatter={(val: any) => `${val}h`} />
+                        </Bar>
+                        <Bar 
+                          dataKey="paradas" 
+                          name="Número paradas" 
+                          fill="#1e3a8a" 
+                          barSize={20} 
+                          isAnimationActive={false}
+                          onClick={(data) => handleChartClick('Máquina', String(data.name))}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <LabelList dataKey="paradas" position="right" fontSize={12} fontWeight="bold" />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
 
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-              <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Parte</h4>
-              <div className="failure-analysis-chart min-h-[400px]" data-pdf-title="Hr. Parada / Parte">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={400}>
-                  <BarChart 
-                    layout="vertical"
-                    data={parteData}
-                    margin={{ top: 5, right: 40, left: 40, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                    <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={180} fontSize={12} interval={0} />
-                    <Tooltip cursor={{fill: 'transparent'}} />
-                    <Legend />
-                    <Bar 
-                      dataKey={horasCol} 
-                      name="Horas Paradas" 
-                      fill="#f97316" 
-                      barSize={20} 
-                      isAnimationActive={false}
-                      onClick={(data) => handleChartClick('Parte', String(data.name))}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <LabelList dataKey={horasCol} position="right" fontSize={12} fontWeight="bold" formatter={(val: any) => `${val}h`} />
-                    </Bar>
-                    <Bar 
-                      dataKey="paradas" 
-                      name="Número Paradas" 
-                      fill="#1e3a8a" 
-                      barSize={20} 
-                      isAnimationActive={false}
-                      onClick={(data) => handleChartClick('Parte', String(data.name))}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <LabelList dataKey="paradas" position="right" fontSize={12} fontWeight="bold" />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+              {(!isGeneratingPDF || pdfConfig.chartParte) && (
+                <div className={cn("bg-white p-6 rounded-2xl border border-slate-100 shadow-sm", isGeneratingPDF && !pdfConfig.chartMaquina && "lg:col-span-2")}>
+                  <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Parte</h4>
+                  <div className="failure-analysis-chart min-h-[400px]" data-pdf-title="Hr. Parada / Parte">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={400}>
+                      <BarChart 
+                        layout="vertical"
+                        data={parteData}
+                        margin={{ top: 5, right: 40, left: 40, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                        <XAxis type="number" />
+                        <YAxis dataKey="name" type="category" width={180} fontSize={12} interval={0} />
+                        <Tooltip cursor={{fill: 'transparent'}} />
+                        <Legend />
+                        <Bar 
+                          dataKey={horasCol} 
+                          name="Horas Paradas" 
+                          fill="#f97316" 
+                          barSize={20} 
+                          isAnimationActive={false}
+                          onClick={(data) => handleChartClick('Parte', String(data.name))}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <LabelList dataKey={horasCol} position="right" fontSize={12} fontWeight="bold" formatter={(val: any) => `${val}h`} />
+                        </Bar>
+                        <Bar 
+                          dataKey="paradas" 
+                          name="Número Paradas" 
+                          fill="#1e3a8a" 
+                          barSize={20} 
+                          isAnimationActive={false}
+                          onClick={(data) => handleChartClick('Parte', String(data.name))}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <LabelList dataKey="paradas" position="right" fontSize={12} fontWeight="bold" />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Linha 3 */}
-            <div className="grid grid-cols-1 gap-6 pdf-block">
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-              <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Causa</h4>
-              <div className="failure-analysis-chart min-h-[400px]" data-pdf-title="Hr. Parada / Causa">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={400}>
-                  <BarChart 
-                    layout="vertical"
-                    data={causaData}
-                    margin={{ top: 5, right: 40, left: 40, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                    <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={180} fontSize={12} interval={0} />
-                    <Tooltip cursor={{fill: 'transparent'}} />
-                    <Bar 
-                      dataKey={horasCol} 
-                      name="Horas Paradas" 
-                      fill="#f97316" 
-                      barSize={30} 
-                      isAnimationActive={false}
-                      onClick={(data) => handleChartClick('Causa', String(data.name))}
-                      style={{ cursor: 'pointer' }}
+            <div className={cn("grid grid-cols-1 gap-6 pdf-block", isGeneratingPDF && !pdfConfig.chartCausa && "hidden")}>
+              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Causa</h4>
+                <div className="failure-analysis-chart min-h-[400px]" data-pdf-title="Hr. Parada / Causa">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={400}>
+                    <BarChart 
+                      layout="vertical"
+                      data={causaData}
+                      margin={{ top: 5, right: 40, left: 40, bottom: 5 }}
                     >
-                      <LabelList dataKey={horasCol} position="right" fontSize={12} fontWeight="bold" formatter={(val: any) => `${val}h`} />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                      <XAxis type="number" />
+                      <YAxis dataKey="name" type="category" width={180} fontSize={12} interval={0} />
+                      <Tooltip cursor={{fill: 'transparent'}} />
+                      <Bar 
+                        dataKey={horasCol} 
+                        name="Horas Paradas" 
+                        fill="#f97316" 
+                        barSize={30} 
+                        isAnimationActive={false}
+                        onClick={(data) => handleChartClick('Causa', String(data.name))}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <LabelList dataKey={horasCol} position="right" fontSize={12} fontWeight="bold" formatter={(val: any) => `${val}h`} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-            </div>
             </div>
           </div>
 
           {/* Histórico de Ações Table */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm pdf-block">
+          <div className={cn("bg-white p-6 rounded-2xl border border-slate-100 shadow-sm pdf-block", isGeneratingPDF && !pdfConfig.history && "hidden")}>
             <h4 className="font-bold text-slate-700 mb-4">Histórico de Ações (Últimos 50 registros)</h4>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm border-collapse">
