@@ -15,7 +15,8 @@ import {
   Eye,
   Clock,
   Download,
-  Box
+  Box,
+  Edit
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -155,6 +156,7 @@ export const ImprovementManagementModule = ({
 
   const [activeSubModal, setActiveSubModal] = useState<{type: 'task' | 'adjustment' | 'indicator' | 'comment', mode: 'create' | 'edit', data?: any} | null>(null);
   const [subItemData, setSubItemData] = useState<any>({});
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'project' | 'task' | 'adjustment' | 'indicator' | 'comment', id: string, name?: string } | null>(null);
 
   useEffect(() => {
     if (activeSubModal?.mode === 'edit') {
@@ -243,6 +245,46 @@ export const ImprovementManagementModule = ({
     setSubItemData({});
   };
 
+  const handleDeleteSubItem = async (type: 'task' | 'adjustment' | 'indicator' | 'comment', id: string) => {
+    setDeleteConfirm({ type, id });
+  };
+
+  const confirmDeleteAction = async () => {
+    if (!deleteConfirm) return;
+    
+    if (deleteConfirm.type === 'project') {
+      try {
+        await onDelete(deleteConfirm.id);
+        showToast('Projeto excluído com sucesso!', 'success');
+      } catch (error) {
+        showToast('Erro ao excluir projeto', 'error');
+      }
+      setDeleteConfirm(null);
+      return;
+    }
+
+    if (!selectedProject) return;
+
+    const collectionName = deleteConfirm.type === 'task' ? 'tasks' : deleteConfirm.type === 'adjustment' ? 'adjustments' : 'indicators';
+    
+    let currentList = [...(selectedProject[collectionName as keyof EngineeringProject] as any[] || [])];
+    const updatedList = currentList.filter(item => item.id !== deleteConfirm.id);
+    const sanitizedList = updatedList.map(item => sanitize(item));
+
+    try {
+      await updateDocument('engineering-projects', selectedProject.id, {
+        [collectionName]: sanitizedList,
+        updatedAt: new Date().toISOString()
+      });
+      showToast('Item excluído com sucesso!', 'success');
+    } catch (error) {
+      console.error('Erro ao excluir item:', error);
+      showToast('Erro ao excluir item', 'error');
+    }
+    
+    setDeleteConfirm(null);
+  };
+
   const filteredProjects = useMemo(() => {
     return projects.filter(project => {
       const matchesSearch = (project.title || '').toLowerCase().includes(search.toLowerCase()) || 
@@ -251,6 +293,37 @@ export const ImprovementManagementModule = ({
       return matchesSearch && matchesStatus;
     });
   }, [projects, search, filterStatus]);
+
+  const renderDeleteConfirmModal = () => {
+    if (!deleteConfirm) return null;
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+        <div className="bg-white p-6 rounded-3xl w-full max-w-sm flex flex-col items-center text-center shadow-xl">
+          <div className="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mb-4">
+            <Trash2 className="w-8 h-8 text-rose-600" />
+          </div>
+          <h3 className="text-xl font-bold text-slate-900 mb-2">Confirmar Exclusão</h3>
+          <p className="text-slate-600 mb-6">
+            Tem certeza que deseja excluir permanentemente {deleteConfirm.type === 'project' ? 'este projeto' : 'este item'}? Esta ação não pode ser desfeita.
+          </p>
+          <div className="flex justify-center gap-3 w-full">
+            <button 
+              onClick={() => setDeleteConfirm(null)} 
+              className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button 
+              onClick={confirmDeleteAction} 
+              className="flex-1 px-4 py-3 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 transition-colors"
+            >
+              Excluir
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const renderSubItemModal = () => {
     if (!activeSubModal) return null;
@@ -435,8 +508,7 @@ export const ImprovementManagementModule = ({
   };
 
   if (selectedProject && modalMode === 'view') {
-    const projectFromList = projects.find(p => p.id === selectedProject.id);
-    const project = projectFromList || selectedProject;
+    const project = selectedProject;
     
     const testStartDate = project.testStartDate ? new Date(project.testStartDate) : null;
     const testDays = testStartDate && !isNaN(testStartDate.getTime()) ? differenceInDays(new Date(), testStartDate) : 0;
@@ -593,11 +665,12 @@ export const ImprovementManagementModule = ({
                     <th className="px-6 py-4 font-semibold uppercase tracking-wider text-[10px]">Data Planejada</th>
                     <th className="px-6 py-4 font-semibold uppercase tracking-wider text-[10px]">Investimento Unit.</th>
                     <th className="px-6 py-4 font-semibold uppercase tracking-wider text-[10px]">Status</th>
+                    <th className="px-6 py-4 font-semibold uppercase tracking-wider text-[10px] text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {project.tasks?.map(task => (
-                    <tr key={task.id} onClick={() => setActiveSubModal({type: 'task', mode: 'edit', data: task})} className="group cursor-pointer hover:bg-blue-50/30 transition-colors">
+                    <tr key={task.id} className="group hover:bg-blue-50/30 transition-colors">
                       <td className="px-6 py-4 font-medium text-slate-700">{task.name}</td>
                       <td className="px-6 py-4 text-slate-600">{task.responsible}</td>
                       <td className="px-6 py-4 text-slate-600">
@@ -606,11 +679,11 @@ export const ImprovementManagementModule = ({
                       <td className="px-6 py-4 font-mono text-slate-700">
                         R$ {task.investmentValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
                       </td>
-                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-6 py-4">
                         <select 
                           value={task.status ?? 'Pendente'}
                           onChange={(e) => handleUpdateTaskStatus(task.id, e.target.value as any)}
-                          className={`px-3 py-1.5 rounded-full text-[10px] font-bold border-none outline-none cursor-pointer transition-all ${
+                          className={`px-3 py-1.5 rounded-full text-[10px] font-bold border border-slate-200 outline-none cursor-pointer transition-all ${
                             task.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 
                             task.status === 'Em andamento' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : 
                             'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -620,6 +693,22 @@ export const ImprovementManagementModule = ({
                           <option value="Em andamento">Em andamento</option>
                           <option value="Concluído">Concluído</option>
                         </select>
+                      </td>
+                      <td className="px-6 py-4 text-right space-x-2">
+                        <button 
+                          onClick={() => setActiveSubModal({type: 'task', mode: 'edit', data: task})} 
+                          className="p-2 text-slate-400 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors"
+                          title="Editar"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteSubItem('task', task.id)} 
+                          className="p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-colors"
+                          title="Excluir"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -685,6 +774,7 @@ export const ImprovementManagementModule = ({
           </div>
           
           {activeSubModal && renderSubItemModal()}
+          {renderDeleteConfirmModal()}
 
           {/* Card: Encerramento */}
           <div className="bg-white p-6 rounded-3xl shadow-sm col-span-1 lg:col-span-2 space-y-4">
@@ -975,9 +1065,7 @@ export const ImprovementManagementModule = ({
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button className="p-1.5 bg-rose-500 text-white rounded hover:bg-rose-600" onClick={() => {
-                          if (window.confirm('Tem certeza que deseja excluir este projeto?')) {
-                            onDelete(project.id);
-                          }
+                          setDeleteConfirm({ type: 'project', id: project.id });
                         }}>
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -990,6 +1078,7 @@ export const ImprovementManagementModule = ({
           </tbody>
         </table>
       </div>
+      {renderDeleteConfirmModal()}
     </div>
   );
 };
