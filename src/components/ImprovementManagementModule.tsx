@@ -245,8 +245,17 @@ export const ImprovementManagementModule = ({
     setSubItemData({});
   };
 
-  const handleDeleteSubItem = async (type: 'task' | 'adjustment' | 'indicator' | 'comment', id: string) => {
-    setDeleteConfirm({ type, id });
+  const toggleAssetCompletion = async (assetId: string) => {
+    if (!selectedProject || !selectedProject.assets) return;
+
+    const updatedAssets = selectedProject.assets.map(asset => 
+      asset.id === assetId ? { ...asset, completed: !asset.completed } : asset
+    );
+
+    await updateDocument('engineering-projects', selectedProject.id, {
+      assets: updatedAssets,
+      updatedAt: new Date().toISOString()
+    });
   };
 
   const confirmDeleteAction = async () => {
@@ -847,10 +856,14 @@ export const ImprovementManagementModule = ({
             {project.assets && project.assets.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 {project.assets.map((asset, idx) => (
-                  <div key={idx} className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                    <p className="font-bold text-slate-900 text-sm">{asset.tag}</p>
-                    <p className="text-xs text-slate-500">{asset.model} - {asset.description}</p>
-                  </div>
+                  <button 
+                    key={idx}
+                    onClick={() => toggleAssetCompletion(asset.id)}
+                    className={`p-3 rounded-2xl border transition-colors ${asset.completed ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-100 hover:bg-slate-100'}`}
+                  >
+                    <p className={`font-bold text-sm ${asset.completed ? 'text-emerald-900' : 'text-slate-900'}`}>{asset.tag}</p>
+                    <p className={`text-xs ${asset.completed ? 'text-emerald-700' : 'text-slate-500'}`}>{asset.model} - {asset.description}</p>
+                  </button>
                 ))}
               </div>
             ) : (

@@ -177,7 +177,7 @@ export interface EngineeringProject {
   title: string;
   assetId: string;
   assetName: string;
-  assets?: { id: string, tag: string, model: string, description: string }[];
+  assets?: { id: string, tag: string, model: string, description: string, completed?: boolean }[];
   description: string;
   objective: string;
   indicator: string;
