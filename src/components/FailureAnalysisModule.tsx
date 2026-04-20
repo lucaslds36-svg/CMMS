@@ -409,7 +409,6 @@ export const FailureAnalysisModule = ({
       const renderWidth = pageWidth - (margin * 2);
 
       let currentY = margin;
-      let isFirstPage = true;
 
       for (let i = 0; i < blocks.length; i++) {
         const block = blocks[i] as HTMLElement;
@@ -432,24 +431,45 @@ export const FailureAnalysisModule = ({
         });
 
         const imgProps = doc.getImageProperties(imgData);
-        const imgHeight = (imgProps.height * renderWidth) / imgProps.width;
+        const imgHeightMm = (imgProps.height * renderWidth) / imgProps.width;
 
-        // Se o bloco sozinho for maior que uma página (ex: tabela gigante)
-        if (imgHeight > pageHeight - margin * 2) {
-          if (currentY > margin) {
-            doc.addPage();
-            currentY = margin;
-          }
-          
+        // Caso 1: O bloco cabe perfeitamente no espaço que sobrou da página atual
+        if (currentY + imgHeightMm <= pageHeight - margin) {
+          doc.addImage(imgData, 'PNG', margin, currentY, renderWidth, imgHeightMm);
+          currentY += imgHeightMm + 5;
+        } 
+        // Caso 2: O bloco é menor que uma página inteira, mas NÃO cabe no espaço que sobrou.
+        // Solução: Pula para a próxima página para não fatiar o gráfico no meio.
+        else if (imgHeightMm <= pageHeight - margin * 2) {
+          doc.addPage();
+          currentY = margin;
+          doc.addImage(imgData, 'PNG', margin, currentY, renderWidth, imgHeightMm);
+          currentY += imgHeightMm + 5;
+        } 
+        // Caso 3: O bloco é GIGANTE (ex: Tabela Histórico com 50 itens). Maior que uma folha inteira.
+        // Solução: Fatiar inteligentemente, aproveitando o espaço da página atual para não deixar um buraco branco.
+        else {
           let yOffsetPixels = 0;
           const pxToMm = renderWidth / imgProps.width;
-          const pageHeightPx = (pageHeight - margin * 2) / pxToMm;
 
           while (yOffsetPixels < imgProps.height) {
+            const availableMm = pageHeight - currentY - margin;
+            
+            // Se o espaço restante for muito pequeno (menos de 2cm), melhor ir para a próxima página 
+            // logo para não fatiar de forma feia (ex: pegar só a ponta do cabeçalho da tabela)
+            if (availableMm < 20) {
+              doc.addPage();
+              currentY = margin;
+              continue;
+            }
+
+            const availablePx = availableMm / pxToMm;
+            const sliceHeightPx = Math.min(availablePx, imgProps.height - yOffsetPixels);
+
             const canvas = document.createElement('canvas');
             canvas.width = imgProps.width;
-            canvas.height = Math.min(pageHeightPx, imgProps.height - yOffsetPixels);
-
+            canvas.height = sliceHeightPx;
+            
             const ctx = canvas.getContext('2d');
             if (ctx) {
               const sourceImage = new Image();
@@ -466,27 +486,19 @@ export const FailureAnalysisModule = ({
               const sliceData = canvas.toDataURL('image/png', 1.0);
               const sliceRenderHeight = canvas.height * pxToMm;
 
-              if (!isFirstPage && yOffsetPixels > 0) doc.addPage();
-              doc.addImage(sliceData, 'PNG', margin, margin, renderWidth, sliceRenderHeight);
-              yOffsetPixels += pageHeightPx;
+              doc.addImage(sliceData, 'PNG', margin, currentY, renderWidth, sliceRenderHeight);
+              yOffsetPixels += canvas.height;
+              currentY += sliceRenderHeight;
               
-              if (yOffsetPixels >= imgProps.height) {
-                 currentY = margin + sliceRenderHeight + 5;
+              if (yOffsetPixels < imgProps.height) {
+                 doc.addPage();
+                 currentY = margin;
               }
-              isFirstPage = false;
             } else {
               break;
             }
           }
-        } else {
-          // Bloco normal
-          if (currentY + imgHeight > pageHeight - margin) {
-            doc.addPage();
-            currentY = margin;
-          }
-          doc.addImage(imgData, 'PNG', margin, currentY, renderWidth, imgHeight);
-          currentY += imgHeight + 5;
-          isFirstPage = false;
+          currentY += 5; // espaço após terminar a tabela gigante
         }
       }
 
