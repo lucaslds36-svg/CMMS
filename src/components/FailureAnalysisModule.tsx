@@ -42,6 +42,7 @@ export const FailureAnalysisModule = ({
   const [selectedRow, setSelectedRow] = useState<any | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'resumo' | 'indicadores' | 'ranking' | 'pareto' | 'tendencia' | 'tecnicos' | 'turno'>('resumo');
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   // Pre-calculate column names once when rawData changes
   const colNames = useMemo(() => {
@@ -383,197 +384,120 @@ export const FailureAnalysisModule = ({
       return;
     }
 
-    if (showToast) showToast('Gerando relatório PDF profissional...', 'success');
-
-    // Wait for UI to settle
-    await new Promise(resolve => setTimeout(resolve, 800));
+    if (showToast) showToast('Gerando relatório da aba atual...', 'success');
+    
+    setIsGeneratingPDF(true);
 
     try {
+      // Wait for React to apply isGeneratingPDF state
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      const element = document.getElementById('pdf-print-area');
+      if (!element) throw new Error('Área de impressão não encontrada');
+
+      const blocks = Array.from(element.querySelectorAll('.pdf-block'));
+      
+      if (blocks.length === 0) {
+        // Fallback pra tela inteira se não houver blocos
+        blocks.push(element);
+      }
+
       const doc = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      
-      // Professional Header
-      doc.setFillColor(30, 58, 138); 
-      doc.rect(0, 0, pageWidth, 25, 'F');
-      
-      doc.setFontSize(20);
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold');
-      doc.text('RELATÓRIO DE ANÁLISE DE FALHAS', pageWidth / 2, 16, { align: 'center' });
-      
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, pageWidth - 15, 20, { align: 'right' });
-      
-      let currentY = 35;
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const margin = 10;
+      const renderWidth = pageWidth - (margin * 2);
 
-      // Stats Section
-      doc.setTextColor(30, 58, 138);
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Resumo Executivo', 15, currentY);
-      
-      currentY += 8;
-      doc.setDrawColor(226, 232, 240);
-      doc.line(15, currentY, pageWidth - 15, currentY);
-      
-      currentY += 10;
-      doc.setFontSize(11);
-      doc.setTextColor(51, 65, 85);
-      doc.setFont('helvetica', 'normal');
-      
-      doc.setFillColor(248, 250, 252);
-      doc.roundedRect(15, currentY, 85, 20, 2, 2, 'F');
-      doc.roundedRect(110, currentY, 85, 20, 2, 2, 'F');
-      
-      doc.setFont('helvetica', 'bold');
-      doc.text('Total de Horas Paradas', 20, currentY + 7);
-      doc.text('Total de Ocorrências', 115, currentY + 7);
-      
-      doc.setFontSize(14);
-      doc.setTextColor(30, 58, 138);
-      doc.text(`${totalHoras}h`, 20, currentY + 15);
-      doc.text(`${filteredData.length}`, 115, currentY + 15);
-      
-      currentY += 30;
+      let currentY = margin;
+      let isFirstPage = true;
 
-      // Filters summary
-      const activeFilters = Object.entries(filters).filter(([_, v]) => v !== '');
-      if (activeFilters.length > 0) {
-        doc.setFontSize(12);
-        doc.setTextColor(30, 58, 138);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Parâmetros de Seleção', 15, currentY);
-        currentY += 6;
-        doc.setFontSize(9);
-        doc.setTextColor(71, 85, 105);
-        doc.setFont('helvetica', 'normal');
-        
-        const filterTexts = activeFilters.map(([k, v]) => `${k}: ${v}`).join('  |  ');
-        const splitFilters = doc.splitTextToSize(filterTexts, pageWidth - 30);
-        doc.text(splitFilters, 15, currentY);
-        currentY += (splitFilters.length * 5) + 10;
-      }
+      for (let i = 0; i < blocks.length; i++) {
+        const block = blocks[i] as HTMLElement;
 
-      // Capture charts
-      doc.setFontSize(14);
-      doc.setTextColor(30, 58, 138);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Análise Gráfica', 15, currentY);
-      currentY += 10;
-
-      const chartContainers = document.querySelectorAll('.failure-analysis-chart');
-      const chartTitles = [
-        'Hr. Parada / Grupo (Tipo)',
-        'Hr. Parada / Setor (Elétrico vs Mecânico)',
-        'Hr. Parada / Máquina',
-        'Hr. Parada / Parte',
-        'Hr. Parada / Causa'
-      ];
-      
-      for (let i = 0; i < chartContainers.length; i++) {
-        // Maximize width to page margins (210mm - 20mm = 190mm)
-        const imgWidth = 190;
-        // Increase height for better visibility
-        const imgHeight = 135; 
-        const spacing = 10;
-        const xPos = (pageWidth - imgWidth) / 2;
-
-        // Check if we need a new page before adding the title and chart
-        // Title (8mm) + Chart (135mm) + Margin (10mm)
-        if (currentY + imgHeight + 15 > pageHeight - 15) {
-          doc.addPage();
-          currentY = 20;
-        }
-        
-        doc.setFontSize(12);
-        doc.setTextColor(30, 58, 138);
-        doc.setFont('helvetica', 'bold');
-        doc.text(chartTitles[i] || `Gráfico ${i + 1}`, 15, currentY);
-        currentY += 8;
-
-        try {
-          const element = chartContainers[i] as HTMLElement;
-          
-          // Use toPng with high quality and stable dimensions
-          // We use a 16:9-ish aspect ratio for the capture to match the PDF dimensions
-          const imgData = await toPng(element, {
-            quality: 1,
-            pixelRatio: 3,
-            backgroundColor: '#ffffff',
-            width: 1400, 
-            height: 900, 
-            style: {
-              padding: '30px', 
-              margin: '0',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center'
+        const imgData = await toPng(block, {
+          quality: 1,
+          pixelRatio: 2,
+          backgroundColor: '#f8fafc',
+          skipFonts: true,
+          style: {
+            margin: '0',
+            transform: 'none'
+          },
+          filter: (node) => {
+            if (node instanceof HTMLElement && node.dataset && node.dataset.html2canvasIgnore === 'true') {
+              return false;
             }
-          });
+            return true;
+          }
+        });
+
+        const imgProps = doc.getImageProperties(imgData);
+        const imgHeight = (imgProps.height * renderWidth) / imgProps.width;
+
+        // Se o bloco sozinho for maior que uma página (ex: tabela gigante)
+        if (imgHeight > pageHeight - margin * 2) {
+          if (currentY > margin) {
+            doc.addPage();
+            currentY = margin;
+          }
           
-          doc.addImage(imgData, 'PNG', xPos, currentY, imgWidth, imgHeight);
-          currentY += imgHeight + spacing;
-        } catch (err) {
-          console.error(`Failed to capture chart ${i}:`, err);
-          doc.setFontSize(10);
-          doc.setTextColor(239, 68, 68);
-          doc.text(`[Erro na renderização do gráfico ${i + 1}]`, 20, currentY + 10);
-          currentY += 20;
+          let yOffsetPixels = 0;
+          const pxToMm = renderWidth / imgProps.width;
+          const pageHeightPx = (pageHeight - margin * 2) / pxToMm;
+
+          while (yOffsetPixels < imgProps.height) {
+            const canvas = document.createElement('canvas');
+            canvas.width = imgProps.width;
+            canvas.height = Math.min(pageHeightPx, imgProps.height - yOffsetPixels);
+
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              const sourceImage = new Image();
+              sourceImage.src = imgData;
+              await new Promise(resolve => {
+                sourceImage.onload = () => {
+                  ctx.fillStyle = '#f8fafc';
+                  ctx.fillRect(0, 0, canvas.width, canvas.height);
+                  ctx.drawImage(sourceImage, 0, yOffsetPixels, imgProps.width, canvas.height, 0, 0, canvas.width, canvas.height);
+                  resolve(null);
+                };
+              });
+              
+              const sliceData = canvas.toDataURL('image/png', 1.0);
+              const sliceRenderHeight = canvas.height * pxToMm;
+
+              if (!isFirstPage && yOffsetPixels > 0) doc.addPage();
+              doc.addImage(sliceData, 'PNG', margin, margin, renderWidth, sliceRenderHeight);
+              yOffsetPixels += pageHeightPx;
+              
+              if (yOffsetPixels >= imgProps.height) {
+                 currentY = margin + sliceRenderHeight + 5;
+              }
+              isFirstPage = false;
+            } else {
+              break;
+            }
+          }
+        } else {
+          // Bloco normal
+          if (currentY + imgHeight > pageHeight - margin) {
+            doc.addPage();
+            currentY = margin;
+          }
+          doc.addImage(imgData, 'PNG', margin, currentY, renderWidth, imgHeight);
+          currentY += imgHeight + 5;
+          isFirstPage = false;
         }
       }
 
-      // Action History Table
-      doc.addPage();
-      currentY = 20;
-      doc.setFontSize(14);
-      doc.setTextColor(30, 58, 138);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Histórico Detalhado de Ocorrências', 15, currentY);
-      
-      const tableData = filteredData.map(row => [
-        formatDate(row['Data'] || row['Dia'] || row['Date']),
-        row['Máquina'] || row['Maquina'] || row['Equipamento'] || '-',
-        row['Setor'] || row['Área'] || '-',
-        row['Causa'] || row['Motivo'] || '-',
-        `${parseHours(row[horasCol]).toFixed(2)}h`,
-        row['Descrição'] || row['Descricao'] || '-'
-      ]);
-
-      autoTable(doc, {
-        head: [['Data', 'Máquina', 'Setor', 'Causa', 'Horas', 'Descrição']],
-        body: tableData,
-        startY: currentY + 10,
-        styles: { fontSize: 8, cellPadding: 2 },
-        headStyles: { fillColor: [30, 58, 138], textColor: [255, 255, 255], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-        columnStyles: {
-          0: { cellWidth: 20 },
-          1: { cellWidth: 25 },
-          2: { cellWidth: 20 },
-          3: { cellWidth: 25 },
-          4: { cellWidth: 15 },
-          5: { cellWidth: 'auto' }
-        },
-        margin: { left: 15, right: 15 }
-      });
-      
-      // Add page numbers to all pages
-      const totalPages = doc.internal.pages.length - 1;
-      for (let j = 1; j <= totalPages; j++) {
-        doc.setPage(j);
-        doc.setFontSize(8);
-        doc.setTextColor(148, 163, 184);
-        doc.text(`Página ${j} de ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
-      }
-
-      doc.save(`Relatorio_Analise_Falhas_${new Date().getTime()}.pdf`);
+      doc.save(`Relatorio_${activeSubTab}_${new Date().getTime()}.pdf`);
 
       if (showToast) showToast('Relatório PDF gerado com sucesso!', 'success');
     } catch (error) {
       console.error('Error generating PDF:', error);
       if (showToast) showToast('Erro ao gerar relatório PDF.', 'error');
+    } finally {
+      setIsGeneratingPDF(false);
     }
   };
 
@@ -795,8 +719,19 @@ export const FailureAnalysisModule = ({
   }, [rawData]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+    <>
+      {/* Loading Overlay for PDF Generation - MUST be outside the print area */}
+      {isGeneratingPDF && (
+        <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600 mb-6 shadow-lg"></div>
+          <h2 className="text-3xl font-black text-slate-800">Montando Relatório Profissional...</h2>
+          <p className="text-slate-500 mt-3 font-medium text-lg">Por favor, aguarde a captura dos gráficos e tabelas.</p>
+        </div>
+      )}
+
+      <div className="space-y-6 relative" id="pdf-print-area">
+        {/* CABEÇALHO */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm pdf-block">
         <div className="flex-1">
           <h3 className="text-xl font-bold text-slate-900">Análise de Falhas (BI)</h3>
           {rawData.length > 0 && (
@@ -850,14 +785,14 @@ export const FailureAnalysisModule = ({
       ) : (
         <>
           {/* Filtros Dinâmicos */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+          <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm pdf-block">
             {/* ... existing filters ... */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-2 text-slate-700 font-medium text-sm">
                 <Filter className="w-4 h-4" />
                 <span>Filtros Dinâmicos</span>
               </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-4" data-html2canvas-ignore="true">
               <button 
                 onClick={generatePDF}
                 className="text-xs text-emerald-600 hover:text-emerald-700 flex items-center space-x-1 font-bold bg-emerald-50 px-3 py-1.5 rounded-lg transition-all"
@@ -992,7 +927,7 @@ export const FailureAnalysisModule = ({
           </div>
 
           {/* Sub-Tabs Navigation */}
-          <div className="flex flex-wrap gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm overflow-x-auto">
+          <div className="flex flex-wrap gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm overflow-x-auto pdf-block">
             {[
               { id: 'resumo', label: 'Resumo', icon: Activity },
               { id: 'indicadores', label: 'Indicadores', icon: ListFilter },
@@ -1021,7 +956,7 @@ export const FailureAnalysisModule = ({
           {/* Sub-Tabs Content */}
           <div className="space-y-6">
             {activeSubTab === 'resumo' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pdf-block">
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                   <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Total de Falhas</p>
                   <h4 className="text-2xl font-black text-slate-900">{advancedAnalysis.resumo.totalFalhas}</h4>
@@ -1046,7 +981,7 @@ export const FailureAnalysisModule = ({
             )}
 
             {activeSubTab === 'indicadores' && (
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden pdf-block">
                 <div className="p-4 border-b border-slate-100 bg-slate-50/50">
                   <h4 className="font-bold text-slate-700">Indicadores por Equipamento</h4>
                 </div>
@@ -1149,11 +1084,11 @@ export const FailureAnalysisModule = ({
             )}
 
             {activeSubTab === 'ranking' && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pdf-block">
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                   <h4 className="font-bold text-slate-700 mb-4">Top 10 Mais Falhas</h4>
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
+                  <div className="failure-analysis-chart min-h-[320px]" data-pdf-title="Ranking: Top 10 Mais Falhas">
+                    <ResponsiveContainer width="100%" height="100%" minHeight={320}>
                       <BarChart data={advancedAnalysis.rankingFalhas.slice(0, 10)} layout="vertical">
                         <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                         <XAxis type="number" />
@@ -1163,6 +1098,7 @@ export const FailureAnalysisModule = ({
                           dataKey="totalFalhas" 
                           fill="#1e3a8a" 
                           radius={[0, 4, 4, 0]} 
+                          isAnimationActive={false}
                           onClick={(data) => handleChartClick('Máquina', String(data.name))}
                           style={{ cursor: 'pointer' }}
                         >
@@ -1174,8 +1110,8 @@ export const FailureAnalysisModule = ({
                 </div>
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                   <h4 className="font-bold text-slate-700 mb-4">Top 10 Maior Tempo Parado</h4>
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
+                  <div className="failure-analysis-chart min-h-[320px]" data-pdf-title="Ranking: Top 10 Maior Tempo Parado">
+                    <ResponsiveContainer width="100%" height="100%" minHeight={320}>
                       <BarChart data={[...advancedAnalysis.indicadoresEquipamentos].sort((a,b) => b.tempoTotalReparo - a.tempoTotalReparo).slice(0, 10)} layout="vertical">
                         <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                         <XAxis type="number" />
@@ -1185,6 +1121,7 @@ export const FailureAnalysisModule = ({
                           dataKey="tempoTotalReparo" 
                           fill="#f97316" 
                           radius={[0, 4, 4, 0]} 
+                          isAnimationActive={false}
                           onClick={(data) => handleChartClick('Máquina', String(data.name))}
                           style={{ cursor: 'pointer' }}
                         >
@@ -1198,17 +1135,18 @@ export const FailureAnalysisModule = ({
             )}
 
             {activeSubTab === 'pareto' && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pdf-block">
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                   <h4 className="font-bold text-slate-700 mb-4">Pareto por Causa</h4>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
+                  <div className="failure-analysis-chart min-h-[256px]" data-pdf-title="Pareto por Causa">
+                    <ResponsiveContainer width="100%" height="100%" minHeight={256}>
                       <PieChart>
                         <Pie 
                           data={advancedAnalysis.paretoCausas.slice(0, 5)} 
                           dataKey="value" 
                           nameKey="name" 
                           cx="50%" cy="50%" outerRadius={60} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          isAnimationActive={false}
                           onClick={(data) => handleChartClick('Causa', String(data.name))}
                           style={{ cursor: 'pointer' }}
                         >
@@ -1221,14 +1159,15 @@ export const FailureAnalysisModule = ({
                 </div>
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                   <h4 className="font-bold text-slate-700 mb-4">Pareto por Problema</h4>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
+                  <div className="failure-analysis-chart min-h-[256px]" data-pdf-title="Pareto por Problema">
+                    <ResponsiveContainer width="100%" height="100%" minHeight={256}>
                       <PieChart>
                         <Pie 
                           data={advancedAnalysis.paretoProblemas.slice(0, 5)} 
                           dataKey="value" 
                           nameKey="name" 
                           cx="50%" cy="50%" outerRadius={60} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          isAnimationActive={false}
                           onClick={(data) => handleChartClick('Problema', String(data.name))}
                           style={{ cursor: 'pointer' }}
                         >
@@ -1241,14 +1180,15 @@ export const FailureAnalysisModule = ({
                 </div>
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                   <h4 className="font-bold text-slate-700 mb-4">Pareto por Parte</h4>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
+                  <div className="failure-analysis-chart min-h-[256px]" data-pdf-title="Pareto por Parte">
+                    <ResponsiveContainer width="100%" height="100%" minHeight={256}>
                       <PieChart>
                         <Pie 
                           data={advancedAnalysis.paretoPartes.slice(0, 5)} 
                           dataKey="value" 
                           nameKey="name" 
                           cx="50%" cy="50%" outerRadius={60} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          isAnimationActive={false}
                           onClick={(data) => handleChartClick('Parte', String(data.name))}
                           style={{ cursor: 'pointer' }}
                         >
@@ -1263,10 +1203,10 @@ export const FailureAnalysisModule = ({
             )}
 
             {activeSubTab === 'tendencia' && (
-              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm pdf-block">
                 <h4 className="font-bold text-slate-700 mb-4">Tendência Mensal de Falhas</h4>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
+                <div className="failure-analysis-chart min-h-[320px]" data-pdf-title="Tendência Mensal de Falhas">
+                  <ResponsiveContainer width="100%" height="100%" minHeight={320}>
                     <BarChart data={advancedAnalysis.tendenciaMensal}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="month" fontSize={10} />
@@ -1276,6 +1216,7 @@ export const FailureAnalysisModule = ({
                         dataKey="falhas" 
                         fill="#3b82f6" 
                         radius={[4, 4, 0, 0]} 
+                        isAnimationActive={false}
                         onClick={(data: any) => {
                           const monthIndex = parseInt(String(data.month).split('-')[1], 10) - 1;
                           const monthsNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -1292,11 +1233,11 @@ export const FailureAnalysisModule = ({
             )}
 
             {activeSubTab === 'tecnicos' && (
-              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm pdf-block">
                 <h4 className="font-bold text-slate-700 mb-4">Análise por Técnico</h4>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
+                  <div className="failure-analysis-chart min-h-[320px]" data-pdf-title="Técnicos: Atendimentos">
+                    <ResponsiveContainer width="100%" height="100%" minHeight={320}>
                       <BarChart data={advancedAnalysis.analiseTecnico.slice(0, 10)} layout="vertical">
                         <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                         <XAxis type="number" />
@@ -1307,6 +1248,7 @@ export const FailureAnalysisModule = ({
                           name="Atendimentos" 
                           fill="#10b981" 
                           radius={[0, 4, 4, 0]} 
+                          isAnimationActive={false}
                           onClick={(data) => handleChartClick('Executante', String(data.name))}
                           style={{ cursor: 'pointer' }}
                         >
@@ -1315,8 +1257,8 @@ export const FailureAnalysisModule = ({
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
+                  <div className="failure-analysis-chart min-h-[320px]" data-pdf-title="Técnicos: MTTR">
+                    <ResponsiveContainer width="100%" height="100%" minHeight={320}>
                       <BarChart data={advancedAnalysis.analiseTecnico.slice(0, 10)} layout="vertical">
                         <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                         <XAxis type="number" />
@@ -1327,6 +1269,7 @@ export const FailureAnalysisModule = ({
                           name="MTTR (h)" 
                           fill="#f59e0b" 
                           radius={[0, 4, 4, 0]} 
+                          isAnimationActive={false}
                           onClick={(data) => handleChartClick('Executante', String(data.name))}
                           style={{ cursor: 'pointer' }}
                         >
@@ -1340,11 +1283,11 @@ export const FailureAnalysisModule = ({
             )}
 
             {activeSubTab === 'turno' && (
-              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm pdf-block">
                 <h4 className="font-bold text-slate-700 mb-4">Análise por Turno</h4>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
+                  <div className="failure-analysis-chart min-h-[400px]" data-pdf-title="Turno: Total Falhas">
+                    <ResponsiveContainer width="100%" height="100%" minHeight={400}>
                       <BarChart data={advancedAnalysis.analiseTurno}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="name" fontSize={10} />
@@ -1355,6 +1298,7 @@ export const FailureAnalysisModule = ({
                           name="Falhas" 
                           fill="#6366f1" 
                           radius={[4, 4, 0, 0]} 
+                          isAnimationActive={false}
                           onClick={(data) => handleChartClick('Turno', String(data.name))}
                           style={{ cursor: 'pointer' }}
                         >
@@ -1363,8 +1307,8 @@ export const FailureAnalysisModule = ({
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
+                  <div className="failure-analysis-chart min-h-[400px]" data-pdf-title="Turno: MTTR">
+                    <ResponsiveContainer width="100%" height="100%" minHeight={400}>
                       <BarChart data={advancedAnalysis.analiseTurno}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="name" fontSize={10} />
@@ -1375,6 +1319,7 @@ export const FailureAnalysisModule = ({
                           name="MTTR (h)" 
                           fill="#ec4899" 
                           radius={[4, 4, 0, 0]} 
+                          isAnimationActive={false}
                           onClick={(data) => handleChartClick('Turno', String(data.name))}
                           style={{ cursor: 'pointer' }}
                         >
@@ -1389,13 +1334,14 @@ export const FailureAnalysisModule = ({
           </div>
 
           {/* Gráficos Originais (Ocultos ou Mantidos conforme regra de não alterar funcionalidade atual) */}
-          <div className="pt-12 border-t border-slate-200">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* ... existing charts ... */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-              <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Grupo (Tipo)</h4>
-              <div className="h-96 failure-analysis-chart">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+          <div className="pt-12 border-t border-slate-200 space-y-6">
+            
+            {/* Linha 1 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pdf-block">
+              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Grupo (Tipo)</h4>
+                <div className="failure-analysis-chart min-h-[400px]" data-pdf-title="Hr. Parada / Grupo (Tipo)">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={400}>
                   <BarChart 
                     layout="vertical"
                     data={grupoData}
@@ -1423,8 +1369,8 @@ export const FailureAnalysisModule = ({
 
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
               <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Setor (Elétrico vs Mecânico)</h4>
-              <div className="h-96 failure-analysis-chart">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+              <div className="failure-analysis-chart min-h-[400px]" data-pdf-title="Hr. Parada / Setor (Elétrico vs Mecânico)">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={400}>
                   <PieChart>
                     <Pie
                       data={setorData}
@@ -1471,11 +1417,14 @@ export const FailureAnalysisModule = ({
                 </ResponsiveContainer>
               </div>
             </div>
+            </div>
 
+            {/* Linha 2 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pdf-block">
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
               <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Máquina</h4>
-              <div className="h-96 failure-analysis-chart">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+              <div className="failure-analysis-chart min-h-[400px]" data-pdf-title="Hr. Parada / Máquina">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={400}>
                   <BarChart 
                     layout="vertical"
                     data={maquinaData}
@@ -1515,8 +1464,8 @@ export const FailureAnalysisModule = ({
 
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
               <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Parte</h4>
-              <div className="h-96 failure-analysis-chart">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+              <div className="failure-analysis-chart min-h-[400px]" data-pdf-title="Hr. Parada / Parte">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={400}>
                   <BarChart 
                     layout="vertical"
                     data={parteData}
@@ -1553,11 +1502,14 @@ export const FailureAnalysisModule = ({
                 </ResponsiveContainer>
               </div>
             </div>
+            </div>
 
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm lg:col-span-2">
+            {/* Linha 3 */}
+            <div className="grid grid-cols-1 gap-6 pdf-block">
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
               <h4 className="font-bold text-slate-700 mb-4">Hr. Parada / Causa</h4>
-              <div className="h-96 failure-analysis-chart">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+              <div className="failure-analysis-chart min-h-[400px]" data-pdf-title="Hr. Parada / Causa">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={400}>
                   <BarChart 
                     layout="vertical"
                     data={causaData}
@@ -1582,11 +1534,11 @@ export const FailureAnalysisModule = ({
                 </ResponsiveContainer>
               </div>
             </div>
+            </div>
           </div>
-        </div>
 
           {/* Histórico de Ações Table */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm pdf-block">
             <h4 className="font-bold text-slate-700 mb-4">Histórico de Ações (Últimos 50 registros)</h4>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm border-collapse">
@@ -1752,6 +1704,7 @@ export const FailureAnalysisModule = ({
           </AnimatePresence>
         </>
       )}
-    </div>
+      </div>
+    </>
   );
 };
