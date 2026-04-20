@@ -827,11 +827,31 @@ export const FailureAnalysisModule = ({
 
       {/* Loading Overlay for PDF Generation - MUST be outside the print area */}
       {isGeneratingPDF && (
-        <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600 mb-6 shadow-lg"></div>
-          <h2 className="text-3xl font-black text-slate-800">Montando Relatório Profissional...</h2>
-          <p className="text-slate-500 mt-3 font-medium text-lg">Por favor, aguarde a captura dos gráficos e tabelas.</p>
-        </div>
+        <>
+          <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600 mb-6 shadow-lg"></div>
+            <h2 className="text-3xl font-black text-slate-800">Montando Relatório Profissional...</h2>
+            <p className="text-slate-500 mt-3 font-medium text-lg text-center px-4">Por favor, aguarde a captura dos gráficos e tabelas.<br/><span className="text-sm opacity-70">Não minimize o navegador</span></p>
+          </div>
+          <style dangerouslySetInnerHTML={{__html: `
+            #pdf-print-area {
+              width: 1200px !important;
+              min-width: 1200px !important;
+              max-width: 1200px !important;
+              margin: 0 auto !important;
+            }
+            /* Force Tailwind layout classes as if it were a desktop screen, ignoring actual device width */
+            #pdf-print-area .md\\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+            #pdf-print-area .lg\\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+            #pdf-print-area .lg\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+            #pdf-print-area .lg\\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+            #pdf-print-area .lg\\:flex-row { flex-direction: row !important; }
+            #pdf-print-area .lg\\:items-center { align-items: center !important; }
+            #pdf-print-area .lg\\:col-span-2 { grid-column: span 2 / span 2 !important; }
+            #pdf-print-area .sm\\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+            #pdf-print-area .md\\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+          `}} />
+        </>
       )}
 
       <div className="space-y-6 relative" id="pdf-print-area">
