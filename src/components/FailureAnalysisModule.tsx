@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   PieChart, Pie, Cell, LabelList 
 } from 'recharts';
-import { Upload, FileSpreadsheet, Filter, X, Eye, Clock, User, Settings, Info, Download, Printer, TrendingUp, Award, PieChart as PieChartIcon, Users, ListFilter, Activity, AlertTriangle as AlertIcon, ArrowUp, ArrowDown } from 'lucide-react';
+import { Upload, FileSpreadsheet, Filter, X, Eye, Clock, User, Settings, Info, Download, Printer, TrendingUp, Award, PieChart as PieChartIcon, Users, ListFilter, Activity, AlertTriangle as AlertIcon, ArrowUp, ArrowDown, Sparkles } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { jsPDF } from 'jspdf';
@@ -689,6 +689,26 @@ export const FailureAnalysisModule = ({
     }
   }, [advancedAnalysis]);
 
+  const activeFiltersDesc = useMemo(() => {
+    const active = [];
+    if (filters.startDate && filters.endDate) {
+      active.push(`Período de ${filters.startDate} a ${filters.endDate}`);
+    } else if (filters.startDate) {
+      active.push(`A partir de ${filters.startDate}`);
+    } else if (filters.endDate) {
+      active.push(`Até ${filters.endDate}`);
+    }
+    
+    Object.entries(filters).forEach(([fKey, fValue]) => {
+      if (fValue && fKey !== 'startDate' && fKey !== 'endDate') {
+        active.push(`${fKey}: ${fValue}`);
+      }
+    });
+    
+    if (active.length === 0) return "Visão Geral (Todos os dados)";
+    return `Filtrando por: ${active.join(' • ')}`;
+  }, [filters]);
+
   const aggregateData = (groupBy: string, sumBy: string, countBy?: string) => {
     const result: Record<string, any> = {};
     
@@ -1081,26 +1101,28 @@ export const FailureAnalysisModule = ({
           {/* Sub-Tabs Content */}
           <div className={cn("space-y-6", isGeneratingPDF && !pdfConfig.currentTab && "hidden")}>
             {activeSubTab === 'resumo' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pdf-block">
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Total de Falhas</p>
-                  <h4 className="text-2xl font-black text-slate-900">{advancedAnalysis.resumo.totalFalhas}</h4>
-                  <div className="mt-2 text-[10px] text-slate-500">Ocorrências no período</div>
-                </div>
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Tempo Total Reparo</p>
-                  <h4 className="text-2xl font-black text-orange-600">{advancedAnalysis.resumo.tempoTotalReparo}h</h4>
-                  <div className="mt-2 text-[10px] text-slate-500">Horas paradas totais</div>
-                </div>
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">MTBF Médio</p>
-                  <h4 className="text-2xl font-black text-blue-600">{advancedAnalysis.resumo.mtbfMedio}h</h4>
-                  <div className="mt-2 text-[10px] text-slate-500">Média entre equipamentos</div>
-                </div>
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Equipamentos Críticos</p>
-                  <h4 className="text-2xl font-black text-rose-600">{advancedAnalysis.resumo.equipamentosCriticos}</h4>
-                  <div className="mt-2 text-[10px] text-slate-500">Mais de 6 falhas no período</div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pdf-block">
+                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Total de Falhas</p>
+                    <h4 className="text-2xl font-black text-slate-900">{advancedAnalysis.resumo.totalFalhas}</h4>
+                    <div className="mt-2 text-[10px] text-slate-500">Ocorrências no período</div>
+                  </div>
+                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Tempo Total Reparo</p>
+                    <h4 className="text-2xl font-black text-orange-600">{advancedAnalysis.resumo.tempoTotalReparo}h</h4>
+                    <div className="mt-2 text-[10px] text-slate-500">Horas paradas totais</div>
+                  </div>
+                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">MTBF Médio</p>
+                    <h4 className="text-2xl font-black text-blue-600">{advancedAnalysis.resumo.mtbfMedio}h</h4>
+                    <div className="mt-2 text-[10px] text-slate-500">Média entre equipamentos</div>
+                  </div>
+                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Equipamentos Críticos</p>
+                    <h4 className="text-2xl font-black text-rose-600">{advancedAnalysis.resumo.equipamentosCriticos}</h4>
+                    <div className="mt-2 text-[10px] text-slate-500">Mais de 6 falhas no período</div>
+                  </div>
                 </div>
               </div>
             )}
@@ -1670,8 +1692,31 @@ export const FailureAnalysisModule = ({
             </div>
           </div>
 
+          {filteredData.length > 0 && (
+            <div className="mt-8 bg-gradient-to-br from-indigo-50 to-blue-50 p-6 rounded-2xl border border-blue-100 shadow-sm flex flex-col md:flex-row gap-4 pdf-block transition-all duration-300">
+              <div className="bg-blue-600 text-white p-3 rounded-xl flex-shrink-0 self-start shadow-inner">
+                <Sparkles className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-black text-blue-900 text-lg mb-2 flex items-center gap-2">
+                  Resumo Inteligente <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-md uppercase tracking-wider font-bold">Análise Dinâmica</span>
+                </h4>
+                <p className="text-blue-700 font-medium text-xs mb-3 italic">
+                  {activeFiltersDesc}
+                </p>
+                <p className="text-blue-900 text-sm leading-relaxed">
+                  Neste cenário restrito de <strong>{filteredData.length} avaliações</strong>, identificamos que o equipamento em situação mais crítica de disponibilidade é o <span className="font-bold underline decoration-blue-300 decoration-2">{[...advancedAnalysis.indicadoresEquipamentos].sort((a,b) => b.tempoTotalReparo - a.tempoTotalReparo)[0]?.name || 'N/A'}</span>. Ele acumula <span className="font-extrabold text-orange-600">{[...advancedAnalysis.indicadoresEquipamentos].sort((a,b) => b.tempoTotalReparo - a.tempoTotalReparo)[0]?.tempoTotalReparo?.toFixed(2) || 0} horas totais de reparo</span> ao longo de {advancedAnalysis.indicadoresEquipamentos.find(i => i.name === [...advancedAnalysis.indicadoresEquipamentos].sort((a,b) => b.tempoTotalReparo - a.tempoTotalReparo)[0]?.name)?.falhas?.length || 0} ocorrências.
+                  <br/><br/>
+                  Analisando o padrão dessas falhas, a principal ofensa relatada (causa raiz global) é de natureza <strong>"{advancedAnalysis.paretoCausas[0]?.name || 'N/A'}"</strong> (representando {(advancedAnalysis.paretoCausas[0]?.percent || 0).toFixed(0)}% do contexto filtrado), cujo impacto se concentra massivamente em defeitos associados com <strong>"{advancedAnalysis.paretoPartes[0]?.name || 'N/A'}"</strong>. 
+                  <br/><br/>
+                  {advancedAnalysis.resumo.totalFalhas > 10 ? " ⚠️ O índice é elevado para o recorte atual. Sugerimos revisar as contramedidas ativas nas OSS (Ordens de Serviço) referentes a este conjunto." : " ✅ Com o volume reduzido neste filtro, o índice de manutenção sugere atuações isoladas, sem padrão repetitivo agudo."}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Histórico de Ações Table */}
-          <div className={cn("bg-white p-6 rounded-2xl border border-slate-100 shadow-sm pdf-block", isGeneratingPDF && !pdfConfig.history && "hidden")}>
+          <div className={cn("mt-6 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm pdf-block", isGeneratingPDF && !pdfConfig.history && "hidden")}>
             <h4 className="font-bold text-slate-700 mb-4">Histórico de Ações (Últimos 50 registros)</h4>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm border-collapse">
