@@ -59,6 +59,11 @@ export const ImprovementManagementModule = ({
     standardize: false,
     scope: 'specific',
     assets: [],
+    totalDowntime: 0,
+    productionLossRate: 0,
+    productValue: 0,
+    maintenanceCost: 0,
+    expectedRecovery: 100,
     responsible: '',
     responsibleId: '',
     startDate: new Date().toISOString(),
@@ -461,6 +466,39 @@ export const ImprovementManagementModule = ({
     doc.text(objLines, margin, y + 5);
     y += (objLines.length * 5) + 12;
 
+    // Impacto de Produção e Manutenção Section in PDF
+    doc.setFontSize(13);
+    doc.setTextColor(30, 64, 175);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Impacto de Produção e Manutenção', margin, y);
+    y += 5;
+
+    const prodLossTon = (project.totalDowntime || 0) * (project.productionLossRate || 0);
+    const prodLossCost = prodLossTon * (project.productValue || 0) * 1000;
+    const totalImpact = prodLossCost + (project.maintenanceCost || 0);
+    const estSaving = totalImpact * ((project.expectedRecovery || 100) / 100);
+    const lossPerTon = prodLossTon > 0 ? (totalImpact / prodLossTon) : 0;
+
+    autoTable(doc, {
+      body: [
+        ['Tempo Parado Total:', `${project.totalDowntime || 0} h`, 'Produção:', `${project.productionLossRate || 0} Ton/h`],
+        ['Volume Perdido:', `${prodLossTon.toLocaleString('pt-BR')} Ton`, 'Valor do Produto:', `R$ ${(project.productValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} /Kg`],
+        ['Custo de Produção:', `R$ ${prodLossCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Custo de Manutenção:', `R$ ${(project.maintenanceCost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
+        [{ content: 'IMPACTO FINANCEIRO TOTAL DO PROBLEMA:', colSpan: 2, styles: { fontStyle: 'bold', textColor: [225, 29, 72] } }, { content: `R$ ${totalImpact.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, colSpan: 2, styles: { halign: 'right', fontStyle: 'bold', textColor: [225, 29, 72] } }],
+        ['Recuperação Esperada:', `${project.expectedRecovery || 100}%`, 'Saving Estimado:', `R$ ${estSaving.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
+        [{ content: 'RESULTADO DE PERDA POR TONELADA:', colSpan: 2, styles: { fontStyle: 'bold' } }, { content: `R$ ${lossPerTon.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / Ton`, colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' } }]
+      ],
+      startY: y,
+      theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 2.5 },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 40, fillColor: [248, 250, 252] },
+        2: { fontStyle: 'bold', cellWidth: 40, fillColor: [248, 250, 252] }
+      }
+    });
+
+    y = (doc as any).lastAutoTable.finalY + 12;
+
     // Tasks Table
     doc.setFontSize(13);
     doc.setTextColor(30, 64, 175);
@@ -608,7 +646,14 @@ export const ImprovementManagementModule = ({
               <p>Responsável: <span className="font-bold">{project.responsible}</span></p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <button 
+              onClick={() => openModal(project, 'edit')}
+              className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-colors border border-slate-200"
+              title="Editar Projeto"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
             <button 
               onClick={() => generatePDF(project)}
               className="px-4 py-2 bg-slate-800 text-white rounded-full text-sm font-bold flex items-center gap-2 hover:bg-slate-900"
@@ -658,6 +703,67 @@ export const ImprovementManagementModule = ({
               <div className="pt-4 mt-2 border-t border-slate-100 flex justify-between items-center">
                 <p className="font-bold text-lg text-blue-600">Investimento Total:</p>
                 <p className="font-bold text-xl text-blue-600">R$ {totalInvestment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Card: Impacto e ROI Estimado */}
+          <div className="bg-white p-6 rounded-3xl shadow-sm space-y-4 border border-slate-100">
+            <h3 className="font-bold text-lg text-slate-800">Impacto e ROI Estimado</h3>
+            <div className="grid grid-cols-2 gap-4 text-sm bg-slate-50 p-4 rounded-2xl border border-slate-100">
+              <div>
+                <p className="text-slate-500 text-[10px] font-bold uppercase">Impacto do Problema</p>
+                <p className="font-bold text-rose-600">R$ {(((project.totalDowntime || 0) * (project.productionLossRate || 0) * (project.productValue || 0) * 1000) + (project.maintenanceCost || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              </div>
+              <div>
+                <p className="text-slate-500 text-[10px] font-bold uppercase">Investimento Total</p>
+                <p className="font-bold text-slate-900">R$ {totalInvestment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              </div>
+              <div>
+                <p className="text-slate-500 text-[10px] font-bold uppercase">Volume Perdido</p>
+                <p className="font-bold text-slate-900">{((project.totalDowntime || 0) * (project.productionLossRate || 0)).toLocaleString('pt-BR')} Ton</p>
+              </div>
+              <div>
+                <p className="text-slate-500 text-[10px] font-bold uppercase">Eficiência Esperada</p>
+                <p className="font-bold text-blue-600">{project.expectedRecovery || 100}%</p>
+              </div>
+            </div>
+            
+            <div className="pt-2 space-y-4">
+              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex justify-between items-center">
+                <div>
+                  <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Saving Estimado do Projeto</p>
+                  <p className="font-bold text-2xl text-emerald-700">
+                    R$ {((((project.totalDowntime || 0) * (project.productionLossRate || 0) * (project.productValue || 0) * 1000) + (project.maintenanceCost || 0)) * ((project.expectedRecovery || 100) / 100)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">ROI Teórico</p>
+                  <p className="font-bold text-xl text-emerald-600">
+                    {totalInvestment > 0 
+                      ? `${(((((project.totalDowntime || 0) * (project.productionLossRate || 0) * (project.productValue || 0) * 1000) + (project.maintenanceCost || 0)) * ((project.expectedRecovery || 100) / 100)) / totalInvestment).toFixed(1)}x`
+                      : '∞'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Perda R$/Ton</p>
+                  <p className="font-bold text-slate-700">
+                    {((project.totalDowntime || 0) * (project.productionLossRate || 0)) > 0 
+                      ? `R$ ${((((project.totalDowntime || 0) * (project.productionLossRate || 0) * (project.productValue || 0) * 1000) + (project.maintenanceCost || 0)) / ((project.totalDowntime || 0) * (project.productionLossRate || 0))).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                      : 'R$ 0,00'}
+                  </p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Payback Simples</p>
+                  <p className="font-bold text-slate-700">
+                    {((((project.totalDowntime || 0) * (project.productionLossRate || 0) * (project.productValue || 0) * 1000) + (project.maintenanceCost || 0)) * ((project.expectedRecovery || 100) / 100)) > 0
+                      ? `${(totalInvestment / ((((project.totalDowntime || 0) * (project.productionLossRate || 0) * (project.productValue || 0) * 1000) + (project.maintenanceCost || 0)) * ((project.expectedRecovery || 100) / 100))).toFixed(2)} Ciclos`
+                      : '-'}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -1090,6 +1196,60 @@ export const ImprovementManagementModule = ({
                 value={newProject.indicator ?? ''}
                 onChange={e => setNewProject({...newProject, indicator: e.target.value})}
               />
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Tempo Parado Total (h)</label>
+                  <input 
+                    type="number"
+                    placeholder="0" 
+                    className="w-full p-2 border rounded-lg text-sm"
+                    value={newProject.totalDowntime ?? ''}
+                    onChange={e => setNewProject({...newProject, totalDowntime: Number(e.target.value)})}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Produção (Ton/h)</label>
+                  <input 
+                    type="number"
+                    placeholder="0.00" 
+                    className="w-full p-2 border rounded-lg text-sm"
+                    value={newProject.productionLossRate ?? ''}
+                    onChange={e => setNewProject({...newProject, productionLossRate: Number(e.target.value)})}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Valor Produto (R$/Kg)</label>
+                  <input 
+                    type="number"
+                    placeholder="0.00" 
+                    className="w-full p-2 border rounded-lg text-sm"
+                    value={newProject.productValue ?? ''}
+                    onChange={e => setNewProject({...newProject, productValue: Number(e.target.value)})}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Custo Manutenção (R$)</label>
+                  <input 
+                    type="number"
+                    placeholder="0.00" 
+                    className="w-full p-2 border rounded-lg text-sm"
+                    value={newProject.maintenanceCost ?? ''}
+                    onChange={e => setNewProject({...newProject, maintenanceCost: Number(e.target.value)})}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Recuperação Esperada (%)</label>
+                  <input 
+                    type="number"
+                    placeholder="100" 
+                    className="w-full p-2 border rounded-lg text-sm"
+                    value={newProject.expectedRecovery ?? ''}
+                    onChange={e => setNewProject({...newProject, expectedRecovery: Number(e.target.value)})}
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <label className="block text-sm font-bold text-slate-700">Escopo do Investimento</label>
                 <select 

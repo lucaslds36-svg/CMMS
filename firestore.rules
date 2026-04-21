@@ -193,7 +193,7 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidEngineeringProject(data) {
-      return hasOnlyAllowedFields(['id', 'title', 'assetId', 'assetName', 'assets', 'description', 'objective', 'indicator', 'responsible', 'responsibleId', 'status', 'startDate', 'testStartDate', 'plannedTestDays', 'testStatus', 'result', 'lessonsLearned', 'standardize', 'scope', 'createdAt', 'updatedAt', 'tasks', 'adjustments', 'indicators', 'comments', 'statusHistory', 'createdBy', 'investmentValue']) &&
+      return hasOnlyAllowedFields(['id', 'title', 'assetId', 'assetName', 'assets', 'description', 'objective', 'indicator', 'responsible', 'responsibleId', 'status', 'startDate', 'testStartDate', 'plannedTestDays', 'testStatus', 'result', 'lessonsLearned', 'standardize', 'scope', 'createdAt', 'updatedAt', 'tasks', 'adjustments', 'indicators', 'comments', 'statusHistory', 'createdBy', 'investmentValue', 'totalDowntime', 'productionLossRate', 'productValue', 'maintenanceCost', 'expectedRecovery']) &&
              (!('title' in data) || (data.title is string && data.title.size() > 0)) &&
              (!('assetId' in data) || data.assetId is string) &&
              (!('assetName' in data) || data.assetName is string) &&
@@ -203,6 +203,11 @@ service cloud.firestore {
              (!('testStartDate' in data) || data.testStartDate is string || data.testStartDate == null) &&
              (!('plannedTestDays' in data) || data.plannedTestDays is number) &&
              (!('investmentValue' in data) || data.investmentValue is number) &&
+             (!('totalDowntime' in data) || data.totalDowntime is number) &&
+             (!('productionLossRate' in data) || data.productionLossRate is number) &&
+             (!('productValue' in data) || data.productValue is number) &&
+             (!('maintenanceCost' in data) || data.maintenanceCost is number) &&
+             (!('expectedRecovery' in data) || data.expectedRecovery is number) &&
              (!('testStatus' in data) || data.testStatus in ['Não iniciado', 'Em teste', 'Aprovado', 'Reprovado', '']) &&
              (!('result' in data) || data.result in ['Sucesso', 'Parcial', 'Falha', ''] || data.result == null) &&
              (!('lessonsLearned' in data) || data.lessonsLearned is string || data.lessonsLearned == null) &&

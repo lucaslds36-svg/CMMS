@@ -193,6 +193,12 @@ export interface EngineeringProject {
   standardize: boolean;
   scope: 'specific' | 'all';
   investmentValue?: number;
+  totalDowntime?: number;
+  productionLossRate?: number;
+  productValue?: number;
+  maintenanceCost?: number;
+  expectedRecovery?: number;
+  estimatedSaving?: number;
   createdAt: string;
   updatedAt: string;
   tasks?: EngineeringTask[];
