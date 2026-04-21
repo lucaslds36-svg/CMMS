@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+// Build Timestamp: 2026-04-21T19:17:00Z - Version 2.4.1
 import { ImprovementManagementModule } from './components/ImprovementManagementModule';
 import { PreventiveAssetsModule } from './components/PreventiveAssetsModule';
 // Version: 1.0.1 - Consolidated structure
@@ -6143,7 +6144,7 @@ export default function App() {
                   animate={{ opacity: 1, x: 0 }}
                   className="text-xl font-bold tracking-tight whitespace-nowrap text-slate-900"
                 >
-                  CMMS Pro <span className="text-[10px] text-blue-600 ml-1">v2.4 ONLINE</span>
+                  CMMS Pro <span className="text-[10px] text-blue-600 ml-1">v2.4.1 ONLINE</span>
                 </motion.span>
               )}
             </div>
@@ -6285,7 +6286,7 @@ export default function App() {
             <h2 className="text-base sm:text-lg font-semibold text-slate-900 capitalize truncate max-w-[150px] sm:max-w-none">
               {menuItems.find(m => m.id === activeTab)?.label}
             </h2>
-            <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-mono border border-blue-500 shadow-sm shadow-blue-500/20">v2.4 ONLINE</span>
+            <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-mono border border-blue-500 shadow-sm shadow-blue-500/20">v2.4.1 ONLINE</span>
           </div>
           <div className="flex items-center space-x-4">
             <button 
