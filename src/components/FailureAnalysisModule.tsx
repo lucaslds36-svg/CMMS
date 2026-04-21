@@ -446,6 +446,11 @@ export const FailureAnalysisModule = ({
           }
         });
 
+        if (!imgData || imgData === 'data:,' || !imgData.startsWith('data:image/')) {
+          console.warn('Erro ao gerar imagem de um bloco HTML (toPng retornou valor inválido), pulando...');
+          continue;
+        }
+
         const imgProps = doc.getImageProperties(imgData);
         const imgHeightMm = (imgProps.height * renderWidth) / imgProps.width;
 
@@ -480,10 +485,10 @@ export const FailureAnalysisModule = ({
             }
 
             const availablePx = availableMm / pxToMm;
-            const sliceHeightPx = Math.min(availablePx, imgProps.height - yOffsetPixels);
+            const sliceHeightPx = Math.max(1, Math.floor(Math.min(availablePx, imgProps.height - yOffsetPixels)));
 
             const canvas = document.createElement('canvas');
-            canvas.width = imgProps.width;
+            canvas.width = Math.max(1, Math.floor(imgProps.width));
             canvas.height = sliceHeightPx;
             
             const ctx = canvas.getContext('2d');
@@ -500,6 +505,12 @@ export const FailureAnalysisModule = ({
               });
               
               const sliceData = canvas.toDataURL('image/png', 1.0);
+              
+              if (!sliceData || sliceData === 'data:,' || !sliceData.startsWith('data:image/')) {
+                console.warn('Fatia inválida, encerrando este bloco');
+                break;
+              }
+
               const sliceRenderHeight = canvas.height * pxToMm;
 
               doc.addImage(sliceData, 'PNG', margin, currentY, renderWidth, sliceRenderHeight);

@@ -19,7 +19,10 @@ import {
   Eye,
   Trash2,
   FileText,
-  DollarSign
+  DollarSign,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, parseISO, differenceInDays, isAfter, isBefore, addDays, startOfMonth, eachDayOfInterval, isToday } from 'date-fns';
@@ -27,6 +30,7 @@ import { ptBR } from 'date-fns/locale';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import type { ServiceDemand, Employee, UserProfile, MaterialRequisition, ServiceDemandScopeChange, ServiceDemandStatusChange, ThirdPartyCompany } from '../types';
 
 const safeParseISO = (dateStr: string | undefined | null) => {
@@ -77,6 +81,17 @@ export const ServiceManagementModule = ({
   const [search, setSearch] = useState('');
   const [filterArea, setFilterArea] = useState<string>('Todas');
   const [filterStatus, setFilterStatus] = useState<string>('Todos');
+  const [filterPriority, setFilterPriority] = useState<string>('Todas');
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+
+  const requestSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
 
   useEffect(() => {
     if (selectedDemandId) {
@@ -137,14 +152,35 @@ export const ServiceManagementModule = ({
   };
 
   const filteredDemands = useMemo(() => {
-    return demands.filter(d => {
+    let result = demands.filter(d => {
       const matchesSearch = (d.description || '').toLowerCase().includes(search.toLowerCase()) || 
                            (d.responsibleName || '').toLowerCase().includes(search.toLowerCase());
       const matchesArea = filterArea === 'Todas' || d.area === filterArea;
       const matchesStatus = filterStatus === 'Todos' || d.status === filterStatus;
-      return matchesSearch && matchesArea && matchesStatus;
+      const matchesPriority = filterPriority === 'Todas' || d.priority === filterPriority;
+      return matchesSearch && matchesArea && matchesStatus && matchesPriority;
     });
-  }, [demands, search, filterArea, filterStatus]);
+
+    if (sortConfig !== null) {
+      result.sort((a, b) => {
+        if (sortConfig.key === 'priority') {
+          const priorityOrder = { 'Alta': 3, 'Média': 2, 'Baixa': 1 };
+          const aVal = priorityOrder[a.priority as keyof typeof priorityOrder] || 0;
+          const bVal = priorityOrder[b.priority as keyof typeof priorityOrder] || 0;
+          return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
+        }
+
+        const aVal = String(a[sortConfig.key as keyof ServiceDemand] || '').toLowerCase();
+        const bVal = String(b[sortConfig.key as keyof ServiceDemand] || '').toLowerCase();
+
+        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return result;
+  }, [demands, search, filterArea, filterStatus, filterPriority, sortConfig]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -224,57 +260,142 @@ export const ServiceManagementModule = ({
   const [viewMode, setViewMode] = useState<'table' | 'gantt'>('table');
 
   const handleGenerateReport = async () => {
-    const sortedDemands = [...filteredDemands].sort((a, b) => {
-      const dateA = safeParseISO(a.estimatedDeliveryDate);
-      const dateB = safeParseISO(b.estimatedDeliveryDate);
-      return dateA.getTime() - dateB.getTime();
-    });
+    if (filteredDemands.length === 0) {
+      if (showToast) showToast('Não há demandas para gerar o PDF.', 'error');
+      return;
+    }
 
-    const doc = new jsPDF('p', 'mm', 'a4');
+    if (showToast) showToast('Gerando relatório da tela atual...', 'success');
     
-    // Header
-    doc.setFontSize(18);
-    doc.setTextColor(30, 64, 175); // Blue-800
-    doc.text('Relatório de Gestão de Serviços', 15, 15);
-    
-    doc.setFontSize(10);
-    doc.setTextColor(100, 116, 139); // Slate-500
-    doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 15, 22);
-    
-    // Stats Summary
-    const total = sortedDemands.length;
-    const inProgress = sortedDemands.filter(d => d.status === 'Em andamento').length;
-    const completed = sortedDemands.filter(d => d.status === 'Concluído').length;
-    
-    doc.setFontSize(12);
-    doc.setTextColor(30, 64, 175);
-    doc.text('Resumo Executivo', 15, 35);
-    
-    doc.setFontSize(10);
-    doc.setTextColor(51, 65, 85);
-    doc.text(`Total de Demandas: ${total}`, 15, 42);
-    doc.text(`Em Andamento: ${inProgress}`, 70, 42);
-    doc.text(`Concluídas: ${completed}`, 120, 42);
+    setIsGeneratingPDF(true);
 
-    // Table
-    autoTable(doc, {
-      head: [['ID', 'Descrição', 'Área', 'Vencimento', 'Executor', 'Responsável', 'Status']],
-      body: sortedDemands.map(demand => [
-        `#${demand.id.replace('SD-', '')}`,
-        demand.description,
-        demand.area,
-        format(safeParseISO(demand.estimatedDeliveryDate), 'dd/MM/yyyy'),
-        demand.executorType === 'Terceiro' ? (demand.companyName || 'Terceiro') : 'Próprio',
-        demand.responsibleName || '-',
-        demand.status
-      ]),
-      startY: 50,
-      headStyles: { fillColor: [30, 64, 175] },
-      styles: { fontSize: 8, cellPadding: 2 },
-    });
-    
-    doc.save(`relatorio-servicos-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
-    showToast('Relatório PDF gerado com sucesso!');
+    try {
+      // Espera o DOM atualizar com o estado isGeneratingPDF = true
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      const element = document.getElementById('pdf-print-area');
+      if (!element) throw new Error('Área de impressão não encontrada');
+
+      const blocks = Array.from(element.querySelectorAll('.pdf-block')).filter(el => {
+        return window.getComputedStyle(el).display !== 'none';
+      });
+      
+      if (blocks.length === 0) {
+        blocks.push(element);
+      }
+
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const margin = 10;
+      const renderWidth = pageWidth - (margin * 2);
+
+      let currentY = margin;
+
+      for (let i = 0; i < blocks.length; i++) {
+        const block = blocks[i] as HTMLElement;
+
+        const imgData = await toPng(block, {
+          quality: 1,
+          pixelRatio: 2,
+          backgroundColor: '#f8fafc',
+          skipFonts: true,
+          style: {
+            margin: '0',
+            transform: 'none'
+          },
+          filter: (node) => {
+            if (node instanceof HTMLElement && node.dataset && node.dataset.html2canvasIgnore === 'true') {
+              return false;
+            }
+            return true;
+          }
+        });
+
+        if (!imgData || imgData === 'data:,' || !imgData.startsWith('data:image/')) {
+          console.warn('Erro ao gerar imagem de um bloco HTML (toPng retornou valor inválido), pulando...');
+          continue;
+        }
+
+        const imgProps = doc.getImageProperties(imgData);
+        const imgHeightMm = (imgProps.height * renderWidth) / imgProps.width;
+
+        if (currentY + imgHeightMm <= pageHeight - margin) {
+          doc.addImage(imgData, 'PNG', margin, currentY, renderWidth, imgHeightMm);
+          currentY += imgHeightMm + 5;
+        } 
+        else if (imgHeightMm <= pageHeight - margin * 2) {
+          doc.addPage();
+          currentY = margin;
+          doc.addImage(imgData, 'PNG', margin, currentY, renderWidth, imgHeightMm);
+          currentY += imgHeightMm + 5;
+        } 
+        else {
+          let yOffsetPixels = 0;
+          const pxToMm = renderWidth / imgProps.width;
+
+          while (yOffsetPixels < imgProps.height) {
+            const availableMm = pageHeight - currentY - margin;
+            
+            if (availableMm < 20) {
+              doc.addPage();
+              currentY = margin;
+              continue;
+            }
+
+            const availablePx = availableMm / pxToMm;
+            const sliceHeightPx = Math.max(1, Math.floor(Math.min(availablePx, imgProps.height - yOffsetPixels)));
+
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.floor(imgProps.width));
+            canvas.height = sliceHeightPx;
+            
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              const sourceImage = new Image();
+              sourceImage.src = imgData;
+              await new Promise(resolve => {
+                sourceImage.onload = () => {
+                  ctx.fillStyle = '#f8fafc';
+                  ctx.fillRect(0, 0, canvas.width, canvas.height);
+                  ctx.drawImage(sourceImage, 0, yOffsetPixels, imgProps.width, canvas.height, 0, 0, canvas.width, canvas.height);
+                  resolve(null);
+                };
+              });
+              
+              const sliceData = canvas.toDataURL('image/png', 1.0);
+              
+              if (!sliceData || sliceData === 'data:,' || !sliceData.startsWith('data:image/')) {
+                console.warn('Fatia inválida, encerrando este bloco');
+                break;
+              }
+
+              const sliceRenderHeight = canvas.height * pxToMm;
+              doc.addImage(sliceData, 'PNG', margin, currentY, renderWidth, sliceRenderHeight);
+              yOffsetPixels += canvas.height;
+              currentY += sliceRenderHeight;
+              
+              if (yOffsetPixels < imgProps.height) {
+                 doc.addPage();
+                 currentY = margin;
+              }
+            } else {
+              break;
+            }
+          }
+          currentY += 5;
+        }
+      }
+
+      doc.save(`Relatorio_Servicos_${new Date().getTime()}.pdf`);
+      if (showToast) showToast('Relatório PDF gerado com sucesso!', 'success');
+
+    } catch (error) {
+      console.error("Erro ao gerar PDF:", error);
+      if (showToast) showToast('Erro ao gerar relatório PDF.', 'error');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
   };
 
   const generateIndividualReport = (demand: ServiceDemand) => {
@@ -363,7 +484,7 @@ export const ServiceManagementModule = ({
     const days = eachDayOfInterval({ start: startDate, end: endDate });
 
     return (
-      <div className="p-6 overflow-x-auto">
+      <div className="p-6 pdf-table-container overflow-x-auto">
         <div className="min-w-[1200px]">
           <div className="flex border-b border-slate-100 pb-4 mb-4">
             <div className="w-64 flex-shrink-0 font-bold text-xs text-slate-400 uppercase">Demanda</div>
@@ -419,12 +540,53 @@ export const ServiceManagementModule = ({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Gestão de Serviços</h2>
-          <p className="text-slate-500 text-sm">Acompanhamento de demandas e ordens de serviço</p>
+    <>
+      <style>{`
+        ${isGeneratingPDF ? `
+          #pdf-print-area {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 1200px !important;
+            min-width: 1200px !important;
+            max-width: 1200px !important;
+            margin: 0 auto !important;
+            background: white !important;
+            padding: 30px !important;
+            z-index: -9999 !important;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif !important;
+          }
+          #pdf-print-area .md\\:flex-row { flex-direction: row !important; }
+          #pdf-print-area .md\\:items-center { align-items: center !important; }
+          #pdf-print-area .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+          #pdf-print-area select, #pdf-print-area button, #pdf-print-area input { display: none !important; }
+          #pdf-print-area .pdf-table-container { overflow: visible !important; width: 100% !important; }
+          /* Provide visible headers/spans specifically for PDF instead of just hiding inputs */
+          .pdf-only-text { display: inline-block !important; }
+        ` : `
+          .pdf-only-text { display: none !important; }
+        `}
+      `}</style>
+      
+      {isGeneratingPDF && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center flex flex-col items-center">
+            <div className="w-16 h-16 rounded-full border-4 border-blue-50 border-t-blue-500 animate-spin mb-4" />
+            <h2 className="text-xl font-bold text-slate-800 mb-2">Gerando Relatório...</h2>
+            <p className="text-slate-500 text-sm">Preparando formatação visual para o documento</p>
+          </div>
         </div>
+      )}
+
+      <div className="space-y-6 relative" id="pdf-print-area">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pdf-block border-b border-slate-100 pb-4">
+          <div>
+            <h2 className="text-3xl font-bold text-slate-900 mb-1">Gestão de Serviços</h2>
+            <p className="text-slate-500 text-sm font-medium">
+              Relatório Emitido em: {format(new Date(), 'dd/MM/yyyy HH:mm')}
+            </p>
+            <p className="text-slate-500 text-sm">Acompanhamento e situação de demandas.</p>
+          </div>
         <div className="flex items-center gap-2">
           <div className="bg-white p-1 rounded-xl border border-slate-100 flex">
             <button 
@@ -463,7 +625,7 @@ export const ServiceManagementModule = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-3 pdf-block">
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
           <div className="flex items-center justify-between mb-1">
             <span className="text-slate-500 text-xs font-medium">Total</span>
@@ -491,10 +653,11 @@ export const ServiceManagementModule = ({
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-100">
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 pdf-block">
         <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center gap-4">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <span className="pdf-only-text px-3 py-1 bg-slate-100 rounded-lg text-sm text-slate-700 font-bold mb-2 inline-block">Filtros Aplicados</span>
+            <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" data-html2canvas-ignore="true" />
             <input 
               type="text" 
               placeholder="Buscar por descrição ou responsável..." 
@@ -502,39 +665,89 @@ export const ServiceManagementModule = ({
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-11 pr-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
             />
+            {search && <span className="pdf-only-text ml-4 text-sm font-bold text-slate-700">Busca: "{search}"</span>}
           </div>
-          <div className="flex items-center gap-2">
-            <select 
-              value={filterArea}
-              onChange={e => setFilterArea(e.target.value)}
-              className="px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="Todas">Todas as Áreas</option>
-              {areas.map(a => <option key={a} value={a}>{a}</option>)}
-            </select>
-            <select 
-              value={filterStatus}
-              onChange={e => setFilterStatus(e.target.value)}
-              className="px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="Todos">Todos os Status</option>
-              {statuses.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative">
+              <span className="pdf-only-text px-3 py-1 bg-slate-100 rounded-lg text-sm text-slate-700 font-bold">Área: {filterArea}</span>
+              <select 
+                value={filterArea}
+                onChange={e => setFilterArea(e.target.value)}
+                className="px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Todas">Todas as Áreas</option>
+                {areas.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
+            
+            <div className="relative">
+              <span className="pdf-only-text px-3 py-1 bg-slate-100 rounded-lg text-sm text-slate-700 font-bold">Status: {filterStatus}</span>
+              <select 
+                value={filterStatus}
+                onChange={e => setFilterStatus(e.target.value)}
+                className="px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Todos">Todos os Status</option>
+                {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+
+            <div className="relative">
+               <span className="pdf-only-text px-3 py-1 bg-slate-100 rounded-lg text-sm text-slate-700 font-bold">Prioridade: {filterPriority}</span>
+              <select 
+                value={filterPriority}
+                onChange={e => setFilterPriority(e.target.value)}
+                className="px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Todas">Todas as Prioridades</option>
+                {priorities.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
           </div>
         </div>
 
         {viewMode === 'table' ? (
-          <div className="overflow-x-auto w-full touch-pan-x">
-            <table className="w-max min-w-full text-left border-collapse">
+          <div className="w-full pdf-table-container overflow-x-auto touch-pan-x">
+            <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">OS</th>
-                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Título</th>
-                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Responsável</th>
-                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Técnico</th>
-                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Status</th>
-                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase">Prioridade</th>
-                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase text-center">Ações</th>
+                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => requestSort('id')}>
+                  <div className="flex items-center gap-1">
+                    OS
+                    {sortConfig?.key === 'id' ? (sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                  </div>
+                </th>
+                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => requestSort('description')}>
+                  <div className="flex items-center gap-1">
+                    Título
+                    {sortConfig?.key === 'description' ? (sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                  </div>
+                </th>
+                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => requestSort('responsibleName')}>
+                  <div className="flex items-center gap-1">
+                    Responsável
+                    {sortConfig?.key === 'responsibleName' ? (sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                  </div>
+                </th>
+                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => requestSort('executorName')}>
+                  <div className="flex items-center gap-1">
+                    Técnico
+                    {sortConfig?.key === 'executorName' ? (sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                  </div>
+                </th>
+                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => requestSort('status')}>
+                  <div className="flex items-center gap-1">
+                    Status
+                    {sortConfig?.key === 'status' ? (sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                  </div>
+                </th>
+                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => requestSort('priority')}>
+                  <div className="flex items-center gap-1">
+                    Prioridade
+                    {sortConfig?.key === 'priority' ? (sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                  </div>
+                </th>
+                <th className="px-4 py-3 text-xs font-bold text-slate-600 uppercase text-center" data-html2canvas-ignore="true">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -552,7 +765,7 @@ export const ServiceManagementModule = ({
                         {demand.responsibleName}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-600">{demand.responsibleName}</td>
+                    <td className="px-4 py-3 text-sm text-slate-600">{demand.executorName || '-'}</td>
                     <td className="px-4 py-3">
                       <span className={cn(
                         "px-2 py-1 rounded text-xs font-bold text-white",
@@ -571,7 +784,7 @@ export const ServiceManagementModule = ({
                         {demand.priority}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3" data-html2canvas-ignore="true">
                       <div className="flex items-center justify-center space-x-1">
                         <button 
                           onClick={() => {
@@ -1385,5 +1598,6 @@ export const ServiceManagementModule = ({
         )}
       </AnimatePresence>
     </div>
+    </>
   );
 };
