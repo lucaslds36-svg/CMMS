@@ -193,7 +193,7 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidEngineeringProject(data) {
-      return hasOnlyAllowedFields(['id', 'title', 'assetId', 'assetName', 'assets', 'description', 'objective', 'indicator', 'responsible', 'responsibleId', 'status', 'startDate', 'testStartDate', 'plannedTestDays', 'testStatus', 'result', 'lessonsLearned', 'standardize', 'scope', 'createdAt', 'updatedAt', 'tasks', 'adjustments', 'indicators', 'comments', 'statusHistory', 'createdBy', 'investmentValue', 'totalDowntime', 'productionLossRate', 'productValue', 'maintenanceCost', 'expectedRecovery']) &&
+      return hasOnlyAllowedFields(['id', 'title', 'assetId', 'assetName', 'assets', 'description', 'objective', 'indicator', 'responsible', 'responsibleId', 'status', 'startDate', 'testStartDate', 'plannedTestDays', 'testStatus', 'result', 'lessonsLearned', 'standardize', 'scope', 'createdAt', 'updatedAt', 'tasks', 'adjustments', 'indicators', 'comments', 'statusHistory', 'createdBy', 'investmentValue', 'totalDowntime', 'productionLossRate', 'productValue', 'maintenanceCost', 'expectedRecovery', 'analysisStartDate', 'analysisEndDate', 'responsibleUid']) &&
              (!('title' in data) || (data.title is string && data.title.size() > 0)) &&
              (!('assetId' in data) || data.assetId is string) &&
              (!('assetName' in data) || data.assetName is string) &&
@@ -208,6 +208,9 @@ service cloud.firestore {
              (!('productValue' in data) || data.productValue is number) &&
              (!('maintenanceCost' in data) || data.maintenanceCost is number) &&
              (!('expectedRecovery' in data) || data.expectedRecovery is number) &&
+             (!('analysisStartDate' in data) || data.analysisStartDate is string) &&
+             (!('analysisEndDate' in data) || data.analysisEndDate is string) &&
+             (!('responsibleUid' in data) || data.responsibleUid is string) &&
              (!('testStatus' in data) || data.testStatus in ['Não iniciado', 'Em teste', 'Aprovado', 'Reprovado', '']) &&
              (!('result' in data) || data.result in ['Sucesso', 'Parcial', 'Falha', ''] || data.result == null) &&
              (!('lessonsLearned' in data) || data.lessonsLearned is string || data.lessonsLearned == null) &&
@@ -265,7 +268,7 @@ service cloud.firestore {
     match /engineering-projects/{projectId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidEngineeringProject(request.resource.data);
-      allow update: if (isMasterOrOwner('createdBy') || isMasterOrOwner('responsibleId')) && isValidEngineeringProject(request.resource.data);
+      allow update: if (isMasterOrOwner('createdBy') || isMasterOrOwner('responsibleUid')) && isValidEngineeringProject(request.resource.data);
       allow delete: if isAdmin();
 
       match /tasks/{taskId} {

@@ -199,6 +199,9 @@ export interface EngineeringProject {
   maintenanceCost?: number;
   expectedRecovery?: number;
   estimatedSaving?: number;
+  analysisStartDate?: string;
+  analysisEndDate?: string;
+  responsibleUid?: string;
   createdAt: string;
   updatedAt: string;
   tasks?: EngineeringTask[];

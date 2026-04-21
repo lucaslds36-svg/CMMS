@@ -18,7 +18,7 @@ import {
   Box,
   Edit
 } from 'lucide-react';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -64,6 +64,8 @@ export const ImprovementManagementModule = ({
     productValue: 0,
     maintenanceCost: 0,
     expectedRecovery: 100,
+    analysisStartDate: '',
+    analysisEndDate: '',
     responsible: '',
     responsibleId: '',
     startDate: new Date().toISOString(),
@@ -103,6 +105,7 @@ export const ImprovementManagementModule = ({
         scope: newProject.scope || 'specific',
         createdAt: newProject.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        responsibleUid: employees.find(emp => emp.ID === newProject.responsibleId)?.userUid || '',
         createdBy: newProject.createdBy || userProfile?.uid
       });
 
@@ -477,10 +480,18 @@ export const ImprovementManagementModule = ({
     const prodLossCost = prodLossTon * (project.productValue || 0) * 1000;
     const totalImpact = prodLossCost + (project.maintenanceCost || 0);
     const estSaving = totalImpact * ((project.expectedRecovery || 100) / 100);
+    
+    const analysisDays = (project.analysisStartDate && project.analysisEndDate) 
+      ? differenceInDays(parseISO(project.analysisEndDate), parseISO(project.analysisStartDate))
+      : 0;
+    const downtimePerDay = analysisDays > 0 ? (project.totalDowntime || 0) / analysisDays : 0;
     const lossPerTon = prodLossTon > 0 ? (totalImpact / prodLossTon) : 0;
 
     autoTable(doc, {
       body: [
+        ['Período Analisado:', (project.analysisStartDate && project.analysisEndDate) 
+            ? `${format(parseISO(project.analysisStartDate), 'dd/MM/yyyy')} a ${format(parseISO(project.analysisEndDate), 'dd/MM/yyyy')}` 
+            : 'Não definido', 'Downtime/Dia:', `${downtimePerDay.toFixed(2)} h/dia`],
         ['Tempo Parado Total:', `${project.totalDowntime || 0} h`, 'Produção:', `${project.productionLossRate || 0} Ton/h`],
         ['Volume Perdido:', `${prodLossTon.toLocaleString('pt-BR')} Ton`, 'Valor do Produto:', `R$ ${(project.productValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} /Kg`],
         ['Custo de Produção:', `R$ ${prodLossCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Custo de Manutenção:', `R$ ${(project.maintenanceCost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
@@ -488,7 +499,6 @@ export const ImprovementManagementModule = ({
         ['Recuperação Esperada:', `${project.expectedRecovery || 100}%`, 'Saving Estimado:', `R$ ${estSaving.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
         [{ content: 'RESULTADO DE PERDA POR TONELADA:', colSpan: 2, styles: { fontStyle: 'bold' } }, { content: `R$ ${lossPerTon.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / Ton`, colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' } }]
       ],
-      startY: y,
       theme: 'grid',
       styles: { fontSize: 8, cellPadding: 2.5 },
       columnStyles: {
@@ -724,12 +734,31 @@ export const ImprovementManagementModule = ({
                 <p className="font-bold text-slate-900">{((project.totalDowntime || 0) * (project.productionLossRate || 0)).toLocaleString('pt-BR')} Ton</p>
               </div>
               <div>
+                <p className="text-slate-500 text-[10px] font-bold uppercase">Período de Análise</p>
+                <p className="font-bold text-slate-900 text-xs">
+                  {project.analysisStartDate && project.analysisEndDate 
+                    ? `${format(parseISO(project.analysisStartDate), 'dd/MM/yyyy')} - ${format(parseISO(project.analysisEndDate), 'dd/MM/yyyy')}`
+                    : 'Não definido'}
+                </p>
+              </div>
+              <div>
                 <p className="text-slate-500 text-[10px] font-bold uppercase">Eficiência Esperada</p>
                 <p className="font-bold text-blue-600">{project.expectedRecovery || 100}%</p>
               </div>
             </div>
             
             <div className="pt-2 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Downtime / Dia</p>
+                  <p className="font-bold text-slate-700">
+                    {project.analysisStartDate && project.analysisEndDate && 
+                     differenceInDays(parseISO(project.analysisEndDate), parseISO(project.analysisStartDate)) > 0
+                     ? `${((project.totalDowntime || 0) / differenceInDays(parseISO(project.analysisEndDate), parseISO(project.analysisStartDate))).toFixed(2)} h/dia`
+                     : '-'}
+                  </p>
+                </div>
+              </div>
               <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex justify-between items-center">
                 <div>
                   <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Saving Estimado do Projeto</p>
@@ -1246,6 +1275,24 @@ export const ImprovementManagementModule = ({
                     className="w-full p-2 border rounded-lg text-sm"
                     value={newProject.expectedRecovery ?? ''}
                     onChange={e => setNewProject({...newProject, expectedRecovery: Number(e.target.value)})}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Início do Período</label>
+                  <input 
+                    type="date"
+                    className="w-full p-2 border rounded-lg text-sm"
+                    value={newProject.analysisStartDate ?? ''}
+                    onChange={e => setNewProject({...newProject, analysisStartDate: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Fim do Período</label>
+                  <input 
+                    type="date"
+                    className="w-full p-2 border rounded-lg text-sm"
+                    value={newProject.analysisEndDate ?? ''}
+                    onChange={e => setNewProject({...newProject, analysisEndDate: e.target.value})}
                   />
                 </div>
               </div>
