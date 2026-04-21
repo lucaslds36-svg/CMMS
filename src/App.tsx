@@ -6259,6 +6259,7 @@ export default function App() {
             <h2 className="text-base sm:text-lg font-semibold text-slate-900 capitalize truncate max-w-[150px] sm:max-w-none">
               {menuItems.find(m => m.id === activeTab)?.label}
             </h2>
+            <span className="text-[10px] bg-slate-900 text-white px-1.5 py-0.5 rounded font-mono">v2.3</span>
           </div>
           <div className="flex items-center space-x-4">
             <button 

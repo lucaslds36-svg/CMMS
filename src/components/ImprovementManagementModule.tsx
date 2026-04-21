@@ -532,7 +532,10 @@ export const ImprovementManagementModule = ({
       margin: { left: margin, right: margin }
     });
 
-    currentY = (doc as any).lastAutoTable.finalY + 15;
+    const lastY = (doc as any).lastAutoTable?.finalY;
+    currentY = (typeof lastY === 'number' ? lastY : currentY) + 15;
+    
+    console.log("Coordenada atual após tabela de impacto:", currentY);
 
     // Action Plan Section
     if (currentY > pageHeight - 60) { doc.addPage(); currentY = 20; }
