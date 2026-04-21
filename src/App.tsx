@@ -4972,6 +4972,18 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // Check for redirect result on mount
+    handleRedirectResult().then((result) => {
+      if (result?.user) {
+        showToast('Login via redirecionamento concluído!');
+      }
+    }).catch((error) => {
+      console.error('Redirect Error:', error);
+      if (error.code !== 'auth/cancelled-popup-request') {
+        showToast('Erro ao processar login via redirecionamento.', 'error');
+      }
+    });
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         // Restrict Google Login to Master User in onAuthStateChanged
