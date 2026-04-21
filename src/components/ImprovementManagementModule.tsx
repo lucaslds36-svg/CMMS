@@ -433,9 +433,9 @@ export const ImprovementManagementModule = ({
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text('GESTÃO DE ENGENHARIA | RELATÓRIO DE MELHORIA v2.3', margin, 15);
+    doc.text('GESTÃO DE ENGENHARIA | RELATÓRIO DE MELHORIA v2.4', margin, 15);
     
-    console.log("Gerando PDF v2.3 para:", project.title);
+    console.log("Gerando PDF v2.4 - Build: " + new Date().toISOString());
     
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
@@ -619,7 +619,7 @@ export const ImprovementManagementModule = ({
       doc.setPage(i);
       doc.setFontSize(8);
       doc.setTextColor(150);
-      doc.text(`Relatório de Engenharia v2.3 - Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+      doc.text(`Relatório de Engenharia v2.4 - Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
     }
 
     doc.save(`relatorio_${project.title.toLowerCase().replace(/\s+/g, '_')}.pdf`);
@@ -647,7 +647,10 @@ export const ImprovementManagementModule = ({
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
-            <span className="px-2 py-1 bg-slate-800 text-slate-400 text-[10px] rounded font-mono border border-slate-700">v2.3</span>
+            <div className="flex flex-col items-end">
+              <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-[9px] rounded font-mono border border-blue-500/30">v2.4 ONLINE</span>
+              <span className="text-[7px] text-slate-500 font-mono mt-0.5">{new Date().toLocaleTimeString()}</span>
+            </div>
             <button 
               onClick={() => openModal(project, 'edit')}
               className="p-2 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition-colors border border-slate-700"
