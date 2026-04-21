@@ -100,6 +100,8 @@ import {
   auth, 
   db,
   loginWithGoogle, 
+  loginWithGoogleRedirect,
+  handleRedirectResult,
   logout, 
   loginWithEmail,
   registerWithEmail,
@@ -5712,11 +5714,23 @@ export default function App() {
       console.error('Login error:', error);
       // Handle cancelled popup request gracefully
       if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-closed-by-user') {
-        showToast('Login cancelado ou janela fechada.', 'error');
+        showToast('Login cancelado ou janela fechada. Tente o login alternativo abaixo se o problema persistir.', 'error');
       } else {
         showToast('Erro ao realizar login. Tente novamente.', 'error');
       }
     } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleRedirectLogin = async () => {
+    if (loginLoading) return;
+    setLoginLoading(true);
+    try {
+      await loginWithGoogleRedirect();
+    } catch (error: any) {
+      console.error('Redirect login error:', error);
+      showToast('Erro ao iniciar redirecionamento.', 'error');
       setLoginLoading(false);
     }
   };
@@ -6366,6 +6380,14 @@ export default function App() {
                   >
                     {loginLoading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <LogIn className="w-5 h-5" />}
                     <span>{loginLoading ? 'Conectando...' : 'Entrar com Google'}</span>
+                  </button>
+                  <button 
+                    onClick={handleRedirectLogin}
+                    disabled={loginLoading}
+                    className="w-full py-3 bg-slate-100 text-slate-700 rounded-2xl text-xs font-bold hover:bg-slate-200 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Login Alternativo (Sem Popup)</span>
                   </button>
                   <button 
                     onClick={() => setAuthMode('login')}

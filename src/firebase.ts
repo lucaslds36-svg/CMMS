@@ -1,5 +1,7 @@
 import { 
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut, 
   onAuthStateChanged, 
   User,
@@ -37,6 +39,24 @@ export const loginWithGoogle = async () => {
     return await signInWithPopup(auth, googleProvider);
   } catch (error) {
     console.error('Google Login Error:', error);
+    throw error;
+  }
+};
+
+export const loginWithGoogleRedirect = async () => {
+  try {
+    return await signInWithRedirect(auth, googleProvider);
+  } catch (error) {
+    console.error('Google Redirect Login Error:', error);
+    throw error;
+  }
+};
+
+export const handleRedirectResult = async () => {
+  try {
+    return await getRedirectResult(auth);
+  } catch (error) {
+    console.error('Redirect Result Error:', error);
     throw error;
   }
 };

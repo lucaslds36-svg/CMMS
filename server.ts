@@ -17,6 +17,15 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
+  // Security Headers for OAuth/Firebase Popups
+  app.use((req, res, next) => {
+    // Allows popups to communicate with the opener window
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+    // Prevents some framing issues while allowing external resources
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  });
+
   // API routes
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok' });
