@@ -433,9 +433,9 @@ export const ImprovementManagementModule = ({
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text('GESTÃO DE ENGENHARIA | RELATÓRIO DE MELHORIA v2.4.1', margin, 15);
+    doc.text('GESTÃO DE ENGENHARIA | RELATÓRIO DE MELHORIA v2.4', margin, 15);
     
-    console.log("Gerando PDF v2.4.1 - Build: " + new Date().toISOString());
+    console.log("Gerando PDF v2.4 - Build: " + new Date().toISOString());
     
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
@@ -619,7 +619,7 @@ export const ImprovementManagementModule = ({
       doc.setPage(i);
       doc.setFontSize(8);
       doc.setTextColor(150);
-      doc.text(`Relatório de Engenharia v2.4.1 - Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+      doc.text(`Relatório de Engenharia v2.4 - Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
     }
 
     doc.save(`relatorio_${project.title.toLowerCase().replace(/\s+/g, '_')}.pdf`);
@@ -639,21 +639,17 @@ export const ImprovementManagementModule = ({
         <button onClick={() => {setSelectedProject(null); setModalMode(null);}} className="text-slate-500 hover:text-slate-900">← Voltar</button>
         
         {/* Header */}
-        <div className="bg-slate-900 p-6 rounded-3xl shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border border-slate-800">
+        <div className="bg-white p-6 rounded-3xl shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border border-slate-100">
           <div>
-            <h2 className="text-2xl font-bold text-white">{project.title}</h2>
-            <div className="flex gap-4 text-sm text-slate-400 mt-2">
-              <p>Responsável: <span className="font-bold text-slate-200">{project.responsible}</span></p>
+            <h2 className="text-2xl font-bold text-slate-900">{project.title}</h2>
+            <div className="flex gap-4 text-sm text-slate-500 mt-2">
+              <p>Responsável: <span className="font-bold text-slate-700">{project.responsible}</span></p>
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
-            <div className="flex flex-col items-end">
-              <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-[9px] rounded font-mono border border-blue-500/30">v2.4.1 ONLINE</span>
-              <span className="text-[7px] text-slate-500 font-mono mt-0.5">{new Date().toLocaleTimeString()}</span>
-            </div>
             <button 
               onClick={() => openModal(project, 'edit')}
-              className="p-2 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition-colors border border-slate-700"
+              className="p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-900 rounded-lg transition-colors border border-slate-200"
               title="Editar Projeto"
             >
               <Pencil className="w-4 h-4" />
