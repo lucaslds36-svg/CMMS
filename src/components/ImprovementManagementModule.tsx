@@ -427,13 +427,15 @@ export const ImprovementManagementModule = ({
     };
 
     // Header - Professional Banner
-    doc.setFillColor(30, 58, 138); // Darker Blue
+    doc.setFillColor(15, 23, 42); // Slate-900
     doc.rect(0, 0, pageWidth, 50, 'F');
     
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text('GESTÃO DE ENGENHARIA | RELATÓRIO DE MELHORIA v2.2', margin, 15);
+    doc.text('GESTÃO DE ENGENHARIA | RELATÓRIO DE MELHORIA v2.3', margin, 15);
+    
+    console.log("Gerando PDF v2.3 para:", project.title);
     
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
@@ -614,7 +616,7 @@ export const ImprovementManagementModule = ({
       doc.setPage(i);
       doc.setFontSize(8);
       doc.setTextColor(150);
-      doc.text(`Relatório de Engenharia v2.2 - Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+      doc.text(`Relatório de Engenharia v2.3 - Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
     }
 
     doc.save(`relatorio_${project.title.toLowerCase().replace(/\s+/g, '_')}.pdf`);
@@ -634,30 +636,30 @@ export const ImprovementManagementModule = ({
         <button onClick={() => {setSelectedProject(null); setModalMode(null);}} className="text-slate-500 hover:text-slate-900">← Voltar</button>
         
         {/* Header */}
-        <div className="bg-white p-6 rounded-3xl shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="bg-slate-900 p-6 rounded-3xl shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border border-slate-800">
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">{project.title}</h2>
-            <div className="flex gap-4 text-sm text-slate-600 mt-2">
-              <p>Responsável: <span className="font-bold">{project.responsible}</span></p>
+            <h2 className="text-2xl font-bold text-white">{project.title}</h2>
+            <div className="flex gap-4 text-sm text-slate-400 mt-2">
+              <p>Responsável: <span className="font-bold text-slate-200">{project.responsible}</span></p>
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
-            <span className="text-[10px] text-slate-400 font-mono">v2.2</span>
+            <span className="px-2 py-1 bg-slate-800 text-slate-400 text-[10px] rounded font-mono border border-slate-700">v2.3</span>
             <button 
               onClick={() => openModal(project, 'edit')}
-              className="p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-lg transition-colors border border-slate-200"
+              className="p-2 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition-colors border border-slate-700"
               title="Editar Projeto"
             >
               <Pencil className="w-4 h-4" />
             </button>
             <button 
               onClick={() => generatePDF(project)}
-              className="px-4 py-2 bg-slate-800 text-white rounded-full text-sm font-bold flex items-center gap-2 hover:bg-slate-900"
+              className="px-4 py-2 bg-blue-600 text-white rounded-full text-sm font-bold flex items-center gap-2 hover:bg-blue-500 shadow-lg shadow-blue-900/20"
             >
               <Download className="w-4 h-4" /> Relatório PDF
             </button>
             <select 
-              className="px-4 py-2 rounded-full text-sm font-bold border border-slate-200"
+              className="px-4 py-2 rounded-full text-sm font-bold border border-slate-700 bg-slate-800 text-white"
               value={project.status ?? 'Planejado'}
               onChange={async (e) => {
                 const newStatus = e.target.value;
