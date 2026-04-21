@@ -400,6 +400,7 @@ export const ImprovementManagementModule = ({
   const generatePDF = (project: EngineeringProject) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 15;
     const contentWidth = pageWidth - (margin * 2);
 
@@ -407,80 +408,94 @@ export const ImprovementManagementModule = ({
     const sumTasksInvestment = project.tasks?.reduce((sum, task) => sum + (task.investmentValue || 0), 0) || 0;
     const total = sumTasksInvestment * assetsCount;
     
-    // Header setup
-    doc.setFillColor(30, 64, 175); // Blue-800
-    doc.rect(0, 0, pageWidth, 40, 'F');
+    // Helper for section headers
+    const addSectionHeader = (title: string, yPos: number) => {
+      doc.setFontSize(13);
+      doc.setTextColor(30, 64, 175);
+      doc.setFont('helvetica', 'bold');
+      doc.text(title, margin, yPos);
+      doc.setDrawColor(30, 64, 175);
+      doc.setLineWidth(0.5);
+      doc.line(margin, yPos + 2, margin + 40, yPos + 2);
+      return yPos + 10;
+    };
+
+    // Header
+    doc.setFillColor(30, 64, 175);
+    doc.rect(0, 0, pageWidth, 45, 'F');
     
     doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
     doc.text('GESTÃO DE ENGENHARIA | RELATÓRIO DE MELHORIA', margin, 15);
     
-    // Title with wrapping
-    const titleLines = doc.splitTextToSize(project.title.toUpperCase(), contentWidth - 40);
-    doc.setFontSize(16);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    const titleLines = doc.splitTextToSize(project.title.toUpperCase(), contentWidth);
     doc.text(titleLines, margin, 25);
     
-    // Header Info Box
-    doc.setFillColor(248, 250, 252); // slate-50
-    doc.roundedRect(margin, 45, contentWidth, 35, 3, 3, 'F');
-    doc.setDrawColor(226, 232, 240); // slate-200
-    doc.roundedRect(margin, 45, contentWidth, 35, 3, 3, 'D');
+    let y = 55;
 
-    doc.setTextColor(100, 116, 139); // slate-500
+    // Project Brief Box
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(margin, y, contentWidth, 30, 3, 3, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(margin, y, contentWidth, 30, 3, 3, 'D');
+
     doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
     doc.setFont('helvetica', 'normal');
-    doc.text('RESPONSÁVEL', margin + 5, 53);
-    doc.text('STATUS', margin + 65, 53);
-    doc.text('ESCOPO', margin + 125, 53);
-    doc.text('DATA DE INÍCIO', margin + 5, 68);
-    doc.text('INDICADOR PRINCIPAL', margin + 65, 68);
+    doc.text('RESPONSÁVEL', margin + 5, y + 8);
+    doc.text('STATUS', margin + 70, y + 8);
+    doc.text('DATA EMISSÃO', margin + 130, y + 8);
 
-    doc.setTextColor(30, 41, 59); // slate-900
     doc.setFontSize(10);
+    doc.setTextColor(30, 41, 59);
     doc.setFont('helvetica', 'bold');
-    doc.text(project.responsible || '-', margin + 5, 58);
-    doc.text(project.status || '-', margin + 65, 58);
-    doc.text(project.scope === 'specific' ? 'Equipamento Específico' : 'Geral (Replicável)', margin + 125, 58);
-    doc.text(project.startDate ? format(new Date(project.startDate), 'dd/MM/yyyy') : '-', margin + 5, 73);
-    doc.text(project.indicator || '-', margin + 65, 73);
-
-    let y = 90;
-
-    // Descrição e Objetivos
-    doc.setFontSize(13);
-    doc.setTextColor(30, 64, 175);
-    doc.text('Descrição e Objetivos', margin, y);
-    y += 7;
+    doc.text(project.responsible || '-', margin + 5, y + 14);
+    doc.text(project.status || '-', margin + 70, y + 14);
+    doc.text(format(new Date(), 'dd/MM/yyyy HH:mm'), margin + 130, y + 14);
+    
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.setFont('helvetica', 'normal');
+    doc.text('INDICADOR PRINCIPAL', margin + 5, y + 23);
+    doc.text('TIPO DE PROJETO', margin + 70, y + 23);
 
     doc.setFontSize(10);
-    doc.setTextColor(51, 65, 85); // slate-700
+    doc.setTextColor(30, 41, 59);
+    doc.setFont('helvetica', 'bold');
+    doc.text(project.indicator || '-', margin + 5, y + 28);
+    doc.text(project.scope === 'specific' ? 'Equipamento Específico' : 'Geral (Replicável)', margin + 70, y + 28);
+
+    y += 45;
+
+    // Description Section
+    y = addSectionHeader('Descrição do Problema e Objetivos', y);
+    doc.setFontSize(9);
+    doc.setTextColor(51, 65, 85);
+    
     doc.setFont('helvetica', 'bold');
     doc.text('Problema:', margin, y);
     doc.setFont('helvetica', 'normal');
     const probLines = doc.splitTextToSize(project.description || '-', contentWidth);
     doc.text(probLines, margin, y + 5);
-    y += (probLines.length * 5) + 8;
+    y += (probLines.length * 5) + 10;
 
     doc.setFont('helvetica', 'bold');
     doc.text('Objetivo Estratégico:', margin, y);
     doc.setFont('helvetica', 'normal');
     const objLines = doc.splitTextToSize(project.objective || '-', contentWidth);
     doc.text(objLines, margin, y + 5);
-    y += (objLines.length * 5) + 12;
+    y += (objLines.length * 5) + 15;
 
-    // Impacto de Produção e Manutenção Section in PDF
-    doc.setFontSize(13);
-    doc.setTextColor(30, 64, 175);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Impacto de Produção e Manutenção', margin, y);
-    y += 5;
-
+    // Impact Analysis Table
+    y = addSectionHeader('Análise de Impacto e Diagnóstico', y);
+    
     const prodLossTon = (project.totalDowntime || 0) * (project.productionLossRate || 0);
     const prodLossCost = prodLossTon * (project.productValue || 0) * 1000;
     const totalImpact = prodLossCost + (project.maintenanceCost || 0);
     const estSaving = totalImpact * ((project.expectedRecovery || 100) / 100);
-    
     const analysisDays = (project.analysisStartDate && project.analysisEndDate) 
       ? differenceInDays(parseISO(project.analysisEndDate), parseISO(project.analysisStartDate))
       : 0;
@@ -488,35 +503,36 @@ export const ImprovementManagementModule = ({
     const lossPerTon = prodLossTon > 0 ? (totalImpact / prodLossTon) : 0;
 
     autoTable(doc, {
+      startY: y,
       body: [
         ['Período Analisado:', (project.analysisStartDate && project.analysisEndDate) 
             ? `${format(parseISO(project.analysisStartDate), 'dd/MM/yyyy')} a ${format(parseISO(project.analysisEndDate), 'dd/MM/yyyy')}` 
-            : 'Não definido', 'Downtime/Dia:', `${downtimePerDay.toFixed(2)} h/dia`],
-        ['Tempo Parado Total:', `${project.totalDowntime || 0} h`, 'Produção:', `${project.productionLossRate || 0} Ton/h`],
-        ['Volume Perdido:', `${prodLossTon.toLocaleString('pt-BR')} Ton`, 'Valor do Produto:', `R$ ${(project.productValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} /Kg`],
+            : 'Não definido', 'Downtime Diário:', `${downtimePerDay.toFixed(2)} h/dia`],
+        ['Downtime Total:', `${project.totalDowntime || 0} h`, 'Taxa de Produção:', `${project.productionLossRate || 0} Ton/h`],
+        ['Volume Perdido:', `${prodLossTon.toLocaleString('pt-BR')} Ton/Período`, 'Valor do Produto:', `R$ ${(project.productValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} /Kg`],
         ['Custo de Produção:', `R$ ${prodLossCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Custo de Manutenção:', `R$ ${(project.maintenanceCost || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
-        [{ content: 'IMPACTO FINANCEIRO TOTAL DO PROBLEMA:', colSpan: 2, styles: { fontStyle: 'bold', textColor: [225, 29, 72] } }, { content: `R$ ${totalImpact.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, colSpan: 2, styles: { halign: 'right', fontStyle: 'bold', textColor: [225, 29, 72] } }],
-        ['Recuperação Esperada:', `${project.expectedRecovery || 100}%`, 'Saving Estimado:', `R$ ${estSaving.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
-        [{ content: 'RESULTADO DE PERDA POR TONELADA:', colSpan: 2, styles: { fontStyle: 'bold' } }, { content: `R$ ${lossPerTon.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / Ton`, colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' } }]
+        [{ content: 'IMPACTO FINANCEIRO TOTAL:', colSpan: 2, styles: { fontStyle: 'bold', textColor: [185, 28, 28] } }, { content: `R$ ${totalImpact.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, colSpan: 2, styles: { halign: 'right', fontStyle: 'bold', textColor: [185, 28, 28] } }],
+        ['Eficiência Esperada:', `${project.expectedRecovery || 100}%`, 'Saving Estimado:', `R$ ${estSaving.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
+        [{ content: 'PERDA POR TONELADA PRODUZIDA:', colSpan: 2, styles: { fontStyle: 'bold' } }, { content: `R$ ${lossPerTon.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / Ton`, colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' } }]
       ],
       theme: 'grid',
-      styles: { fontSize: 8, cellPadding: 2.5 },
+      styles: { fontSize: 8, cellPadding: 3 },
       columnStyles: {
-        0: { fontStyle: 'bold', cellWidth: 40, fillColor: [248, 250, 252] },
-        2: { fontStyle: 'bold', cellWidth: 40, fillColor: [248, 250, 252] }
-      }
+        0: { fontStyle: 'bold', cellWidth: 35, fillColor: [248, 250, 252] },
+        2: { fontStyle: 'bold', cellWidth: 35, fillColor: [248, 250, 252] }
+      },
+      margin: { left: margin, right: margin }
     });
 
-    y = (doc as any).lastAutoTable.finalY + 12;
+    y = (doc as any).lastAutoTable.finalY + 15;
 
-    // Tasks Table
-    doc.setFontSize(13);
-    doc.setTextColor(30, 64, 175);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Plano de Ação e Investimentos', margin, y);
-    
+    // Action Plan Table
+    if (y > 230) { doc.addPage(); y = 20; }
+    y = addSectionHeader('Plano de Ação e Investimentos', y);
+
     autoTable(doc, {
-      head: [['Tarefa', 'Responsável', 'Previsão', 'Inv. Unitário', 'Inv. Total']],
+      startY: y,
+      head: [['Tarefa / Etapa do Projeto', 'Responsável', 'Data Prevista', 'Inv. Unitário', 'Inv. Total']],
       body: project.tasks?.map(t => [
         t.name, 
         t.responsible, 
@@ -524,91 +540,78 @@ export const ImprovementManagementModule = ({
         `R$ ${t.investmentValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}`,
         `R$ ${((t.investmentValue || 0) * assetsCount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
       ]) || [],
-      startY: y + 3,
-      headStyles: { 
-        fillColor: [30, 64, 175],
-        fontSize: 9,
-        halign: 'left'
-      },
+      headStyles: { fillColor: [30, 64, 175], fontSize: 9 },
+      styles: { fontSize: 8, cellPadding: 3.5 },
       columnStyles: {
         3: { halign: 'right' },
         4: { halign: 'right' }
       },
-      styles: { fontSize: 8, cellPadding: 3 },
-      alternateRowStyles: { fillColor: [248, 250, 252] }
+      alternateRowStyles: { fillColor: [249, 250, 251] }
     });
-    
+
     y = (doc as any).lastAutoTable.finalY + 10;
-    
-    // Investment Summary Box
+
+    // Investment Summary
     if (y > 240) { doc.addPage(); y = 20; }
-    const summaryWidth = 90;
-    const summaryX = pageWidth - margin - summaryWidth; 
+    const summaryWidth = pageWidth * 0.4;
+    const summaryX = pageWidth - margin - summaryWidth;
     
-    doc.setFillColor(248, 250, 252);
+    doc.setFillColor(30, 64, 175);
+    doc.rect(summaryX, y, summaryWidth, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(9);
+    doc.text('RESUMO DO INVESTIMENTO', summaryX + 2, y + 5.5);
+    
+    doc.setFillColor(255, 255, 255);
     doc.setDrawColor(30, 64, 175);
-    doc.setLineWidth(0.5);
-    doc.roundedRect(summaryX, y, summaryWidth, 30, 2, 2, 'FD');
-    doc.setLineWidth(0.1);
+    doc.rect(summaryX, y, summaryWidth, 32, 'D');
     
+    doc.setTextColor(71, 85, 105);
     doc.setFontSize(8);
-    doc.setTextColor(100, 116, 139);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Soma das Etapas:', summaryX + 5, y + 8);
-    doc.text('Qtde Equipamentos:', summaryX + 5, y + 16);
+    doc.text('Soma das Etapas:', summaryX + 5, y + 15);
+    doc.text('Qtd Equipamentos:', summaryX + 5, y + 21);
+    doc.setFontSize(10);
+    doc.setTextColor(30, 64, 175);
+    doc.text('TOTAL:', summaryX + 5, y + 28);
     
     doc.setTextColor(30, 41, 59);
     doc.setFont('helvetica', 'bold');
-    doc.text(`R$ ${sumTasksInvestment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth - margin - 5, y + 8, { align: 'right' });
-    doc.text(`${assetsCount}`, pageWidth - margin - 5, y + 16, { align: 'right' });
-    
-    doc.setDrawColor(226, 232, 240);
-    doc.line(summaryX + 5, y + 19, pageWidth - margin - 5, y + 19);
-    
-    doc.setFontSize(10);
-    doc.setTextColor(30, 64, 175);
-    doc.text('INVESTIMENTO TOTAL:', summaryX + 5, y + 26);
-    doc.text(`R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth - margin - 5, y + 26, { align: 'right' });
-    
-    y += 40;
+    doc.text(`R$ ${sumTasksInvestment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth - margin - 5, y + 15, { align: 'right' });
+    doc.text(`${assetsCount}`, pageWidth - margin - 5, y + 21, { align: 'right' });
+    doc.setFontSize(11);
+    doc.text(`R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth - margin - 5, y + 28, { align: 'right' });
 
-    // Indicators Table
+    y += 45;
+
+    // Performance Indicators
     if (project.indicators && project.indicators.length > 0) {
-      if (y > 230) { doc.addPage(); y = 20; }
-      doc.setFontSize(13);
-      doc.setTextColor(30, 64, 175);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Indicadores de Desempenho (Antes vs Depois)', margin, y);
+      if (y > 220) { doc.addPage(); y = 20; }
+      y = addSectionHeader('Kpis e Indicadores de Desempenho (Antes vs Depois)', y);
       autoTable(doc, {
-        head: [['KPI / Indicador', 'Baseline (Antes)', 'Atual (Depois)', 'Variação (%)']],
+        startY: y,
+        head: [['Indicador', 'Baseline (Antes)', 'Atual (Depois)', 'Variação (%)']],
         body: project.indicators.map(i => [
-          i.name, 
-          i.before, 
-          i.after, 
-          { content: `${i.variation > 0 ? '+' : ''}${i.variation}%`, styles: { fontStyle: 'bold', textColor: i.variation > 0 ? [16, 185, 129] : [225, 29, 72] } }
+          i.name, i.before, i.after, 
+          { content: `${i.variation > 0 ? '+' : ''}${i.variation}%`, styles: { fontStyle: 'bold', textColor: i.variation > 0 ? [5, 150, 105] : [220, 38, 38] } }
         ]),
-        startY: y + 3,
-        headStyles: { fillColor: [71, 85, 105] }, // slate-600
+        headStyles: { fillColor: [71, 85, 105] },
         styles: { fontSize: 8, cellPadding: 3 }
       });
       y = (doc as any).lastAutoTable.finalY + 15;
     }
 
+    // Results and Lessons Learned
     if (project.lessonsLearned || project.result) {
-      if (y > 230) { doc.addPage(); y = 20; }
-      doc.setFontSize(13);
-      doc.setTextColor(30, 64, 175);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Encerramento e Lições Aprendidas', margin, y);
-      y += 8;
+      if (y > 220) { doc.addPage(); y = 20; }
+      y = addSectionHeader('Enclosure e Lições Aprendidas', y);
       
       doc.setFontSize(9);
-      doc.setTextColor(30, 41, 59);
       doc.setFont('helvetica', 'bold');
+      doc.setTextColor(51, 65, 85);
       doc.text('Resultado Qualitativo:', margin, y);
       doc.setFont('helvetica', 'normal');
-      doc.text(project.result || 'Não informado', margin + 40, y);
-      y += 7;
+      doc.text(project.result || 'Não reportado', margin + 40, y);
+      y += 8;
 
       doc.setFont('helvetica', 'bold');
       doc.text('Lições Aprendidas:', margin, y);
@@ -618,21 +621,27 @@ export const ImprovementManagementModule = ({
       y += (lessonLines.length * 5) + 15;
     }
 
-    // Equipamentos Table (Moved to the end)
-    if (y > 220) { doc.addPage(); y = 20; }
-    doc.setFontSize(13);
-    doc.setTextColor(30, 64, 175);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Equipamentos Escopados no Projeto', margin, y);
+    // Assets Table
+    if (y > 240) { doc.addPage(); y = 20; }
+    y = addSectionHeader('Ativos Vinculados ao Projeto', y);
     autoTable(doc, {
-      head: [['TAG', 'Modelo / Fabricante', 'Descrição Técnica']],
+      startY: y,
+      head: [['TAG', 'Modelo / Fabricante', 'Descrição']],
       body: project.assets?.map(a => [a.tag, a.model, a.description]) || [[project.assetName || '-', '-', '-']],
-      startY: y + 3,
-      headStyles: { fillColor: [51, 65, 85] }, // slate-700
+      headStyles: { fillColor: [51, 65, 85] },
       styles: { fontSize: 8, cellPadding: 3 }
     });
-    
-    doc.save(`relatorio_melhoria_${project.title.replace(/\s+/g, '_')}.pdf`);
+
+    // Footer
+    const totalPages = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text(`Página ${i} de ${totalPages} | Relatório gerado em ${format(new Date(), 'dd/MM/yyyy')}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+    }
+
+    doc.save(`relatorio_${project.title.toLowerCase().replace(/\s+/g, '_')}.pdf`);
   };
 
   if (selectedProject && modalMode === 'view') {
