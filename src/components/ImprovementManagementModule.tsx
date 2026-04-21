@@ -669,26 +669,26 @@ export const ImprovementManagementModule = ({
               <table className="w-full text-sm min-w-[600px]">
                 <thead>
                   <tr className="text-left bg-slate-800 text-white">
-                    <th className="px-6 py-4 font-semibold uppercase tracking-wider text-[10px]">Tarefa</th>
-                    <th className="px-6 py-4 font-semibold uppercase tracking-wider text-[10px]">Responsável</th>
-                    <th className="px-6 py-4 font-semibold uppercase tracking-wider text-[10px]">Data Planejada</th>
-                    <th className="px-6 py-4 font-semibold uppercase tracking-wider text-[10px]">Investimento Unit.</th>
-                    <th className="px-6 py-4 font-semibold uppercase tracking-wider text-[10px]">Status</th>
-                    <th className="px-6 py-4 font-semibold uppercase tracking-wider text-[10px] text-right">Ações</th>
+                    <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Tarefa</th>
+                    <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Responsável</th>
+                    <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Data Planejada</th>
+                    <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Investimento Unit.</th>
+                    <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px]">Status</th>
+                    <th className="px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {project.tasks?.map(task => (
                     <tr key={task.id} className="group hover:bg-blue-50/30 transition-colors">
-                      <td className="px-6 py-4 font-medium text-slate-700">{task.name}</td>
-                      <td className="px-6 py-4 text-slate-600">{task.responsible}</td>
-                      <td className="px-6 py-4 text-slate-600">
+                      <td className="px-4 py-3 text-sm font-medium text-slate-700">{task.name}</td>
+                      <td className="px-4 py-3 text-sm text-slate-600">{task.responsible}</td>
+                      <td className="px-4 py-3 text-sm text-slate-600">
                         {task.plannedDate ? format(new Date(task.plannedDate), 'dd/MM/yyyy') : '-'}
                       </td>
-                      <td className="px-6 py-4 font-mono text-slate-700">
+                      <td className="px-4 py-3 text-sm font-mono text-slate-700">
                         R$ {task.investmentValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3 text-sm">
                         <select 
                           value={task.status ?? 'Pendente'}
                           onChange={(e) => handleUpdateTaskStatus(task.id, e.target.value as any)}
@@ -703,7 +703,7 @@ export const ImprovementManagementModule = ({
                           <option value="Concluído">Concluído</option>
                         </select>
                       </td>
-                      <td className="px-6 py-4 text-right space-x-2">
+                      <td className="px-4 py-3 text-sm text-right space-x-2">
                         <button 
                           onClick={() => setActiveSubModal({type: 'task', mode: 'edit', data: task})} 
                           className="p-2 text-slate-400 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors"
@@ -1040,25 +1040,25 @@ export const ImprovementManagementModule = ({
         <table className="w-full min-w-[800px]">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
             <tr>
-              <th className="px-6 py-4 text-left">Projeto</th>
-              <th className="px-6 py-4 text-left">Status</th>
-              <th className="px-6 py-4 text-left">Responsável</th>
-              <th className="px-6 py-4 text-left">Início</th>
-              <th className="px-6 py-4 text-center">Ações</th>
+              <th className="px-4 py-3 text-left">Projeto</th>
+              <th className="px-4 py-3 text-left">Status</th>
+              <th className="px-4 py-3 text-left">Responsável</th>
+              <th className="px-4 py-3 text-left">Início</th>
+              <th className="px-4 py-3 text-center">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filteredProjects.map(project => (
               <tr key={project.id} className="hover:bg-slate-50">
-                <td className="px-6 py-4 font-bold text-slate-900">{project.title}</td>
-                <td className="px-6 py-4">
+                <td className="px-4 py-3 text-sm font-bold text-slate-900">{project.title}</td>
+                <td className="px-4 py-3 text-sm">
                   <span className={`px-2 py-1 rounded-full text-xs font-bold ${getStatusColor(project.status)}`}>
                     {project.status}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-slate-600">{project.responsible}</td>
-                <td className="px-6 py-4 text-slate-600">{project.startDate ? format(new Date(project.startDate), 'dd/MM/yyyy', { locale: ptBR }) : '-'}</td>
-                <td className="px-6 py-4 text-center">
+                <td className="px-4 py-3 text-sm text-slate-600">{project.responsible}</td>
+                <td className="px-4 py-3 text-sm text-slate-600">{project.startDate ? format(new Date(project.startDate), 'dd/MM/yyyy', { locale: ptBR }) : '-'}</td>
+                <td className="px-4 py-3 text-sm text-center">
                   <div className="flex justify-center gap-2">
                     <button 
                       className="p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600"
