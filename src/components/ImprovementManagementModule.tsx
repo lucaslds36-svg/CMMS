@@ -294,6 +294,10 @@ export const ImprovementManagementModule = ({
     setDeleteConfirm(null);
   };
 
+  const handleDeleteSubItem = (type: 'task' | 'adjustment' | 'indicator' | 'comment', id: string) => {
+    setDeleteConfirm({ type, id });
+  };
+
   const filteredProjects = useMemo(() => {
     return projects.filter(project => {
       const matchesSearch = (project.title || '').toLowerCase().includes(search.toLowerCase()) || 
@@ -387,49 +391,84 @@ export const ImprovementManagementModule = ({
 
   const generatePDF = (project: EngineeringProject) => {
     const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 15;
+    const contentWidth = pageWidth - (margin * 2);
+
     const assetsCount = project.assets?.length || 1;
     const sumTasksInvestment = project.tasks?.reduce((sum, task) => sum + (task.investmentValue || 0), 0) || 0;
     const total = sumTasksInvestment * assetsCount;
     
-    doc.setFontSize(18);
-    doc.setTextColor(30, 64, 175); // Blue-800
-    doc.text(`Relatório de Projeto: ${project.title}`, 10, 15);
+    // Header setup
+    doc.setFillColor(30, 64, 175); // Blue-800
+    doc.rect(0, 0, pageWidth, 40, 'F');
     
-    doc.setFontSize(12);
-    doc.setTextColor(0, 0, 0);
-    doc.text(`Responsável: ${project.responsible}`, 10, 25);
-    doc.text(`Status: ${project.status}`, 10, 32);
-    doc.text(`Escopo: ${project.scope === 'specific' ? 'Equipamento Específico' : 'Todos os Equipamentos'}`, 10, 39);
-    doc.text(`Data de Início: ${project.startDate ? format(new Date(project.startDate), 'dd/MM/yyyy') : '-'}`, 10, 46);
-    
-    doc.setFontSize(14);
-    doc.text('Descrição e Objetivos', 10, 60);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
-    doc.text(`Problema: ${project.description}`, 10, 67, { maxWidth: 180 });
-    doc.text(`Objetivo: ${project.objective}`, 10, 77, { maxWidth: 180 });
-    doc.text(`Indicador Principal: ${project.indicator}`, 10, 87);
+    doc.text('GESTÃO DE ENGENHARIA | RELATÓRIO DE MELHORIA', margin, 15);
     
-    let y = 100;
+    // Title with wrapping
+    const titleLines = doc.splitTextToSize(project.title.toUpperCase(), contentWidth - 40);
+    doc.setFontSize(16);
+    doc.text(titleLines, margin, 25);
+    
+    // Header Info Box
+    doc.setFillColor(248, 250, 252); // slate-50
+    doc.roundedRect(margin, 45, contentWidth, 35, 3, 3, 'F');
+    doc.setDrawColor(226, 232, 240); // slate-200
+    doc.roundedRect(margin, 45, contentWidth, 35, 3, 3, 'D');
 
-    // Equipamentos Table
-    doc.setFontSize(14);
-    doc.text('Equipamentos do Projeto', 10, y);
-    autoTable(doc, {
-      head: [['TAG', 'Modelo', 'Descrição']],
-      body: project.assets?.map(a => [a.tag, a.model, a.description]) || [[project.assetName, '-', '-']],
-      startY: y + 5,
-      headStyles: { fillColor: [30, 64, 175] }
-    });
-    y = (doc as any).lastAutoTable.finalY + 15;
+    doc.setTextColor(100, 116, 139); // slate-500
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text('RESPONSÁVEL', margin + 5, 53);
+    doc.text('STATUS', margin + 65, 53);
+    doc.text('ESCOPO', margin + 125, 53);
+    doc.text('DATA DE INÍCIO', margin + 5, 68);
+    doc.text('INDICADOR PRINCIPAL', margin + 65, 68);
+
+    doc.setTextColor(30, 41, 59); // slate-900
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text(project.responsible || '-', margin + 5, 58);
+    doc.text(project.status || '-', margin + 65, 58);
+    doc.text(project.scope === 'specific' ? 'Equipamento Específico' : 'Geral (Replicável)', margin + 125, 58);
+    doc.text(project.startDate ? format(new Date(project.startDate), 'dd/MM/yyyy') : '-', margin + 5, 73);
+    doc.text(project.indicator || '-', margin + 65, 73);
+
+    let y = 90;
+
+    // Descrição e Objetivos
+    doc.setFontSize(13);
+    doc.setTextColor(30, 64, 175);
+    doc.text('Descrição e Objetivos', margin, y);
+    y += 7;
+
+    doc.setFontSize(10);
+    doc.setTextColor(51, 65, 85); // slate-700
+    doc.setFont('helvetica', 'bold');
+    doc.text('Problema:', margin, y);
+    doc.setFont('helvetica', 'normal');
+    const probLines = doc.splitTextToSize(project.description || '-', contentWidth);
+    doc.text(probLines, margin, y + 5);
+    y += (probLines.length * 5) + 8;
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Objetivo Estratégico:', margin, y);
+    doc.setFont('helvetica', 'normal');
+    const objLines = doc.splitTextToSize(project.objective || '-', contentWidth);
+    doc.text(objLines, margin, y + 5);
+    y += (objLines.length * 5) + 12;
 
     // Tasks Table
-    doc.setFontSize(14);
+    doc.setFontSize(13);
+    doc.setTextColor(30, 64, 175);
     doc.setFont('helvetica', 'bold');
-    doc.text('Plano de Ação e Investimentos', 10, y);
-    doc.setFont('helvetica', 'normal');
+    doc.text('Plano de Ação e Investimentos', margin, y);
     
     autoTable(doc, {
-      head: [['Tarefa', 'Responsável', 'Data Planejada', 'Investimento Unit.', 'Investimento Total']],
+      head: [['Tarefa', 'Responsável', 'Previsão', 'Inv. Unitário', 'Inv. Total']],
       body: project.tasks?.map(t => [
         t.name, 
         t.responsible, 
@@ -437,81 +476,113 @@ export const ImprovementManagementModule = ({
         `R$ ${t.investmentValue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}`,
         `R$ ${((t.investmentValue || 0) * assetsCount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
       ]) || [],
-      startY: y + 5,
+      startY: y + 3,
       headStyles: { 
         fillColor: [30, 64, 175],
-        fontSize: 10,
-        halign: 'center'
+        fontSize: 9,
+        halign: 'left'
       },
       columnStyles: {
         3: { halign: 'right' },
         4: { halign: 'right' }
       },
-      styles: { fontSize: 9 }
+      styles: { fontSize: 8, cellPadding: 3 },
+      alternateRowStyles: { fillColor: [248, 250, 252] }
     });
     
     y = (doc as any).lastAutoTable.finalY + 10;
     
-    // Check for page break before summary box
-    if (y > 240) {
-      doc.addPage();
-      y = 20;
-    }
-
     // Investment Summary Box
-    const summaryWidth = 85;
-    const summaryX = 200 - summaryWidth; 
+    if (y > 240) { doc.addPage(); y = 20; }
+    const summaryWidth = 90;
+    const summaryX = pageWidth - margin - summaryWidth; 
     
-    doc.setFillColor(255, 255, 255); // White background
-    doc.setDrawColor(241, 245, 249); // slate-100
-    doc.roundedRect(summaryX, y, summaryWidth, 32, 3, 3, 'FD');
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(30, 64, 175);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(summaryX, y, summaryWidth, 30, 2, 2, 'FD');
+    doc.setLineWidth(0.1);
     
-    doc.setFontSize(9);
-    doc.setTextColor(100, 116, 139); // slate-500
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
     doc.setFont('helvetica', 'normal');
     doc.text('Soma das Etapas:', summaryX + 5, y + 8);
-    doc.text('Quantidade de Equipamentos:', summaryX + 5, y + 16);
+    doc.text('Qtde Equipamentos:', summaryX + 5, y + 16);
     
-    doc.setTextColor(30, 41, 59); // slate-900
+    doc.setTextColor(30, 41, 59);
     doc.setFont('helvetica', 'bold');
-    doc.text(`R$ ${sumTasksInvestment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 195, y + 8, { align: 'right' });
-    doc.text(`${assetsCount}`, 195, y + 16, { align: 'right' });
+    doc.text(`R$ ${sumTasksInvestment.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth - margin - 5, y + 8, { align: 'right' });
+    doc.text(`${assetsCount}`, pageWidth - margin - 5, y + 16, { align: 'right' });
     
-    doc.setDrawColor(241, 245, 249);
-    doc.line(summaryX + 5, y + 20, 195, y + 20);
+    doc.setDrawColor(226, 232, 240);
+    doc.line(summaryX + 5, y + 19, pageWidth - margin - 5, y + 19);
     
-    doc.setFontSize(9);
-    doc.setTextColor(30, 41, 59); // slate-900
-    doc.text('Investimento Total:', summaryX + 5, y + 27);
-    doc.text(`R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 195, y + 27, { align: 'right' });
+    doc.setFontSize(10);
+    doc.setTextColor(30, 64, 175);
+    doc.text('INVESTIMENTO TOTAL:', summaryX + 5, y + 26);
+    doc.text(`R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth - margin - 5, y + 26, { align: 'right' });
     
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(0, 0, 0);
-    
-    y += 45;
+    y += 40;
 
     // Indicators Table
     if (project.indicators && project.indicators.length > 0) {
-      if (y > 250) { doc.addPage(); y = 20; }
-      doc.setFontSize(14);
-      doc.text('Indicadores de Desempenho', 10, y);
+      if (y > 230) { doc.addPage(); y = 20; }
+      doc.setFontSize(13);
+      doc.setTextColor(30, 64, 175);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Indicadores de Desempenho (Antes vs Depois)', margin, y);
       autoTable(doc, {
-        head: [['Indicador', 'Antes', 'Depois', 'Variação']],
-        body: project.indicators.map(i => [i.name, i.before, i.after, `${i.variation}%`]),
-        startY: y + 5,
-        headStyles: { fillColor: [30, 64, 175] }
+        head: [['KPI / Indicador', 'Baseline (Antes)', 'Atual (Depois)', 'Variação (%)']],
+        body: project.indicators.map(i => [
+          i.name, 
+          i.before, 
+          i.after, 
+          { content: `${i.variation > 0 ? '+' : ''}${i.variation}%`, styles: { fontStyle: 'bold', textColor: i.variation > 0 ? [16, 185, 129] : [225, 29, 72] } }
+        ]),
+        startY: y + 3,
+        headStyles: { fillColor: [71, 85, 105] }, // slate-600
+        styles: { fontSize: 8, cellPadding: 3 }
       });
       y = (doc as any).lastAutoTable.finalY + 15;
     }
 
-    if (project.lessonsLearned) {
-      if (y > 250) { doc.addPage(); y = 20; }
-      doc.setFontSize(14);
-      doc.text('Encerramento e Lições Aprendidas', 10, y);
-      doc.setFontSize(10);
-      doc.text(`Resultado: ${project.result || '-'}`, 10, y + 7);
-      doc.text(`Lições: ${project.lessonsLearned}`, 10, y + 14, { maxWidth: 180 });
+    if (project.lessonsLearned || project.result) {
+      if (y > 230) { doc.addPage(); y = 20; }
+      doc.setFontSize(13);
+      doc.setTextColor(30, 64, 175);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Encerramento e Lições Aprendidas', margin, y);
+      y += 8;
+      
+      doc.setFontSize(9);
+      doc.setTextColor(30, 41, 59);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Resultado Qualitativo:', margin, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(project.result || 'Não informado', margin + 40, y);
+      y += 7;
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Lições Aprendidas:', margin, y);
+      doc.setFont('helvetica', 'normal');
+      const lessonLines = doc.splitTextToSize(project.lessonsLearned || '-', contentWidth);
+      doc.text(lessonLines, margin, y + 5);
+      y += (lessonLines.length * 5) + 15;
     }
+
+    // Equipamentos Table (Moved to the end)
+    if (y > 220) { doc.addPage(); y = 20; }
+    doc.setFontSize(13);
+    doc.setTextColor(30, 64, 175);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Equipamentos Escopados no Projeto', margin, y);
+    autoTable(doc, {
+      head: [['TAG', 'Modelo / Fabricante', 'Descrição Técnica']],
+      body: project.assets?.map(a => [a.tag, a.model, a.description]) || [[project.assetName || '-', '-', '-']],
+      startY: y + 3,
+      headStyles: { fillColor: [51, 65, 85] }, // slate-700
+      styles: { fontSize: 8, cellPadding: 3 }
+    });
     
     doc.save(`relatorio_melhoria_${project.title.replace(/\s+/g, '_')}.pdf`);
   };
@@ -751,16 +822,25 @@ export const ImprovementManagementModule = ({
                   <th className="pb-2">Antes</th>
                   <th className="pb-2">Depois</th>
                   <th className="pb-2">Variação</th>
+                  <th className="pb-2 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {project.indicators?.map(ind => (
-                  <tr key={ind.id} onClick={() => setActiveSubModal({type: 'indicator', mode: 'edit', data: ind})} className="cursor-pointer hover:bg-slate-50">
-                    <td className="py-3">{ind.name}</td>
-                    <td className="py-3">{ind.before}</td>
-                    <td className="py-3">{ind.after}</td>
-                    <td className={`py-3 font-bold ${ind.variation > 0 ? 'text-emerald-600' : ind.variation < 0 ? 'text-rose-600' : 'text-slate-600'}`}>
+                  <tr key={ind.id} className="group hover:bg-slate-50">
+                    <td className="py-3 cursor-pointer" onClick={() => setActiveSubModal({type: 'indicator', mode: 'edit', data: ind})}>{ind.name}</td>
+                    <td className="py-3 cursor-pointer" onClick={() => setActiveSubModal({type: 'indicator', mode: 'edit', data: ind})}>{ind.before}</td>
+                    <td className="py-3 cursor-pointer" onClick={() => setActiveSubModal({type: 'indicator', mode: 'edit', data: ind})}>{ind.after}</td>
+                    <td className={`py-3 font-bold cursor-pointer ${ind.variation > 0 ? 'text-emerald-600' : ind.variation < 0 ? 'text-rose-600' : 'text-slate-600'}`} onClick={() => setActiveSubModal({type: 'indicator', mode: 'edit', data: ind})}>
                       {ind.variation > 0 ? '+' : ''}{ind.variation}%
+                    </td>
+                    <td className="py-3 text-right">
+                      <button 
+                        onClick={() => handleDeleteSubItem('indicator', ind.id)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -770,12 +850,26 @@ export const ImprovementManagementModule = ({
           </div>
 
           {/* Card: Histórico de Ajustes */}
-          <div className="bg-white p-6 rounded-3xl shadow-sm">
-            <h3 className="font-bold text-lg mb-4">Histórico de Ajustes</h3>
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-lg">Histórico de Ajustes</h3>
+            </div>
             <ul className="space-y-2 text-sm">
               {project.adjustments?.map(adj => (
-                <li key={adj.id} onClick={() => setActiveSubModal({type: 'adjustment', mode: 'edit', data: adj})} className="border-b pb-2 cursor-pointer hover:bg-slate-50">
-                  {adj.date ? format(new Date(adj.date), 'dd/MM/yyyy') : '-'} - {adj.description} - {adj.responsible}
+                <li key={adj.id} className="group flex justify-between items-center p-2 rounded-xl hover:bg-slate-50 transition-colors">
+                  <div className="cursor-pointer flex-1" onClick={() => setActiveSubModal({type: 'adjustment', mode: 'edit', data: adj})}>
+                    <span className="font-bold text-slate-700">{adj.date ? format(new Date(adj.date), 'dd/MM/yyyy') : '-'}</span>
+                    <span className="mx-2 text-slate-300">|</span>
+                    <span className="text-slate-600">{adj.description}</span>
+                    <span className="mx-2 text-slate-300">|</span>
+                    <span className="text-slate-500 text-xs uppercase">{adj.responsible}</span>
+                  </div>
+                  <button 
+                    onClick={() => handleDeleteSubItem('adjustment', adj.id)}
+                    className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </li>
               ))}
             </ul>

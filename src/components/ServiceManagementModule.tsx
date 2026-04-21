@@ -400,43 +400,83 @@ export const ServiceManagementModule = ({
 
   const generateIndividualReport = (demand: ServiceDemand) => {
     const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 15;
+    const contentWidth = pageWidth - (margin * 2);
+
+    // Header Color Bar
+    doc.setFillColor(30, 64, 175); // Blue-800
+    doc.rect(0, 0, pageWidth, 40, 'F');
     
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('GESTÃO DE SERVIÇOS | RELATÓRIO DE DEMANDA', margin, 15);
+    
+    // ID and Title
     doc.setFontSize(18);
-    doc.setTextColor(30, 64, 175); // Blue-800
-    doc.text(`Relatório de Demanda: #${demand.id.replace('SD-', '')}`, 10, 15);
+    const demandId = demand.id.replace('SD-', '');
+    doc.text(`DEMANDA #${demandId}`, margin, 25);
     
-    doc.setFontSize(12);
-    doc.setTextColor(0, 0, 0);
-    doc.text(`Responsável: ${demand.responsibleName || '-'}`, 10, 25);
-    doc.text(`Status: ${demand.status}`, 10, 32);
-    doc.text(`Área: ${demand.area}`, 10, 39);
-    doc.text(`Prioridade: ${demand.priority}`, 10, 46);
-    doc.text(`Data de Abertura: ${demand.openedAt ? format(safeParseISO(demand.openedAt), 'dd/MM/yyyy HH:mm') : '-'}`, 10, 53);
-    doc.text(`Previsão de Entrega: ${demand.estimatedDeliveryDate ? format(safeParseISO(demand.estimatedDeliveryDate), 'dd/MM/yyyy') : '-'}`, 10, 60);
-    
+    // Header Info Box
+    doc.setFillColor(248, 250, 252); // slate-50
+    doc.roundedRect(margin, 45, contentWidth, 35, 3, 3, 'F');
+    doc.setDrawColor(226, 232, 240); // slate-200
+    doc.roundedRect(margin, 45, contentWidth, 35, 3, 3, 'D');
+
+    doc.setTextColor(100, 116, 139); // slate-500
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text('RESPONSÁVEL', margin + 5, 53);
+    doc.text('STATUS', margin + 65, 53);
+    doc.text('ÁREA', margin + 125, 53);
+    doc.text('PRIORIDADE', margin + 5, 68);
+    doc.text('DATA ABERTURA', margin + 65, 68);
+    doc.text('PREVISÃO ENTREGA', margin + 125, 68);
+
+    doc.setTextColor(30, 41, 59); // slate-900
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text(demand.responsibleName || '-', margin + 5, 58);
+    doc.text(demand.status || '-', margin + 65, 58);
+    doc.text(demand.area || '-', margin + 125, 58);
+    doc.text(demand.priority || '-', margin + 5, 73);
+    doc.text(demand.openedAt ? format(safeParseISO(demand.openedAt), 'dd/MM/yyyy HH:mm') : '-', margin + 65, 73);
+    doc.text(demand.estimatedDeliveryDate ? format(safeParseISO(demand.estimatedDeliveryDate), 'dd/MM/yyyy') : '-', margin + 125, 73);
+
+    let y = 90;
+
+    // Descrição
     doc.setFontSize(14);
     doc.setTextColor(30, 64, 175);
-    doc.text('Descrição da Demanda', 10, 75);
+    doc.text('Descrição da Demanda', margin, y);
+    y += 7;
+
     doc.setFontSize(10);
     doc.setTextColor(51, 65, 85);
-    doc.text(demand.description || '-', 10, 82, { maxWidth: 180 });
+    doc.setFont('helvetica', 'normal');
+    const descLines = doc.splitTextToSize(demand.description || '-', contentWidth);
+    doc.text(descLines, margin, y);
+    y += (descLines.length * 5) + 10;
     
-    let y = 100;
-
     // Status History Table
     if (demand.statusHistory && demand.statusHistory.length > 0) {
-      doc.setFontSize(14);
+      if (y > 250) { doc.addPage(); y = 20; }
+      doc.setFontSize(13);
       doc.setTextColor(30, 64, 175);
-      doc.text('Histórico de Status', 10, y);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Histórico de Movimentações', margin, y);
       autoTable(doc, {
-        head: [['Data', 'Status', 'Usuário']],
+        head: [['Data / Hora', 'Status', 'Usuário / Responsável']],
         body: demand.statusHistory.map(h => [
           format(safeParseISO(h.date), 'dd/MM/yyyy HH:mm'),
           h.status,
           h.user
         ]),
-        startY: y + 5,
-        headStyles: { fillColor: [30, 64, 175] }
+        startY: y + 3,
+        headStyles: { fillColor: [71, 85, 105] }, // slate-600
+        styles: { fontSize: 8, cellPadding: 3 },
+        alternateRowStyles: { fillColor: [248, 250, 252] }
       });
       y = (doc as any).lastAutoTable.finalY + 15;
     }
@@ -444,18 +484,20 @@ export const ServiceManagementModule = ({
     // Scope Changes Table
     if (demand.scopeChanges && demand.scopeChanges.length > 0) {
       if (y > 250) { doc.addPage(); y = 20; }
-      doc.setFontSize(14);
+      doc.setFontSize(13);
       doc.setTextColor(30, 64, 175);
-      doc.text('Alterações de Escopo', 10, y);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Alterações de Escopo e Prazos', margin, y);
       autoTable(doc, {
-        head: [['Data', 'Descrição', 'Usuário']],
+        head: [['Data', 'Descrição da Alteração', 'Responsável']],
         body: demand.scopeChanges.map(s => [
           format(safeParseISO(s.date), 'dd/MM/yyyy'),
           s.description,
           s.user
         ]),
-        startY: y + 5,
-        headStyles: { fillColor: [30, 64, 175] }
+        startY: y + 3,
+        headStyles: { fillColor: [51, 65, 85] }, // slate-700
+        styles: { fontSize: 8, cellPadding: 3 }
       });
       y = (doc as any).lastAutoTable.finalY + 15;
     }
@@ -463,17 +505,33 @@ export const ServiceManagementModule = ({
     // Material Requisition
     if (demand.needsMaterial && demand.materialRequisition) {
       if (y > 250) { doc.addPage(); y = 20; }
-      doc.setFontSize(14);
+      doc.setFontSize(13);
       doc.setTextColor(30, 64, 175);
-      doc.text('Requisição de Material', 10, y);
-      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Requisição de Material', margin, y);
+      y += 8;
+      
+      doc.setFontSize(9);
       doc.setTextColor(51, 65, 85);
-      doc.text(`Item: ${demand.materialRequisition.item}`, 10, y + 7);
-      doc.text(`Nº Requisição: ${demand.materialRequisition.requisitionNumber}`, 10, y + 14);
-      doc.text(`Data de Entrega: ${demand.materialRequisition.deliveryDate ? format(safeParseISO(demand.materialRequisition.deliveryDate), 'dd/MM/yyyy') : '-'}`, 10, y + 21);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Item:', margin, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(demand.materialRequisition.item || '-', margin + 15, y);
+      y += 7;
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Nº Req:', margin, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(demand.materialRequisition.requisitionNumber || '-', margin + 15, y);
+      y += 7;
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Entrega:', margin, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(demand.materialRequisition.deliveryDate ? format(safeParseISO(demand.materialRequisition.deliveryDate), 'dd/MM/yyyy') : '-', margin + 15, y);
     }
     
-    doc.save(`relatorio_demanda_${demand.id}.pdf`);
+    doc.save(`Demanda_Servico_#${demandId}.pdf`);
     showToast('Relatório PDF gerado com sucesso!');
   };
 
