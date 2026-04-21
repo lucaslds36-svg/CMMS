@@ -41,6 +41,7 @@ export const FailureAnalysisModule = ({
   });
   const [selectedRow, setSelectedRow] = useState<any | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'resumo' | 'indicadores' | 'ranking' | 'pareto' | 'tendencia' | 'tecnicos' | 'turno'>('resumo');
+  const [summaryFocus, setSummaryFocus] = useState<'horas' | 'chamados'>('horas');
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [showPdfModal, setShowPdfModal] = useState(false);
@@ -708,6 +709,93 @@ export const FailureAnalysisModule = ({
     if (active.length === 0) return "Visão Geral (Todos os dados)";
     return `Filtrando por: ${active.join(' • ')}`;
   }, [filters]);
+
+  const macroAnalysis = useMemo(() => {
+    if (filteredData.length === 0) return null;
+
+    const setorCol = filterColMapping['Setor'] || 'Setor';
+    const processoAgg: Record<string, { falhas: number, horas: number }> = {};
+    
+    filteredData.forEach(row => {
+      const processo = String(row[setorCol] || 'N/A').trim();
+      const horas = Number(row[horasCol]) || 0;
+      
+      if (!processoAgg[processo]) processoAgg[processo] = { falhas: 0, horas: 0 };
+      processoAgg[processo].falhas += 1;
+      processoAgg[processo].horas += horas;
+    });
+
+    const processosSorted = Object.entries(processoAgg).sort((a, b) => {
+      return summaryFocus === 'horas' ? b[1].horas - a[1].horas : b[1].falhas - a[1].falhas;
+    });
+    const criticoProcesso = processosSorted[0] ? { name: processosSorted[0][0], ...processosSorted[0][1] } : null;
+
+    return criticoProcesso;
+  }, [filteredData, filterColMapping, horasCol, summaryFocus]);
+
+  const topEquipamentoInfo = useMemo(() => {
+    if (!advancedAnalysis.indicadoresEquipamentos || advancedAnalysis.indicadoresEquipamentos.length === 0) return { primary: null, isTie: false, tiedWith: null };
+    
+    const sorted = [...advancedAnalysis.indicadoresEquipamentos].sort((a, b) => {
+        return summaryFocus === 'horas' ? b.tempoTotalReparo - a.tempoTotalReparo : b.totalFalhas - a.totalFalhas;
+    });
+    
+    const primary = sorted[0];
+    let isTie = false;
+    let tiedWith = null;
+
+    if (summaryFocus === 'chamados' && sorted.length > 1) {
+        if (sorted[0].totalFalhas === sorted[1].totalFalhas) {
+            isTie = true;
+            tiedWith = sorted[1];
+        }
+    }
+
+    return { primary, isTie, tiedWith };
+  }, [advancedAnalysis.indicadoresEquipamentos, summaryFocus]);
+
+  const rootCauseAnalysis = useMemo(() => {
+    if (filteredData.length === 0) return { topCausa: null, topParte: null, isCauseTie: false, tiedCause: null };
+
+    const causaCol = filterColMapping['Causa'] || 'Causa';
+    const parteCol = filterColMapping['Parte'] || 'Parte';
+
+    const causasAgg: Record<string, number> = {};
+    const partesAgg: Record<string, number> = {};
+
+    filteredData.forEach(row => {
+      const causa = String(row[causaCol] || row['Causa'] || 'N/A').trim();
+      const parte = String(row[parteCol] || row['Parte'] || 'N/A').trim();
+      const value = summaryFocus === 'horas' ? (Number(row[horasCol]) || 0) : 1;
+
+      causasAgg[causa] = (causasAgg[causa] || 0) + value;
+      partesAgg[parte] = (partesAgg[parte] || 0) + value;
+    });
+
+    const sortedCausas = Object.entries(causasAgg).sort((a, b) => b[1] - a[1]);
+    const topCausaEntry = sortedCausas[0];
+    
+    let isCauseTie = false;
+    let tiedCause = null;
+
+    if (summaryFocus === 'chamados' && sortedCausas.length > 1) {
+       if (sortedCausas[0][1] === sortedCausas[1][1]) {
+           isCauseTie = true;
+           tiedCause = { name: sortedCausas[1][0], value: sortedCausas[1][1] };
+       }
+    }
+
+    const topParteEntry = Object.entries(partesAgg).sort((a, b) => b[1] - a[1])[0];
+
+    const totalValue = Object.values(causasAgg).reduce((acc, curr) => acc + curr, 0);
+
+    return {
+      topCausa: topCausaEntry ? { name: topCausaEntry[0], value: topCausaEntry[1], percent: totalValue ? (topCausaEntry[1] / totalValue) * 100 : 0 } : null,
+      topParte: topParteEntry ? { name: topParteEntry[0], value: topParteEntry[1] } : null,
+      isCauseTie,
+      tiedCause
+    };
+  }, [filteredData, filterColMapping, horasCol, summaryFocus]);
 
   const aggregateData = (groupBy: string, sumBy: string, countBy?: string) => {
     const result: Record<string, any> = {};
@@ -1697,20 +1785,88 @@ export const FailureAnalysisModule = ({
               <div className="bg-blue-600 text-white p-3 rounded-xl flex-shrink-0 self-start shadow-inner">
                 <Sparkles className="w-6 h-6" />
               </div>
-              <div>
-                <h4 className="font-black text-blue-900 text-lg mb-2 flex items-center gap-2">
-                  Resumo Inteligente <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-md uppercase tracking-wider font-bold">Análise Dinâmica</span>
-                </h4>
+              <div className="flex-1 w-full max-w-full">
+                <div className="flex flex-col md:flex-row md:justify-between md:items-start w-full mb-2 gap-3">
+                  <h4 className="font-black text-blue-900 text-lg flex items-center gap-2">
+                    Resumo Inteligente <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-md uppercase tracking-wider font-bold">Análise Dinâmica</span>
+                  </h4>
+                  <div className="flex bg-white rounded-lg p-1 shadow-sm border border-blue-100 text-[10px] sm:text-xs font-bold w-fit">
+                      <button
+                          onClick={() => setSummaryFocus('horas')}
+                          className={`px-3 py-1.5 rounded-md transition-colors ${summaryFocus === 'horas' ? 'bg-blue-100 text-blue-800' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
+                      >
+                          Foco em Horas
+                      </button>
+                      <button
+                          onClick={() => setSummaryFocus('chamados')}
+                          className={`px-3 py-1.5 rounded-md transition-colors ${summaryFocus === 'chamados' ? 'bg-blue-100 text-blue-800' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
+                      >
+                          Foco em Frequência
+                      </button>
+                  </div>
+                </div>
                 <p className="text-blue-700 font-medium text-xs mb-3 italic">
-                  {activeFiltersDesc}
+                  {activeFiltersDesc} {summaryFocus === 'horas' ? '(Perspectiva de MTTR)' : '(Perspectiva de Repetição)'}
                 </p>
-                <p className="text-blue-900 text-sm leading-relaxed">
-                  Neste cenário restrito de <strong>{filteredData.length} avaliações</strong>, identificamos que o equipamento em situação mais crítica de disponibilidade é o <span className="font-bold underline decoration-blue-300 decoration-2">{[...advancedAnalysis.indicadoresEquipamentos].sort((a,b) => b.tempoTotalReparo - a.tempoTotalReparo)[0]?.name || 'N/A'}</span>. Ele acumula <span className="font-extrabold text-orange-600">{[...advancedAnalysis.indicadoresEquipamentos].sort((a,b) => b.tempoTotalReparo - a.tempoTotalReparo)[0]?.tempoTotalReparo?.toFixed(2) || 0} horas totais de reparo</span> ao longo de {advancedAnalysis.indicadoresEquipamentos.find(i => i.name === [...advancedAnalysis.indicadoresEquipamentos].sort((a,b) => b.tempoTotalReparo - a.tempoTotalReparo)[0]?.name)?.falhas?.length || 0} ocorrências.
-                  <br/><br/>
-                  Analisando o padrão dessas falhas, a principal ofensa relatada (causa raiz global) é de natureza <strong>"{advancedAnalysis.paretoCausas[0]?.name || 'N/A'}"</strong> (representando {(advancedAnalysis.paretoCausas[0]?.percent || 0).toFixed(0)}% do contexto filtrado), cujo impacto se concentra massivamente em defeitos associados com <strong>"{advancedAnalysis.paretoPartes[0]?.name || 'N/A'}"</strong>. 
-                  <br/><br/>
-                  {advancedAnalysis.resumo.totalFalhas > 10 ? " ⚠️ O índice é elevado para o recorte atual. Sugerimos revisar as contramedidas ativas nas OSS (Ordens de Serviço) referentes a este conjunto." : " ✅ Com o volume reduzido neste filtro, o índice de manutenção sugere atuações isoladas, sem padrão repetitivo agudo."}
-                </p>
+                
+                {/* Diferenciar Visão Macroscópica (Processo/Setores gerais) vs Visão Filtrada (Foco no Equipamento) */}
+                {(!filters.Setor && macroAnalysis) ? (
+                  <p className="text-blue-900 text-sm leading-relaxed">
+                    Avaliando a totalidade de <strong>{filteredData.length} registros</strong> neste recorte, o processo/setor mais crítico sob a ótica de {summaryFocus === 'horas' ? 'tempo parado' : 'ocorrências'} é <strong>"{macroAnalysis.name}"</strong>, correspondendo a <span className="font-extrabold text-orange-600">{macroAnalysis.horas.toFixed(2)} horas totais de parada</span> em {macroAnalysis.falhas} ocorrências.
+                    <br/><br/>
+                    
+                    {topEquipamentoInfo.isTie ? (
+                       <>
+                         Neste cenário, identificamos um <strong>empate técnico na quantidade de chamados</strong> entre dois grandes ofensores: a máquina <span className="font-bold underline decoration-blue-300 decoration-2">{topEquipamentoInfo.primary?.name || 'N/A'}</span> e a máquina <span className="font-bold underline decoration-blue-300 decoration-2">{topEquipamentoInfo.tiedWith?.name || 'N/A'}</span> (ambas acumularam <strong>{topEquipamentoInfo.primary?.totalFalhas} falhas</strong>).
+                         <br/><br/>
+                         💡 <em>Recomendamos alterar a perspectiva para <strong>"Foco em Horas"</strong> para desempatar e focar no evento de maior severidade e custo de inatividade.</em>
+                         <br/><br/>
+                         De forma geral, a raiz sistêmica das dores nestes equipamentos está ligada a <strong>"{rootCauseAnalysis.topCausa?.name || 'N/A'}"</strong> e afeta componentes do tipo <strong>"{rootCauseAnalysis.topParte?.name || 'N/A'}"</strong>.
+                       </>
+                    ) : (
+                       <>
+                         Dentro desse cenário geral, o equipamento com o ofensor individual mais grave é o <span className="font-bold underline decoration-blue-300 decoration-2">{topEquipamentoInfo.primary?.name || 'N/A'}</span> ({topEquipamentoInfo.primary?.tempoTotalReparo?.toFixed(2) || 0}h retidas em {topEquipamentoInfo.primary?.totalFalhas || 0} falhas).
+                         
+                         {rootCauseAnalysis.isCauseTie ? (
+                            <>
+                              A raiz do problema divide-se em um forte <strong>empate técnico entre duas causas atuantes:</strong> <strong>"{rootCauseAnalysis.topCausa?.name || 'N/A'}"</strong> e <strong>"{rootCauseAnalysis.tiedCause?.name || 'N/A'}"</strong> (ambas com o mesmo volume de registros), afetando os componentes do tipo <strong>"{rootCauseAnalysis.topParte?.name || 'N/A'}"</strong>. Recomendamos chavear a análise com foco em HORAS na parte superior direita deste painel.
+                            </>
+                         ) : (
+                            <>
+                               A raiz do problema sistêmico está muito ligada a <strong>"{rootCauseAnalysis.topCausa?.name || 'N/A'}"</strong> ({(rootCauseAnalysis.topCausa?.percent || 0).toFixed(0)}% do peso no impacto global) e afeta majoritariamente os componentes do tipo <strong>"{rootCauseAnalysis.topParte?.name || 'N/A'}"</strong>.
+                            </>
+                         )}
+                       </>
+                    )}
+                    <br/><br/>
+                    {(topEquipamentoInfo.primary?.tempoTotalReparo > 10 || (advancedAnalysis.resumo?.totalFalhas || 0) > 15) ? " ⚠️ O panorama industrial exige atenção global nesse processo crítico para investigar eventos de alta demanda temporal e mitigar paradas longas na área." : " ✅ O cenário global está controlado e indica atuações eficientes para a área selecionada, sem colapso sistêmico ou de linha."}
+                  </p>
+                ) : (
+                  <p className="text-blue-900 text-sm leading-relaxed">
+                    Neste cenário focado ({filters.Setor ? `processo restrito a ${filters.Setor}` : `visão parcial`} contendo <strong>{filteredData.length} avaliações</strong>), a gravidade por {summaryFocus === 'horas' ? 'impacto de tempo' : 'frequência quebradiça'} aponta para:
+                    <br/><br/>
+                    
+                    {topEquipamentoInfo.isTie ? (
+                        <>
+                           <strong>Empate Técnico:</strong> Os agressores empataram. O equipamento <span className="font-bold underline decoration-blue-300 decoration-2">{topEquipamentoInfo.primary?.name || 'N/A'}</span> e o equipamento <span className="font-bold underline decoration-blue-300 decoration-2">{topEquipamentoInfo.tiedWith?.name || 'N/A'}</span> dividem a estatística com <strong>{topEquipamentoInfo.primary?.totalFalhas} ocorrências diretas</strong>.
+                           <br/><br/>
+                           💡 <em>A frequência pura de quebras não revela toda a verdade (uma pode ter durado minutos, e a outra, horas). Clique em <strong>"Foco em Horas"</strong> (no topo direito desta caixa) para o sistema ranquear qual das duas custou mais caro na produção.</em>
+                        </>
+                    ) : (
+                        <>
+                           O <span className="font-bold underline decoration-blue-300 decoration-2">{topEquipamentoInfo.primary?.name || 'N/A'}</span>. Ele isoladamente acumula <span className="font-extrabold text-orange-600">{topEquipamentoInfo.primary?.tempoTotalReparo?.toFixed(2) || 0} horas totais de reparo</span> ao longo de {topEquipamentoInfo.primary?.totalFalhas || 0} ocorrências diretas.
+                           <br/><br/>
+                           {rootCauseAnalysis.isCauseTie ? (
+                               <>Avaliando a assinatura de falha desse local, a ofensa (causa raiz micro) apresentou <strong>Empate Múltiplo</strong> entre duas frentes: as causas <strong>"{rootCauseAnalysis.topCausa?.name || 'N/A'}"</strong> e <strong>"{rootCauseAnalysis.tiedCause?.name || 'N/A'}"</strong> empataram em frequência e prejudicam os mesmos conjuntos de <strong>"{rootCauseAnalysis.topParte?.name || 'N/A'}"</strong>. Recomendamos a análise com foco em <em>horas</em> nesses casos para entender qual custou mais caro para arrumar.</>
+                           ) : (
+                               <>Avaliando a assinatura de falha desse recorte específico, a principal ofensa (causa raiz micro) é de natureza <strong>"{rootCauseAnalysis.topCausa?.name || 'N/A'}"</strong> ({(rootCauseAnalysis.topCausa?.percent || 0).toFixed(0)}% do impacto local documentado), cujo reflexo destrutivo se concentra sobre a parte/componente <strong>"{rootCauseAnalysis.topParte?.name || 'N/A'}"</strong>.</>
+                           )}
+                        </>
+                    )}
+                    <br/><br/>
+                    {(topEquipamentoInfo.primary?.tempoTotalReparo > 5 || topEquipamentoInfo.primary?.totalFalhas > 5) ? ` 🚨 ATENÇÃO: As perdas registradas neste filtro caracterizam um impacto severo ou crônico na operação. É crítico analisar a reincidência e propor uma engenharia de contramedida definitiva.` : " ✅ A análise parcial sugere atuações corretivas pontuais, não configurando gargalo crônico extremo no exato momento."}
+                  </p>
+                )}
               </div>
             </div>
           )}
