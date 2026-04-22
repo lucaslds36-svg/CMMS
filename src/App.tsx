@@ -4275,6 +4275,13 @@ const Gantt = ({ wos, assets, employees }: { wos: WorkOrder[], assets: Asset[], 
           <button onClick={nextMonth} className="p-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-all shadow-sm">
             <ChevronRight className="w-4 h-4" />
           </button>
+          <div className="w-px h-4 bg-slate-200 mx-1" />
+          <button 
+            onClick={() => setCurrentMonth(new Date())}
+            className="px-3 py-1.5 bg-white border border-slate-200 text-[10px] font-bold text-blue-600 rounded-lg hover:bg-blue-50 transition-all shadow-sm active:scale-95"
+          >
+            HOJE
+          </button>
         </div>
       </div>
 
