@@ -4423,7 +4423,7 @@ const Gantt = ({ wos, assets, employees }: { wos: WorkOrder[], assets: Asset[], 
                       <UserIcon className="w-4 h-4 text-slate-400" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-black text-slate-900 truncate">{selectedWo.AssignedTo}</p>
+                      <p className="text-sm font-black text-slate-900">{selectedWo.AssignedTo}</p>
                       <p className="text-[10px] text-slate-500 font-bold uppercase">{viewMode === 'technician' ? 'Técnico' : 'Ativo'}</p>
                     </div>
                   </div>

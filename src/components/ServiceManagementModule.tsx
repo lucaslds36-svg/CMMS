@@ -304,7 +304,7 @@ const GanttView = ({ filteredDemands, ptBR }: GanttViewProps) => {
                       <UserIcon className="w-4 h-4 text-slate-400" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-bold text-slate-900 truncate">{selectedDemand.responsibleName}</p>
+                      <p className="text-xs font-bold text-slate-900">{selectedDemand.responsibleName}</p>
                       <p className="text-[9px] text-slate-500 uppercase tracking-tight">{selectedDemand.area}</p>
                     </div>
                   </div>
