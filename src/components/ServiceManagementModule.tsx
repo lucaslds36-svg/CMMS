@@ -280,39 +280,39 @@ const GanttView = ({ filteredDemands, ptBR }: GanttViewProps) => {
                   <FileText className="w-6 h-6" />
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[9px] font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-full">
+                  <div className="flex items-center gap-2 mb-1.5 text-[10px]">
+                    <span className="font-bold text-blue-600 uppercase tracking-wider bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
                       O.S. #{selectedDemand.id.replace('SD-', '')}
                     </span>
                     <span className={cn(
-                      "text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full",
-                      selectedDemand.priority === 'Alta' ? "bg-rose-50 text-rose-600" :
-                      selectedDemand.priority === 'Média' ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"
+                      "font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border",
+                      selectedDemand.priority === 'Alta' ? "bg-rose-50 text-rose-600 border-rose-100" :
+                      selectedDemand.priority === 'Média' ? "bg-amber-50 text-amber-600 border-amber-100" : "bg-emerald-50 text-emerald-600 border-emerald-100"
                     )}>
                       {selectedDemand.priority}
                     </span>
                   </div>
-                  <h3 className="text-xl font-bold text-slate-900 leading-tight">{selectedDemand.description}</h3>
+                  <h3 className="text-xl font-bold text-slate-900 leading-snug">{selectedDemand.description}</h3>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Responsável</p>
-                  <div className="flex items-center gap-2.5">
+              <div className="grid grid-cols-2 gap-3.5 mb-6">
+                <div className="p-3.5 bg-slate-50/80 rounded-[18px] border border-slate-100/80">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Responsável</p>
+                  <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center border border-slate-200 shadow-sm">
                       <UserIcon className="w-4 h-4 text-slate-400" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-bold text-slate-900">{selectedDemand.responsibleName}</p>
-                      <p className="text-[9px] text-slate-500 uppercase tracking-tight">{selectedDemand.area}</p>
+                      <p className="text-xs font-bold text-slate-900 leading-tight">{selectedDemand.responsibleName}</p>
+                      <p className="text-[9px] text-slate-500 uppercase tracking-tight mt-0.5">{selectedDemand.area}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Status Atual</p>
-                  <div className="flex items-center gap-2.5">
+                <div className="p-3.5 bg-slate-50/80 rounded-[18px] border border-slate-100/80">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Status Atual</p>
+                  <div className="flex items-center gap-3">
                     <div className={cn(
                       "w-8 h-8 rounded-lg flex items-center justify-center border shadow-sm",
                       selectedDemand.status === 'Concluído' ? "bg-emerald-50 border-emerald-100 text-emerald-600" :
@@ -326,11 +326,11 @@ const GanttView = ({ filteredDemands, ptBR }: GanttViewProps) => {
               </div>
 
               <div className="space-y-3 mb-6">
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <div className="flex items-center gap-3 text-slate-600">
-                    <CalendarIcon className="w-4 h-4 opacity-40" />
+                <div className="flex items-center justify-between p-4 bg-slate-50/80 rounded-[18px] border border-slate-100/80">
+                  <div className="flex items-center gap-3.5 text-slate-600">
+                    <CalendarIcon className="w-4 h-4 text-blue-500 opacity-60" />
                     <div>
-                      <p className="text-[10px] font-medium text-slate-400">Período Planejado</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Período Planejado</p>
                       <p className="text-xs font-bold text-slate-900">
                         {format(safeParseISO(selectedDemand.startDate || selectedDemand.openedAt), "dd/MM/yyyy")} → {format(safeParseISO(selectedDemand.estimatedDeliveryDate), "dd/MM/yyyy")}
                       </p>

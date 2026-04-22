@@ -4398,74 +4398,74 @@ const Gantt = ({ wos, assets, employees }: { wos: WorkOrder[], assets: Asset[], 
                   <ClipboardList className="w-6 h-6" />
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-full">
+                  <div className="flex items-center gap-2 mb-1.5 text-[10px]">
+                    <span className="font-bold text-blue-600 uppercase tracking-wider bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
                       O.S. #{selectedWo.ID}
                     </span>
                     <span className={cn(
-                      "text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full",
-                      (selectedWo.Priority || selectedWo.priority) === 'Alta' ? "bg-rose-50 text-rose-600" :
-                      (selectedWo.Priority || selectedWo.priority) === 'Crítica' ? "bg-rose-600 text-white" :
-                      (selectedWo.Priority || selectedWo.priority) === 'Média' ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"
+                      "font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border",
+                      (selectedWo.Priority || selectedWo.priority) === 'Alta' ? "bg-rose-50 text-rose-600 border-rose-100" :
+                      (selectedWo.Priority || selectedWo.priority) === 'Crítica' ? "bg-rose-600 text-white border-rose-700" :
+                      (selectedWo.Priority || selectedWo.priority) === 'Média' ? "bg-amber-50 text-amber-600 border-amber-100" : "bg-emerald-50 text-emerald-600 border-emerald-100"
                     )}>
                       {selectedWo.Priority || selectedWo.priority}
                     </span>
                   </div>
-                  <h3 className="text-xl font-black text-slate-900 leading-tight">{selectedWo.Description}</h3>
+                  <h3 className="text-xl font-bold text-slate-900 leading-snug">{selectedWo.Description}</h3>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                <div className="p-4 bg-slate-50 rounded-[18px] border border-slate-100">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Responsável</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 mb-8">
+                <div className="p-3.5 bg-slate-50/80 rounded-[18px] border border-slate-100/80">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Responsável</p>
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center border border-slate-200 shadow-sm">
+                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center border border-slate-200 shadow-sm">
                       <UserIcon className="w-4 h-4 text-slate-400" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-black text-slate-900">{selectedWo.AssignedTo}</p>
-                      <p className="text-[10px] text-slate-500 font-bold uppercase">{viewMode === 'technician' ? 'Técnico' : 'Ativo'}</p>
+                      <p className="text-sm font-bold text-slate-900 leading-tight">{selectedWo.AssignedTo}</p>
+                      <p className="text-[10px] text-slate-500 font-medium uppercase mt-0.5">{viewMode === 'technician' ? 'Técnico' : 'Ativo'}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-4 bg-slate-50 rounded-[18px] border border-slate-100">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Status Atual</p>
+                <div className="p-3.5 bg-slate-50/80 rounded-[18px] border border-slate-100/80">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Status Atual</p>
                   <div className="flex items-center gap-3">
                     <div className={cn(
-                      "w-9 h-9 rounded-xl flex items-center justify-center border shadow-sm",
+                      "w-8 h-8 rounded-lg flex items-center justify-center border shadow-sm",
                       selectedWo.Status === 'Concluída' ? "bg-emerald-100 border-emerald-200 text-emerald-600" :
                       selectedWo.Status === 'Cancelada' ? "bg-slate-200 border-slate-300 text-slate-600" : "bg-blue-100 border-blue-200 text-blue-600"
                     )}>
                       {selectedWo.Status === 'Concluída' ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
                     </div>
-                    <p className="text-sm font-black text-slate-900 truncate">{selectedWo.Status}</p>
+                    <p className="text-sm font-bold text-slate-900">{selectedWo.Status}</p>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-3 mb-8">
-                <div className="p-4 bg-slate-50 rounded-[18px] border border-slate-100">
-                  <div className="flex items-center gap-3 text-slate-600 mb-3">
-                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center border border-slate-200">
+                <div className="p-4 bg-slate-50/80 rounded-[18px] border border-slate-100/80">
+                  <div className="flex items-center gap-3.5 text-slate-600 mb-4">
+                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center border border-slate-200 flex-shrink-0">
                       <Calendar className="w-4 h-4 text-blue-500" />
                     </div>
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase">Período de Realização</p>
-                      <p className="text-sm font-black text-slate-900">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Período de Realização</p>
+                      <p className="text-sm font-bold text-slate-900">
                         {format(parseISO(selectedWo.StartDate || selectedWo.ScheduledDate || selectedWo.CreatedAt), "dd/MM/yyyy")} → {selectedWo.EndDate ? format(parseISO(selectedWo.EndDate), "dd/MM/yyyy") : 'Em aberto'}
                       </p>
                     </div>
                   </div>
                   
                   {selectedWo.AssetID && (
-                    <div className="flex items-center gap-3 text-slate-600">
-                      <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center border border-slate-200">
+                    <div className="flex items-center gap-3.5 text-slate-600">
+                      <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center border border-slate-200 flex-shrink-0">
                         <Box className="w-4 h-4 text-blue-500" />
                       </div>
                       <div>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase">Equipamento / Ativo</p>
-                        <p className="text-sm font-black text-slate-900">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Equipamento / Ativo</p>
+                        <p className="text-sm font-bold text-slate-900">
                           {assets.find(a => a.ID === selectedWo.AssetID || a.Tag === selectedWo.AssetID)?.Tag || selectedWo.AssetID}
                         </p>
                       </div>
@@ -4474,15 +4474,15 @@ const Gantt = ({ wos, assets, employees }: { wos: WorkOrder[], assets: Asset[], 
                 </div>
 
                 {selectedWo.Cause && (
-                  <div className="p-4 bg-amber-50 rounded-[18px] border border-amber-100">
-                    <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest mb-1.5">Causa / Observação</p>
+                  <div className="p-4 bg-amber-50 rounded-[18px] border border-amber-100/60">
+                    <p className="text-[9px] font-bold text-amber-600 uppercase tracking-widest mb-1.5">Causa / Observação</p>
                     <p className="text-xs text-amber-900 font-medium leading-relaxed">{selectedWo.Cause}</p>
                   </div>
                 )}
               </div>
 
               <button 
-                className="w-full py-4 bg-slate-900 text-white rounded-2xl text-base font-black hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 active:scale-[0.98]"
+                className="w-full py-4 bg-slate-900 text-white rounded-2xl text-base font-bold hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 active:scale-[0.98]"
                 onClick={() => setSelectedWo(null)}
               >
                 Fechar Detalhes
