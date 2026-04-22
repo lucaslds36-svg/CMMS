@@ -524,8 +524,8 @@ export const ImprovementManagementModule = ({
         [{ content: 'IMPACTO FINANCEIRO TOTAL:', colSpan: 2, styles: { fontStyle: 'bold', textColor: [153, 27, 27], fontSize: 9 } }, { content: `R$ ${totalImpact.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, colSpan: 2, styles: { halign: 'right', fontStyle: 'bold', textColor: [153, 27, 27], fontSize: 10 } }],
         ['Expectativa de Recuperação:', `${project.expectedRecovery || 100}%`, 'Saving Estimado:', `R$ ${estSaving.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
         [{ content: 'PERDA POR TONELADA PRODUZIDA:', colSpan: 2, styles: { fontStyle: 'bold' } }, { content: `R$ ${lossPerTon.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / Ton`, colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' } }],
-        [{ content: 'ROI ESTIMADO DO PROJETO:', colSpan: 2, styles: { fontStyle: 'bold', fillColor: [240, 253, 244] } }, { content: `${total > 0 ? (((estSaving - total) / total) * 100).toFixed(1) : 0}%`, colSpan: 2, styles: { halign: 'right', fontStyle: 'bold', textColor: [21, 128, 61], fillColor: [240, 253, 244] } }],
-        [{ content: 'PAYBACK SIMPLES (CICLOS):', colSpan: 2, styles: { fontStyle: 'bold' } }, { content: `${estSaving > 0 ? (total / estSaving).toFixed(2) : '-'} Ciclos`, colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' } }]
+        [{ content: 'ROI ESTIMADO DO PROJETO:', colSpan: 2, styles: { fontStyle: 'bold', fillColor: [240, 253, 244] } }, { content: `${total > 0 ? Math.max(0, ((estSaving - total) / total) * 100).toFixed(1) : 0}%`, colSpan: 2, styles: { halign: 'right', fontStyle: 'bold', textColor: [21, 128, 61], fillColor: [240, 253, 244] } }],
+        [{ content: 'PAYBACK ESTIMADO (RETORNO):', colSpan: 2, styles: { fontStyle: 'bold' } }, { content: `${analysisDays > 0 ? ((total / estSaving) * analysisDays).toFixed(1) + ' Dias' : (estSaving > 0 ? (total / estSaving).toFixed(2) + ' Ciclos' : '-')}`, colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' } }]
       ],
       theme: 'grid',
       styles: { fontSize: 8, cellPadding: 3.5 },
@@ -638,12 +638,17 @@ export const ImprovementManagementModule = ({
     const sumTasksInvestment = project.tasks?.reduce((sum, task) => sum + (task.investmentValue || 0), 0) || 0;
     const totalInvestment = sumTasksInvestment * assetsCount;
 
+    const analysisDays = (project.analysisStartDate && project.analysisEndDate) 
+      ? Math.max(1, differenceInDays(parseISO(project.analysisEndDate), parseISO(project.analysisStartDate)))
+      : 0;
+
     const estimatedSaving = ((((project.totalDowntime || 0) * (project.productionLossRate || 0) * (project.productValue || 0) * 1000) + (project.maintenanceCost || 0)) * ((project.expectedRecovery || 100) / 100));
-    const roiPercentage = totalInvestment > 0 ? ((estimatedSaving - totalInvestment) / totalInvestment) * 100 : 0;
-    const paybackValue = estimatedSaving > 0 ? totalInvestment / estimatedSaving : 0;
+    const roiPercentage = totalInvestment > 0 ? Math.max(0, ((estimatedSaving - totalInvestment) / totalInvestment) * 100) : 0;
+    const paybackCiclos = estimatedSaving > 0 ? totalInvestment / estimatedSaving : 0;
+    const paybackInDays = analysisDays > 0 ? paybackCiclos * analysisDays : 0;
     
     const isGoodROI = roiPercentage >= 50;
-    const isGoodPayback = paybackValue <= 0.75;
+    const isGoodPayback = analysisDays > 0 ? paybackInDays <= (analysisDays * 0.75) : paybackCiclos <= 0.75;
     
     return (
       <div className="p-4 sm:p-6 space-y-6 bg-slate-100 min-h-screen">
@@ -760,30 +765,24 @@ export const ImprovementManagementModule = ({
                   </p>
                 </div>
               </div>
-              <div className={cn(
-                "p-4 rounded-2xl border flex justify-between items-center transition-colors",
-                isGoodROI ? "bg-emerald-50 border-emerald-100" : "bg-rose-50 border-rose-100"
-              )}>
+              <div className="p-4 rounded-2xl border border-slate-100 bg-slate-50 flex justify-between items-center transition-colors">
                 <div>
-                  <p className={cn(
-                    "text-[10px] font-bold uppercase tracking-wider",
-                    isGoodROI ? "text-emerald-600" : "text-rose-600"
-                  )}>Saving Estimado do Projeto</p>
-                  <p className={cn(
-                    "font-bold text-2xl",
-                    isGoodROI ? "text-emerald-700" : "text-rose-700"
-                  )}>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Saving Estimado do Projeto</p>
+                  <p className="font-bold text-2xl text-emerald-700">
                     R$ {estimatedSaving.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
-                <div className="text-right">
+                <div className={cn(
+                  "text-right p-2.5 rounded-xl border transition-colors",
+                  isGoodROI ? "bg-emerald-50 border-emerald-100" : "bg-rose-50 border-rose-100"
+                )}>
                   <p className={cn(
-                    "text-[10px] font-bold uppercase tracking-wider",
+                    "text-[9px] font-bold uppercase tracking-wider",
                     isGoodROI ? "text-emerald-600" : "text-rose-600"
                   )}>ROI Teórico</p>
                   <p className={cn(
-                    "font-bold text-xl",
-                    isGoodROI ? "text-emerald-600" : "text-rose-600"
+                    "font-bold text-lg",
+                    isGoodROI ? "text-emerald-700" : "text-rose-700"
                   )}>
                     {totalInvestment > 0 ? `${roiPercentage.toFixed(1)}%` : '∞'}
                   </p>
@@ -806,12 +805,14 @@ export const ImprovementManagementModule = ({
                   <p className={cn(
                     "text-[10px] font-bold uppercase tracking-wider",
                     isGoodPayback ? "text-emerald-600" : "text-rose-600"
-                  )}>Payback Simples</p>
+                  )}>Payback (Estimado)</p>
                   <p className={cn(
                     "font-bold",
                     isGoodPayback ? "text-emerald-700" : "text-rose-700"
                   )}>
-                    {estimatedSaving > 0 ? `${paybackValue.toFixed(2)} Ciclos` : '-'}
+                    {analysisDays > 0 
+                      ? `${paybackInDays.toFixed(1)} Dias` 
+                      : estimatedSaving > 0 ? `${paybackCiclos.toFixed(2)} Ciclos` : '-'}
                   </p>
                 </div>
               </div>
