@@ -25,7 +25,7 @@ import {
   ArrowDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { format, parseISO, differenceInDays, isAfter, isBefore, addDays, startOfMonth, eachDayOfInterval, isToday } from 'date-fns';
+import { format, parseISO, differenceInDays, isAfter, isBefore, addDays, startOfMonth, eachDayOfInterval, isToday, addMonths, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -61,6 +61,297 @@ interface ServiceManagementModuleProps {
   selectedDemandId?: string | null;
   onClearSelectedDemandId?: () => void;
 }
+
+interface GanttViewProps {
+  filteredDemands: ServiceDemand[];
+  ptBR: any;
+}
+
+const GanttView = ({ filteredDemands, ptBR }: GanttViewProps) => {
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const startDate = startOfMonth(currentMonth);
+  const endDate = endOfMonth(currentMonth);
+  const days = eachDayOfInterval({ start: startDate, end: endDate });
+  
+  const [selectedDemand, setSelectedDemand] = useState<ServiceDemand | null>(null);
+
+  const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
+  const prevMonth = () => setCurrentMonth(addMonths(currentMonth, -1));
+  const goToToday = () => setCurrentMonth(new Date());
+  
+  const goToMonth = (month: number) => {
+    const newDate = new Date(currentMonth);
+    newDate.setMonth(month);
+    setCurrentMonth(newDate);
+  };
+  const goToYear = (year: number) => {
+    const newDate = new Date(currentMonth);
+    newDate.setFullYear(year);
+    setCurrentMonth(newDate);
+  };
+
+  return (
+    <div className="p-6 pdf-table-container overflow-x-auto relative min-h-[600px]">
+      {/* Nav & Legend integrated style */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4">
+        <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
+          <button onClick={prevMonth} className="p-2 text-slate-600 hover:bg-white hover:shadow-sm rounded-xl transition-all">
+            <ChevronRight className="w-5 h-5 rotate-180" />
+          </button>
+          
+          <div className="flex items-center gap-1">
+            <select 
+              value={currentMonth.getMonth()} 
+              onChange={(e) => goToMonth(parseInt(e.target.value))}
+              className="bg-transparent border-none py-1.5 text-sm font-bold text-slate-700 outline-none cursor-pointer hover:text-blue-600 transition-colors"
+            >
+              {Array.from({ length: 12 }).map((_, i) => (
+                <option key={i} value={i}>{format(new Date(2000, i, 1), 'MMMM', { locale: ptBR })}</option>
+              ))}
+            </select>
+            <select 
+              value={currentMonth.getFullYear()} 
+              onChange={(e) => goToYear(parseInt(e.target.value))}
+              className="bg-transparent border-none py-1.5 text-sm font-bold text-slate-700 outline-none cursor-pointer hover:text-blue-600 transition-colors"
+            >
+              {Array.from({ length: 10 }).map((_, i) => {
+                const year = new Date().getFullYear() - 5 + i;
+                return <option key={year} value={year}>{year}</option>;
+              })}
+            </select>
+          </div>
+          
+          <button onClick={nextMonth} className="p-2 text-slate-600 hover:bg-white hover:shadow-sm rounded-xl transition-all">
+            <ChevronRight className="w-5 h-5" />
+          </button>
+          
+          <div className="w-px h-4 bg-slate-200 mx-1" />
+          
+          <button 
+            onClick={goToToday}
+            className="px-4 py-1.5 text-xs font-bold text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+          >
+            Hoje
+          </button>
+        </div>
+        
+        <div className="flex items-center gap-6 px-4">
+           <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 bg-blue-600 rounded-full shadow-sm shadow-blue-100" />
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No Prazo</span>
+           </div>
+           <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full shadow-sm shadow-emerald-100" />
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Concluído</span>
+           </div>
+           <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 bg-rose-500 rounded-full shadow-sm shadow-rose-100" />
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Vencida</span>
+           </div>
+        </div>
+      </div>
+
+      <div className="min-w-[1240px] border border-slate-100 rounded-2xl overflow-hidden shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
+        <div className="flex border-b border-slate-100 bg-slate-50/50">
+          <div className="w-64 flex-shrink-0 p-4 font-bold text-[9px] text-slate-400 uppercase tracking-widest border-r border-slate-100 bg-slate-50 flex items-center">
+            Descrição da Atividade
+          </div>
+          <div className="flex-1 flex overflow-hidden">
+            {days.map((day, i) => (
+              <div key={i} className={cn(
+                "flex-1 text-center py-2 text-[9px] font-bold border-l border-slate-100 flex flex-col justify-center min-w-[30px] transition-colors",
+                isToday(day) ? "text-blue-600 bg-blue-50/50" : "text-slate-400"
+              )}>
+                <span className="text-[7px] opacity-70 mb-0.5">{format(day, 'EEE', { locale: ptBR }).toUpperCase()}</span>
+                <span className="text-xs font-black">{format(day, 'dd')}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        <div className="divide-y divide-slate-100 bg-white">
+          {filteredDemands.length > 0 ? filteredDemands.map(demand => {
+            const start = safeParseISO(demand.startDate || demand.openedAt);
+            const end = safeParseISO(demand.estimatedDeliveryDate);
+                          
+            const isVisible = !(isAfter(start, endDate) || isBefore(end, startDate));
+            if (!isVisible) return null;
+
+            const effectiveStart = isBefore(start, startDate) ? startDate : start;
+            const effectiveEnd = isAfter(end, endDate) ? endDate : end;
+            
+            const startOffset = differenceInDays(effectiveStart, startDate);
+            const duration = differenceInDays(effectiveEnd, effectiveStart) + 1;
+            const totalDaysInMonth = days.length;
+            
+            const left = (startOffset / totalDaysInMonth) * 100;
+            const width = (duration / totalDaysInMonth) * 100;
+
+            return (
+              <div key={demand.id} className="flex items-stretch hover:bg-slate-50/30 transition-all">
+                <div className="w-64 flex-shrink-0 p-3 border-r border-slate-100 overflow-hidden bg-white/50">
+                  <div className="text-xs font-bold text-slate-900 truncate" title={demand.description}>
+                    {demand.description}
+                  </div>
+                  <div className="flex items-center justify-between gap-2 mt-1.5">
+                    <div className="flex items-center gap-1 min-w-0">
+                      <div className="w-4 h-4 rounded-md bg-blue-50 flex items-center justify-center border border-blue-100">
+                        <UserIcon className="w-2.5 h-2.5 text-blue-500" />
+                      </div>
+                      <span className="text-[9px] text-slate-500 font-bold truncate tracking-tight">{demand.responsibleName}</span>
+                    </div>
+                    <span className={cn(
+                      "text-[7px] font-black uppercase px-1.5 py-0 rounded-full border",
+                      demand.priority === 'Alta' ? "bg-rose-50 border-rose-100 text-rose-600" :
+                      demand.priority === 'Média' ? "bg-amber-50 border-amber-100 text-amber-600" : "bg-emerald-50 border-emerald-100 text-emerald-600"
+                    )}>
+                      {demand.priority}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex-1 h-12 relative group">
+                  <div className="absolute inset-0 flex pointer-events-none">
+                    {days.map((_, idx) => (
+                      <div key={idx} className="flex-1 border-l border-slate-50/50" />
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setSelectedDemand(demand)}
+                    className={cn(
+                      "absolute top-2.5 bottom-2.5 rounded-lg shadow-sm transition-all hover:scale-[1.01] hover:shadow-xl hover:brightness-110 flex items-center px-3 text-[10px] text-white font-bold overflow-hidden z-10 border-2 border-white/20",
+                      demand.status === 'Concluído' ? "bg-emerald-500 shadow-emerald-100" :
+                      demand.status === 'Cancelado' ? "bg-slate-400" :
+                      isBefore(end, new Date()) ? "bg-rose-500 shadow-rose-100" : "bg-blue-600 shadow-blue-200"
+                    )}
+                    style={{ 
+                      left: `calc(${left}% + 4px)`, 
+                      width: `calc(${width}% - 8px)`,
+                      minWidth: '32px'
+                    }}
+                  >
+                    <span className="truncate drop-shadow-sm">{demand.description}</span>
+                  </button>
+                </div>
+              </div>
+            );
+          }) : (
+            <div className="p-20 text-center bg-slate-50/50">
+              <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-white shadow-sm">
+                <CalendarIcon className="w-8 h-8 text-slate-300" />
+              </div>
+              <p className="text-slate-400 font-black text-lg">Sem atividades este mês</p>
+              <p className="text-slate-400 text-sm mt-1">Ajuste os filtros ou navegue para outro período.</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+
+      <AnimatePresence>
+        {selectedDemand && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-hidden" 
+            onClick={() => setSelectedDemand(null)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="bg-white rounded-[24px] p-6 w-full max-w-md shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar" 
+              onClick={e => e.stopPropagation()}
+            >
+              <button 
+                onClick={() => setSelectedDemand(null)}
+                className="absolute top-5 right-5 p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-start gap-4 mb-6">
+                <div className={cn(
+                  "w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg",
+                  selectedDemand.status === 'Concluído' ? "bg-emerald-500 text-white shadow-emerald-200" :
+                  selectedDemand.status === 'Cancelado' ? "bg-slate-400 text-white" :
+                  isBefore(safeParseISO(selectedDemand.estimatedDeliveryDate), new Date()) ? "bg-rose-500 text-white shadow-rose-200" : "bg-blue-600 text-white shadow-blue-200"
+                )}>
+                  <FileText className="w-6 h-6" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[9px] font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-full">
+                      O.S. #{selectedDemand.id.replace('SD-', '')}
+                    </span>
+                    <span className={cn(
+                      "text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full",
+                      selectedDemand.priority === 'Alta' ? "bg-rose-50 text-rose-600" :
+                      selectedDemand.priority === 'Média' ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"
+                    )}>
+                      {selectedDemand.priority}
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900 leading-tight">{selectedDemand.description}</h3>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Responsável</p>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center border border-slate-200 shadow-sm">
+                      <UserIcon className="w-4 h-4 text-slate-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-900 truncate">{selectedDemand.responsibleName}</p>
+                      <p className="text-[9px] text-slate-500 uppercase tracking-tight">{selectedDemand.area}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Status Atual</p>
+                  <div className="flex items-center gap-2.5">
+                    <div className={cn(
+                      "w-8 h-8 rounded-lg flex items-center justify-center border shadow-sm",
+                      selectedDemand.status === 'Concluído' ? "bg-emerald-50 border-emerald-100 text-emerald-600" :
+                      selectedDemand.status === 'Cancelado' ? "bg-slate-100 border-slate-200 text-slate-600" : "bg-blue-50 border-blue-100 text-blue-600"
+                    )}>
+                      {selectedDemand.status === 'Concluído' ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                    </div>
+                    <p className="text-xs font-bold text-slate-900 truncate">{selectedDemand.status}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <div className="flex items-center gap-3 text-slate-600">
+                    <CalendarIcon className="w-4 h-4 opacity-40" />
+                    <div>
+                      <p className="text-[10px] font-medium text-slate-400">Período Planejado</p>
+                      <p className="text-xs font-bold text-slate-900">
+                        {format(safeParseISO(selectedDemand.startDate || selectedDemand.openedAt), "dd/MM/yyyy")} → {format(safeParseISO(selectedDemand.estimatedDeliveryDate), "dd/MM/yyyy")}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <button 
+                className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 active:scale-[0.98]"
+                onClick={() => setSelectedDemand(null)}
+              >
+                Fechar Detalhes
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 export const ServiceManagementModule = ({
   demands,
@@ -535,67 +826,7 @@ export const ServiceManagementModule = ({
     showToast('Relatório PDF gerado com sucesso!');
   };
 
-  const GanttView = () => {
-    const today = new Date();
-    const startDate = startOfMonth(today);
-    const endDate = addDays(startDate, 30);
-    const days = eachDayOfInterval({ start: startDate, end: endDate });
 
-    return (
-      <div className="p-6 pdf-table-container overflow-x-auto">
-        <div className="min-w-[1200px]">
-          <div className="flex border-b border-slate-100 pb-4 mb-4">
-            <div className="w-64 flex-shrink-0 font-bold text-xs text-slate-400 uppercase">Demanda</div>
-            <div className="flex-1 flex">
-              {days.map((day, i) => (
-                <div key={i} className={cn(
-                  "flex-1 text-center text-[10px] font-bold border-l border-slate-50",
-                  isToday(day) ? "text-blue-600 bg-blue-50/50" : "text-slate-400"
-                )}>
-                  {format(day, 'dd')}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-4">
-            {filteredDemands.map(demand => {
-              const start = safeParseISO(demand.startDate || demand.openedAt);
-              const end = safeParseISO(demand.estimatedDeliveryDate);
-              
-              const startOffset = Math.max(differenceInDays(start, startDate), 0);
-              const duration = Math.max(differenceInDays(end, start), 1);
-              const totalDays = 31;
-              
-              const left = (startOffset / totalDays) * 100;
-              const width = (duration / totalDays) * 100;
-
-              return (
-                <div key={demand.id} className="flex items-center group">
-                  <div className="w-64 flex-shrink-0 pr-4">
-                    <div className="text-sm font-bold text-slate-900 truncate" title={demand.description}>
-                      {demand.description}
-                    </div>
-                    <div className="text-[10px] text-slate-400">{demand.responsibleName}</div>
-                  </div>
-                  <div className="flex-1 h-8 bg-slate-50 rounded-lg relative overflow-hidden">
-                    <div 
-                      className={cn(
-                        "absolute top-1 bottom-1 rounded-md shadow-sm transition-all group-hover:brightness-110",
-                        demand.status === 'Concluído' ? "bg-emerald-500" :
-                        demand.status === 'Cancelado' ? "bg-slate-400" :
-                        isAfter(today, end) ? "bg-rose-500" : "bg-blue-500"
-                      )}
-                      style={{ left: `${left}%`, width: `${width}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   return (
     <>
@@ -639,11 +870,15 @@ export const ServiceManagementModule = ({
       <div className="space-y-6 relative" id="pdf-print-area">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pdf-block border-b border-slate-100 pb-4">
           <div>
-            <h2 className="text-3xl font-bold text-slate-900 mb-1">Gestão de Serviços</h2>
+            <h2 className="text-3xl font-bold text-slate-900 mb-1">
+              {viewMode === 'table' ? 'Gestão de Serviços' : 'Planejamento de Manutenção'}
+            </h2>
             <p className="text-slate-500 text-sm font-medium">
               Relatório Emitido em: {format(new Date(), 'dd/MM/yyyy HH:mm')}
             </p>
-            <p className="text-slate-500 text-sm">Acompanhamento e situação de demandas.</p>
+            <p className="text-slate-500 text-sm">
+              {viewMode === 'table' ? 'Acompanhamento e situação de demandas.' : 'Cronograma e cronograma físico de atividades.'}
+            </p>
           </div>
         <div className="flex items-center gap-2">
           <div className="bg-white p-1 rounded-xl border border-slate-100 flex">
@@ -890,7 +1125,7 @@ export const ServiceManagementModule = ({
             </table>
           </div>
         ) : (
-          <GanttView />
+          <GanttView filteredDemands={filteredDemands} ptBR={ptBR} />
         )}
       </div>
 

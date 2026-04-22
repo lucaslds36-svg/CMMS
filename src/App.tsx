@@ -84,7 +84,9 @@ import {
   addDays,
   startOfDay,
   endOfDay,
-  isWithinInterval
+  isWithinInterval,
+  isAfter,
+  isBefore
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { hasPermission, Action } from './lib/permissions';
@@ -4202,18 +4204,24 @@ const PreventiveModule = ({
 // --- Gantt Component ---
 const Gantt = ({ wos, assets, employees }: { wos: WorkOrder[], assets: Asset[], employees: Employee[] }) => {
   const [viewMode, setViewMode] = useState<'technician' | 'asset'>('technician');
-  const [startDate, setStartDate] = useState(startOfWeek(new Date(), { locale: ptBR }));
-  const daysToShow = 14;
-  const days = Array.from({ length: daysToShow }, (_, i) => addDays(startDate, i));
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedWo, setSelectedWo] = useState<WorkOrder | null>(null);
 
-  const groupedWos = useMemo(() => {
+  const startDate = startOfMonth(currentMonth);
+  const endDate = endOfMonth(currentMonth);
+  const days = eachDayOfInterval({ start: startDate, end: endDate });
+
+  const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
+  const prevMonth = () => setCurrentMonth(addMonths(currentMonth, -1));
+
+  const groupedItems = useMemo(() => {
     const groups: Record<string, WorkOrder[]> = {};
     wos.forEach(wo => {
       const key = viewMode === 'technician' ? (wo.TechnicianID || wo.AssignedTo || 'Não Atribuído') : (wo.AssetID || 'Sem Ativo');
       if (!groups[key]) groups[key] = [];
       groups[key].push(wo);
     });
-    return groups;
+    return Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
   }, [wos, viewMode]);
 
   const getLabel = (key: string) => {
@@ -4223,96 +4231,266 @@ const Gantt = ({ wos, assets, employees }: { wos: WorkOrder[], assets: Asset[], 
     return assets.find(a => a.ID === key || a.Tag === key)?.Tag || key;
   };
 
+  const getSubLabel = (key: string, items: WorkOrder[]) => {
+    if (viewMode === 'asset') {
+      return assets.find(a => a.ID === key || a.Tag === key)?.Description || '';
+    }
+    return `${items.length} Ordens`;
+  };
+
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col h-[calc(100vh-200px)]">
-      <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-        <div className="flex items-center space-x-4">
-          <h3 className="font-bold text-slate-900">Planejamento (Gantt)</h3>
-          <div className="flex bg-slate-200 p-1 rounded-lg">
+    <div className="bg-white rounded-[24px] shadow-sm border border-slate-100 overflow-hidden flex flex-col h-[calc(100vh-200px)]">
+      <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/30">
+        <div className="flex items-center gap-4">
+          <h3 className="text-lg font-bold text-slate-900">Planejamento (Gantt)</h3>
+          <div className="flex bg-slate-200/50 p-1 rounded-lg">
             <button 
               onClick={() => setViewMode('technician')}
-              className={cn("px-3 py-1 text-xs font-medium rounded-md transition-all", viewMode === 'technician' ? "bg-white text-blue-600 shadow-sm" : "text-slate-600 hover:text-slate-900")}
+              className={cn(
+                "px-3 py-1 text-[10px] font-bold rounded-md transition-all", 
+                viewMode === 'technician' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              )}
             >
               Por Técnico
             </button>
             <button 
               onClick={() => setViewMode('asset')}
-              className={cn("px-3 py-1 text-xs font-medium rounded-md transition-all", viewMode === 'asset' ? "bg-white text-blue-600 shadow-sm" : "text-slate-600 hover:text-slate-900")}
+              className={cn(
+                "px-3 py-1 text-[10px] font-bold rounded-md transition-all", 
+                viewMode === 'asset' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              )}
             >
               Por Ativo
             </button>
           </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <button onClick={() => setStartDate(subMonths(startDate, 1))} className="p-2 hover:bg-slate-200 rounded-lg transition-colors"><ChevronRight className="w-4 h-4 rotate-180" /></button>
-          <span className="text-sm font-bold text-slate-700 min-w-[120px] text-center">{format(startDate, 'MMMM yyyy', { locale: ptBR })}</span>
-          <button onClick={() => setStartDate(addMonths(startDate, 1))} className="p-2 hover:bg-slate-200 rounded-lg transition-colors"><ChevronRight className="w-4 h-4" /></button>
+
+        <div className="flex items-center gap-2">
+          <button onClick={prevMonth} className="p-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-all shadow-sm">
+            <ChevronRight className="w-4 h-4 rotate-180" />
+          </button>
+          <div className="px-4 py-1.5 bg-white border border-slate-200 rounded-lg shadow-sm text-xs font-bold text-slate-700 min-w-[140px] text-center">
+            {format(currentMonth, 'MMMM yyyy', { locale: ptBR }).toUpperCase()}
+          </div>
+          <button onClick={nextMonth} className="p-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-all shadow-sm">
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto custom-scrollbar">
         <div className="min-w-max">
           {/* Header */}
-          <div className="flex border-b border-slate-100 sticky top-0 bg-white z-10">
-            <div className="w-48 p-4 border-r border-slate-100 font-bold text-xs text-slate-500 uppercase">Recurso</div>
+          <div className="flex border-b border-slate-100 sticky top-0 bg-white/95 backdrop-blur-sm z-20">
+            <div className="w-56 p-4 border-r border-slate-100 font-bold text-[9px] text-slate-400 uppercase tracking-widest bg-slate-50/50">Recurso</div>
             {days.map(day => (
-              <div key={day.toISOString()} className={cn("w-24 p-2 border-r border-slate-100 text-center flex flex-col items-center justify-center", isToday(day) && "bg-blue-50")}>
-                <span className="text-[10px] uppercase text-slate-400 font-bold">{format(day, 'EEE', { locale: ptBR })}</span>
-                <span className="text-sm font-bold text-slate-700">{format(day, 'dd')}</span>
+              <div key={day.toISOString()} className={cn(
+                "w-20 p-2 border-r border-slate-100 text-center flex flex-col items-center justify-center transition-colors", 
+                isToday(day) ? "bg-blue-50/50" : ""
+              )}>
+                <span className="text-[7px] uppercase text-slate-400 font-black mb-0.5">{format(day, 'EEE', { locale: ptBR })}</span>
+                <span className={cn(
+                  "text-sm font-black",
+                  isToday(day) ? "text-blue-600" : "text-slate-700"
+                )}>{format(day, 'dd')}</span>
               </div>
             ))}
           </div>
 
           {/* Rows */}
-          {Object.entries(groupedWos).map(([key, items]) => (
-            <div key={key} className="flex border-b border-slate-50 hover:bg-slate-50/30 transition-colors">
-              <div className="w-48 p-4 border-r border-slate-100 flex flex-col justify-center">
-                <span className="text-sm font-bold text-slate-800 truncate">{getLabel(key)}</span>
-                <span className="text-[10px] text-slate-400">{items.length} Ordens</span>
+          {groupedItems.length > 0 ? groupedItems.map(([key, items]) => (
+            <div key={key} className="flex border-b border-slate-50 hover:bg-slate-50/30 transition-colors group">
+              <div className="w-56 p-4 border-r border-slate-100 flex flex-col justify-center bg-white/50 group-hover:bg-white transition-colors">
+                <span className="text-xs font-black text-slate-800 truncate mb-1" title={getLabel(key)}>{getLabel(key)}</span>
+                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">{getSubLabel(key, items)}</span>
               </div>
-              <div className="flex relative h-16">
+              <div className="flex relative h-14 items-center">
                 {days.map(day => (
-                  <div key={day.toISOString()} className="w-24 border-r border-slate-50 h-full" />
+                  <div key={day.toISOString()} className={cn(
+                    "w-20 border-r border-slate-50 h-full",
+                    isToday(day) ? "bg-blue-50/10" : ""
+                  )} />
                 ))}
                 {items.map(wo => {
-                  const start = wo.StartDate ? parseISO(wo.StartDate) : (wo.ScheduledDate ? parseISO(wo.ScheduledDate) : null);
-                  const durationDays = wo.Duration && wo.Duration > 0 ? wo.Duration : 1;
-                  const end = wo.EndDate ? parseISO(wo.EndDate) : (start ? addDays(start, durationDays) : null);
+                  const rawStart = wo.StartDate || wo.ScheduledDate || wo.CreatedAt;
+                  if (!rawStart) return null;
                   
-                  if (!start || !end) return null;
-
-                  const startDiff = differenceInDays(startOfDay(start), startOfDay(startDate));
-                  const duration = Math.max(1, differenceInDays(startOfDay(end), startOfDay(start)));
+                  const start = parseISO(rawStart);
+                  const durationDays = wo.Duration && wo.Duration > 0 ? wo.Duration : (wo.duration && wo.duration > 0 ? wo.duration : 1);
+                  const end = wo.EndDate || wo.endDate ? parseISO(wo.EndDate || wo.endDate!) : addDays(start, durationDays);
                   
-                  if (startDiff + duration < 0 || startDiff >= daysToShow) return null;
+                  // Filter for current month view
+                  if (isAfter(start, endDate) || isBefore(end, startDate)) return null;
 
-                  const left = Math.max(0, startDiff) * 96;
-                  const width = Math.min(daysToShow - Math.max(0, startDiff), duration + Math.min(0, startDiff)) * 96;
+                  const effectiveStart = isBefore(start, startDate) ? startDate : start;
+                  const effectiveEnd = isAfter(end, endDate) ? endDate : end;
+
+                  const startDiff = differenceInDays(startOfDay(effectiveStart), startOfDay(startDate));
+                  const duration = Math.max(1, differenceInDays(startOfDay(effectiveEnd), startOfDay(effectiveStart)) + 1);
+                  
+                  const left = startDiff * 80;
+                  const width = duration * 80;
 
                   return (
                     <motion.div 
                       key={wo.ID}
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
+                      onClick={() => setSelectedWo(wo)}
                       className={cn(
-                        "absolute top-2 h-12 rounded-lg border shadow-sm p-2 flex flex-col justify-center overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all z-0",
-                        wo.Status === 'Concluída' ? "bg-emerald-50 border-emerald-200 text-emerald-700" :
-                        wo.Status === 'Em Execução' ? "bg-blue-50 border-blue-200 text-blue-700" :
-                        "bg-amber-50 border-amber-200 text-amber-700"
+                        "absolute h-10 rounded-xl border shadow-sm p-2 flex flex-col justify-center cursor-pointer hover:shadow-xl hover:scale-[1.02] transition-all z-10 border-white/20",
+                        wo.Status === 'Concluída' ? "bg-emerald-500 text-white shadow-emerald-100" :
+                        wo.Status === 'Em Execução' ? "bg-blue-600 text-white shadow-blue-100" :
+                        wo.Status === 'Cancelada' ? "bg-slate-400 text-white" :
+                        "bg-amber-500 text-white shadow-amber-100"
                       )}
-                      style={{ left: `${left}px`, width: `${width}px` }}
-                      title={`${wo.ID}: ${wo.Description}`}
+                      style={{ left: `${left + 3}px`, width: `${width - 6}px` }}
                     >
-                      <span className="text-[10px] font-bold truncate">{wo.ID}</span>
-                      <span className="text-[9px] truncate opacity-80">{wo.Description}</span>
+                      <span className="text-[7px] font-black tracking-widest mb-0.5">#{wo.ID}</span>
+                      <span className="text-[9px] font-bold truncate opacity-90">{wo.Description}</span>
                     </motion.div>
                   );
                 })}
               </div>
             </div>
-          ))}
+          )) : (
+            <div className="p-20 text-center flex flex-col items-center justify-center">
+              <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6">
+                <GanttChart className="w-10 h-10 text-slate-300" />
+              </div>
+              <h4 className="text-xl font-bold text-slate-900 mb-2">Sem ordens agendadas</h4>
+              <p className="text-slate-500 text-sm">Não há dados para exibir neste período e modo de visualização.</p>
+            </div>
+          )}
         </div>
       </div>
+
+      <AnimatePresence>
+        {selectedWo && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-hidden" 
+            onClick={() => setSelectedWo(null)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="bg-white rounded-[24px] p-8 w-full max-w-md shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar" 
+              onClick={e => e.stopPropagation()}
+            >
+              <button 
+                onClick={() => setSelectedWo(null)}
+                className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-start gap-4 mb-8">
+                <div className={cn(
+                  "w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg",
+                  selectedWo.Status === 'Concluída' ? "bg-emerald-500 text-white shadow-emerald-200" :
+                  selectedWo.Status === 'Cancelada' ? "bg-slate-400 text-white" :
+                  selectedWo.Status === 'Em Execução' ? "bg-blue-600 text-white shadow-blue-200" : "bg-amber-500 text-white shadow-amber-200"
+                )}>
+                  <ClipboardList className="w-6 h-6" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-full">
+                      O.S. #{selectedWo.ID}
+                    </span>
+                    <span className={cn(
+                      "text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full",
+                      (selectedWo.Priority || selectedWo.priority) === 'Alta' ? "bg-rose-50 text-rose-600" :
+                      (selectedWo.Priority || selectedWo.priority) === 'Crítica' ? "bg-rose-600 text-white" :
+                      (selectedWo.Priority || selectedWo.priority) === 'Média' ? "bg-amber-50 text-amber-600" : "bg-emerald-50 text-emerald-600"
+                    )}>
+                      {selectedWo.Priority || selectedWo.priority}
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-black text-slate-900 leading-tight">{selectedWo.Description}</h3>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                <div className="p-4 bg-slate-50 rounded-[18px] border border-slate-100">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Responsável</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center border border-slate-200 shadow-sm">
+                      <UserIcon className="w-4 h-4 text-slate-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-black text-slate-900 truncate">{selectedWo.AssignedTo}</p>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase">{viewMode === 'technician' ? 'Técnico' : 'Ativo'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-50 rounded-[18px] border border-slate-100">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Status Atual</p>
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "w-9 h-9 rounded-xl flex items-center justify-center border shadow-sm",
+                      selectedWo.Status === 'Concluída' ? "bg-emerald-100 border-emerald-200 text-emerald-600" :
+                      selectedWo.Status === 'Cancelada' ? "bg-slate-200 border-slate-300 text-slate-600" : "bg-blue-100 border-blue-200 text-blue-600"
+                    )}>
+                      {selectedWo.Status === 'Concluída' ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                    </div>
+                    <p className="text-sm font-black text-slate-900 truncate">{selectedWo.Status}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 mb-8">
+                <div className="p-4 bg-slate-50 rounded-[18px] border border-slate-100">
+                  <div className="flex items-center gap-3 text-slate-600 mb-3">
+                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center border border-slate-200">
+                      <Calendar className="w-4 h-4 text-blue-500" />
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">Período de Realização</p>
+                      <p className="text-sm font-black text-slate-900">
+                        {format(parseISO(selectedWo.StartDate || selectedWo.ScheduledDate || selectedWo.CreatedAt), "dd/MM/yyyy")} → {selectedWo.EndDate ? format(parseISO(selectedWo.EndDate), "dd/MM/yyyy") : 'Em aberto'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {selectedWo.AssetID && (
+                    <div className="flex items-center gap-3 text-slate-600">
+                      <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center border border-slate-200">
+                        <Box className="w-4 h-4 text-blue-500" />
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase">Equipamento / Ativo</p>
+                        <p className="text-sm font-black text-slate-900">
+                          {assets.find(a => a.ID === selectedWo.AssetID || a.Tag === selectedWo.AssetID)?.Tag || selectedWo.AssetID}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {selectedWo.Cause && (
+                  <div className="p-4 bg-amber-50 rounded-[18px] border border-amber-100">
+                    <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest mb-1.5">Causa / Observação</p>
+                    <p className="text-xs text-amber-900 font-medium leading-relaxed">{selectedWo.Cause}</p>
+                  </div>
+                )}
+              </div>
+
+              <button 
+                className="w-full py-4 bg-slate-900 text-white rounded-2xl text-base font-black hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 active:scale-[0.98]"
+                onClick={() => setSelectedWo(null)}
+              >
+                Fechar Detalhes
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
