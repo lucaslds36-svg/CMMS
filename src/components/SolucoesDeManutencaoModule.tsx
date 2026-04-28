@@ -1,9 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Search, Calendar, Tag, Trash2, Edit2, Wrench, X, Download, ClipboardList, User, Eye } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format, parseISO } from 'date-fns';
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 import { Asset } from '../types';
 
@@ -18,6 +18,8 @@ interface Solution {
   titulo: string;
   responsavelAcompanhamento: string;
   maquina: string;
+  resumoBreve: string;
+  resumoAcao?: string;
   processo?: string;
   tipo: 'Mecânico' | 'Elétrico' | 'Automação' | 'Outros';
   problema: string;
@@ -36,6 +38,23 @@ interface MaintenanceSolutionsModuleProps {
 
 export const MaintenanceSolutionsModule: React.FC<MaintenanceSolutionsModuleProps> = ({ assets }) => {
   const [solutions, setSolutions] = useState<Solution[]>([]);
+
+  // LocalStorage Persistence
+  useEffect(() => {
+    const saved = localStorage.getItem('manutencao_conhecimento');
+    if (saved) {
+      try {
+        setSolutions(JSON.parse(saved));
+      } catch (e) {
+        console.error('Erro ao carregar do localStorage', e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('manutencao_conhecimento', JSON.stringify(solutions));
+  }, [solutions]);
+
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewingSolution, setViewingSolution] = useState<Solution | null>(null);
@@ -47,6 +66,8 @@ export const MaintenanceSolutionsModule: React.FC<MaintenanceSolutionsModuleProp
     localizacao: '',
     modelo: '',
     maquina: '',
+    resumoBreve: '',
+    resumoAcao: '',
     tipo: 'Mecânico' as Solution['tipo'],
     problema: '',
     solucao: '',
@@ -65,6 +86,8 @@ export const MaintenanceSolutionsModule: React.FC<MaintenanceSolutionsModuleProp
       localizacao: '',
       modelo: '',
       maquina: '',
+      resumoBreve: '',
+      resumoAcao: '',
       tipo: 'Mecânico',
       problema: '',
       solucao: '',
@@ -118,6 +141,8 @@ export const MaintenanceSolutionsModule: React.FC<MaintenanceSolutionsModuleProp
       localizacao: '', // Users will re-select or we could try to find it
       modelo: '',
       maquina: solution.maquina,
+      resumoBreve: solution.resumoBreve || '',
+      resumoAcao: solution.resumoAcao || '',
       tipo: solution.tipo,
       problema: solution.problema,
       solucao: solution.solucao,
@@ -183,6 +208,7 @@ export const MaintenanceSolutionsModule: React.FC<MaintenanceSolutionsModuleProp
     return solutions.filter(s => 
       s.maquina.toLowerCase().includes(search.toLowerCase()) ||
       s.problema.toLowerCase().includes(search.toLowerCase()) ||
+      s.resumoBreve?.toLowerCase().includes(search.toLowerCase()) ||
       s.titulo?.toLowerCase().includes(search.toLowerCase()) ||
       s.responsavelAcompanhamento?.toLowerCase().includes(search.toLowerCase()) ||
       s.tags.some(t => t.toLowerCase().includes(search.toLowerCase())) ||
@@ -196,6 +222,8 @@ export const MaintenanceSolutionsModule: React.FC<MaintenanceSolutionsModuleProp
       titulo: form.titulo,
       responsavelAcompanhamento: form.responsavelAcompanhamento,
       maquina: form.maquina,
+      resumoBreve: form.resumoBreve,
+      resumoAcao: form.resumoAcao,
       processo: form.localizacao && form.modelo ? `${form.localizacao} > ${form.modelo}` : (editingId ? solutions.find(s => s.id === editingId)?.processo : 'Geral'),
       tipo: form.tipo,
       problema: form.problema,
@@ -275,13 +303,14 @@ export const MaintenanceSolutionsModule: React.FC<MaintenanceSolutionsModuleProp
       const tableData = [
         ['Especialidade:', s.tipo, 'Data Registro:', format(new Date(s.data), 'dd/MM/yyyy')],
         ['Responsável:', s.responsavelAcompanhamento || '-', 'Local:', s.processo || 'Geral'],
-        [{ content: 'PROBLEMA / CAUSA RAIZ:', colSpan: 1, styles: { fontStyle: 'bold', textColor: [185, 28, 28] } }, { content: s.problema, colSpan: 3 }],
-        [{ content: 'RESUMO DA SOLUÇÃO:', colSpan: 1, styles: { fontStyle: 'bold', textColor: [21, 128, 61] } }, { content: s.solucao, colSpan: 3 }]
+        ['Resumo Falha:', { content: s.resumoBreve || '-', colSpan: 1 }, 'Resumo Ação:', { content: s.resumoAcao || '-', colSpan: 1 }],
+        [{ content: 'PROBLEMA / CAUSA RAIZ:', colSpan: 1, styles: { fontStyle: 'bold' as const, textColor: [185, 28, 28] } }, { content: s.problema, colSpan: 3 }],
+        [{ content: 'AÇÃO / LIÇÃO APRENDIDA:', colSpan: 1, styles: { fontStyle: 'bold' as const, textColor: [21, 128, 61] } }, { content: s.solucao, colSpan: 3 }]
       ];
 
-      doc.autoTable({
+      autoTable(doc, {
         startY: currentY,
-        body: tableData,
+        body: tableData as any,
         theme: 'grid',
         styles: { fontSize: 8, cellPadding: 3.5, lineColor: [226, 232, 240] },
         columnStyles: {
@@ -291,7 +320,7 @@ export const MaintenanceSolutionsModule: React.FC<MaintenanceSolutionsModuleProp
         margin: { left: margin, right: margin }
       });
 
-      currentY = doc.lastAutoTable.finalY + 5;
+      currentY = (doc as any).lastAutoTable.finalY + 5;
 
       // Add Step by Step section
       if (s.passos && s.passos.length > 0) {
@@ -315,11 +344,55 @@ export const MaintenanceSolutionsModule: React.FC<MaintenanceSolutionsModuleProp
           doc.setFont('helvetica', 'normal');
           doc.text(splitText, margin + 15, currentY);
           
-          currentY += (splitText.length * 4) + 5;
+          currentY += (splitText.length * 4) + 3;
+
+          // Add image to step in bulk report
+          if (passo.imagem) {
+            try {
+              const stepImgH = 30;
+              const stepImgW = 50;
+              if (currentY + stepImgH > 270) {
+                doc.addPage();
+                currentY = 20;
+              }
+              doc.addImage(passo.imagem, 'JPEG', margin + 15, currentY, stepImgW, stepImgH);
+              currentY += stepImgH + 5;
+            } catch(e) { }
+          }
+          currentY += 2;
         });
       }
 
       currentY += 10;
+
+      // Add Images section to full report
+      if (s.fotoAntes || s.fotoDepois) {
+        if (currentY > 230) {
+          doc.addPage();
+          currentY = 20;
+        }
+        
+        const imgSize = 40;
+        if (s.fotoAntes) {
+          try {
+            doc.addImage(s.fotoAntes, 'JPEG', margin, currentY, imgSize, imgSize);
+            doc.setFontSize(7);
+            doc.text('SITUAÇÃO INICIAL', margin + (imgSize/2), currentY + imgSize + 3, { align: 'center' });
+          } catch(e) { console.warn('Erro ao add imagem antes no PDF bulk'); }
+        }
+        
+        if (s.fotoDepois) {
+          try {
+            const xPos = margin + imgSize + 5;
+            doc.addImage(s.fotoDepois, 'JPEG', xPos, currentY, imgSize, imgSize);
+            doc.setFontSize(7);
+            doc.text('RESULTADO FINAL', xPos + (imgSize/2), currentY + imgSize + 3, { align: 'center' });
+          } catch(e) { console.warn('Erro ao add imagem depois no PDF bulk'); }
+        }
+        currentY += imgSize + 10;
+      }
+
+      currentY += 5;
     });
 
     const totalPages = doc.internal.getNumberOfPages();
@@ -331,6 +404,125 @@ export const MaintenanceSolutionsModule: React.FC<MaintenanceSolutionsModuleProp
     }
 
     doc.save(`base_conhecimento_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
+  };
+
+  const generateSinglePDF = (solution: Solution) => {
+    const doc = new jsPDF() as any;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 15;
+    const contentWidth = pageWidth - (margin * 2);
+    
+    doc.setFillColor(15, 23, 42); 
+    doc.rect(0, 0, pageWidth, 40, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.text('RELATÓRIO TÉCNICO INDIVIDUAL', margin, 18);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(`ID Registro: #${solution.id.slice(-6)} - Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, margin, 26);
+
+    let currentY = 55;
+
+    doc.setFillColor(241, 245, 249);
+    doc.rect(margin, currentY, contentWidth, 12, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.rect(margin, currentY, contentWidth, 12, 'D');
+    
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text(solution.titulo?.toUpperCase() || 'SEM TÍTULO', margin + 5, currentY + 8);
+    
+    currentY += 12;
+
+    const tableData = [
+      ['Equipamento:', solution.maquina, 'Especialidade:', solution.tipo],
+      ['Responsável:', solution.responsavelAcompanhamento || '-', 'Data:', format(new Date(solution.data), 'dd/MM/yyyy')],
+      ['Resumo Falha:', solution.resumoBreve || '-', 'Resumo Ação:', solution.resumoAcao || '-'],
+      ['Localização:', { content: solution.processo || 'Geral', colSpan: 3 }],
+      [{ content: 'PROBLEMA / CAUSA RAIZ:', colSpan: 1, styles: { fontStyle: 'bold' as const, textColor: [185, 28, 28] } }, { content: solution.problema, colSpan: 3 }],
+      [{ content: 'AÇÃO / LIÇÃO APRENDIDA:', colSpan: 1, styles: { fontStyle: 'bold' as const, textColor: [21, 128, 61] } }, { content: solution.solucao, colSpan: 3 }]
+    ];
+
+    autoTable(doc, {
+      startY: currentY,
+      body: tableData as any,
+      theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 4, lineColor: [226, 232, 240] },
+      columnStyles: {
+        0: { cellWidth: 40, fontStyle: 'bold', fillColor: [248, 250, 252] },
+        2: { cellWidth: 40, fontStyle: 'bold', fillColor: [248, 250, 252] }
+      },
+      margin: { left: margin, right: margin }
+    });
+
+    currentY = (doc as any).lastAutoTable.finalY + 10;
+
+    if (solution.passos && solution.passos.length > 0) {
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('DETALHAMENTO PASSO A PASSO:', margin, currentY);
+      currentY += 7;
+
+      solution.passos.forEach((passo, pIdx) => {
+        if (currentY > 260) {
+          doc.addPage();
+          currentY = 20;
+        }
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Passo ${pIdx + 1}:`, margin, currentY);
+        const splitText = doc.splitTextToSize(passo.texto, contentWidth - 25);
+        doc.setFont('helvetica', 'normal');
+        doc.text(splitText, margin + 20, currentY);
+        currentY += (splitText.length * 4) + 3;
+
+        // Add Step Image if exists
+        if (passo.imagem) {
+          try {
+            const stepImgHeight = 35;
+            const stepImgWidth = 60;
+            if (currentY + stepImgHeight > 270) {
+              doc.addPage();
+              currentY = 20;
+            }
+            doc.addImage(passo.imagem, 'JPEG', margin + 20, currentY, stepImgWidth, stepImgHeight);
+            currentY += stepImgHeight + 5;
+          } catch(e) { 
+            console.warn('Erro ao carregar imagem do passo no PDF', e);
+          }
+        }
+        currentY += 3;
+      });
+    }
+
+    if (solution.fotoAntes || solution.fotoDepois) {
+      if (currentY > 180) {
+        doc.addPage();
+        currentY = 20;
+      }
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('EVIDÊNCIAS FOTOGRÁFICAS:', margin, currentY);
+      currentY += 10;
+
+      const imgWidth = (contentWidth / 2) - 5;
+      if (solution.fotoAntes) {
+        doc.addImage(solution.fotoAntes, 'JPEG', margin, currentY, imgWidth, imgWidth);
+        doc.setFontSize(7);
+        doc.text('SITUAÇÃO INICIAL', margin + (imgWidth/2), currentY + imgWidth + 5, { align: 'center' });
+      }
+      if (solution.fotoDepois) {
+        doc.addImage(solution.fotoDepois, 'JPEG', margin + imgWidth + 10, currentY, imgWidth, imgWidth);
+        doc.setFontSize(7);
+        doc.text('RESULTADO FINAL', margin + imgWidth + 10 + (imgWidth/2), currentY + imgWidth + 5, { align: 'center' });
+      }
+    }
+
+    doc.save(`relatorio_${solution.id.slice(-6)}.pdf`);
   };
 
   return (
@@ -371,6 +563,26 @@ export const MaintenanceSolutionsModule: React.FC<MaintenanceSolutionsModuleProp
                 placeholder="Ex: Falha recorrente no rolamento do motor principal" 
                 value={form.titulo} 
                 onChange={e => setForm({...form, titulo: e.target.value})} 
+                required 
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 text-blue-600">Resumo da Falha</label>
+              <input 
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" 
+                placeholder="Ex: Quebra do motor" 
+                value={form.resumoBreve} 
+                onChange={e => setForm({...form, resumoBreve: e.target.value})} 
+                required 
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase ml-1 text-emerald-600">Resumo da Ação</label>
+              <input 
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all" 
+                placeholder="Ex: Substituição completa" 
+                value={form.resumoAcao} 
+                onChange={e => setForm({...form, resumoAcao: e.target.value})} 
                 required 
               />
             </div>
@@ -666,6 +878,11 @@ export const MaintenanceSolutionsModule: React.FC<MaintenanceSolutionsModuleProp
                       Resp: {s.responsavelAcompanhamento}
                     </div>
                   )}
+                  {s.resumoBreve && (
+                    <p className="text-xs font-bold text-blue-600 italic bg-blue-50 px-2 py-1 rounded-lg border border-blue-100 inline-block mt-1">
+                      {s.resumoBreve}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <button 
@@ -790,6 +1007,24 @@ export const MaintenanceSolutionsModule: React.FC<MaintenanceSolutionsModuleProp
                 </div>
               </div>
 
+              {/* Status Bar */}
+              {(viewingSolution.resumoBreve || viewingSolution.resumoAcao) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  {viewingSolution.resumoBreve && (
+                    <div className="p-6 bg-blue-50 rounded-3xl border border-blue-100">
+                      <p className="text-[10px] font-bold text-blue-500 uppercase mb-2 tracking-widest">Resumo da Falha</p>
+                      <p className="text-lg font-bold text-slate-800 italic">"{viewingSolution.resumoBreve}"</p>
+                    </div>
+                  )}
+                  {viewingSolution.resumoAcao && (
+                    <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100">
+                      <p className="text-[10px] font-bold text-emerald-500 uppercase mb-2 tracking-widest">Resumo da Ação</p>
+                      <p className="text-lg font-bold text-slate-800 italic">"{viewingSolution.resumoAcao}"</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Problem/Solution Summary */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-rose-50 p-6 rounded-3xl border border-rose-100">
@@ -865,21 +1100,26 @@ export const MaintenanceSolutionsModule: React.FC<MaintenanceSolutionsModuleProp
             </div>
 
             {/* Modal Footer */}
-            <div className="bg-slate-50 p-6 border-t border-slate-100 flex justify-end gap-3 font-bold text-sm">
+            <div className="bg-slate-50 p-6 border-t border-slate-100 flex justify-end gap-3 font-bold text-sm no-print">
               <button 
                 onClick={() => setViewingSolution(null)}
                 className="px-6 py-2.5 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-all uppercase"
               >
-                Fechar Visualização
+                Fechar
+              </button>
+              <button 
+                onClick={() => window.print()}
+                className="bg-slate-100 text-slate-700 px-6 py-2.5 rounded-xl hover:bg-slate-200 shadow-sm flex items-center gap-2 uppercase tracking-tight"
+              >
+                <Eye className="w-4 h-4" /> Impressão Direta
               </button>
               <button 
                 onClick={() => {
-                  generatePDF();
-                  setViewingSolution(null);
+                  generateSinglePDF(viewingSolution);
                 }}
                 className="bg-slate-900 text-white px-6 py-2.5 rounded-xl hover:bg-slate-800 shadow-lg flex items-center gap-2 uppercase tracking-tight"
               >
-                <Download className="w-4 h-4" /> Baixar PDF
+                <Download className="w-4 h-4" /> Exportar PDF
               </button>
             </div>
           </div>

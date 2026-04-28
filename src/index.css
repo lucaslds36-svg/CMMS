@@ -52,3 +52,24 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #cbd5e1;
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .fixed.inset-0, .fixed.inset-0 * {
+    visibility: visible;
+  }
+  .fixed.inset-0 {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .max-h-\[calc\(100vh-200px\)\] {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
