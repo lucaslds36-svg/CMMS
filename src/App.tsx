@@ -139,6 +139,7 @@ import { ThirdPartyModule } from './components/ThirdPartyModule';
 
 // ... (inside App component)
 
+import { MaintenanceSolutionsModule } from './components/SolucoesDeManutencaoModule';
 import { Database } from 'lucide-react';
 
 const getMonthNumber = (val: any) => {
@@ -6011,6 +6012,7 @@ export default function App() {
       items: [
         { id: 'failure-analysis', label: 'Análise de Falhas', icon: AlertCircle, permission: 'failureAnalysis' },
         { id: 'improvement-management', label: 'Gestão de Melhorias', icon: Lightbulb, permission: 'serviceManagement' },
+        { id: 'maintenance-solutions', label: 'Gestão de Conhecimento', icon: Wrench, permission: 'serviceManagement' },
       ]
     },
     {
@@ -7094,6 +7096,9 @@ export default function App() {
                     selectedDemandId={selectedDemandId}
                     onClearSelectedDemandId={() => setSelectedDemandId(null)}
                   />
+                )}
+                {activeTab === 'maintenance-solutions' && (
+                  <MaintenanceSolutionsModule assets={assets} />
                 )}
                 {activeTab === 'improvement-management' && (
                   <ImprovementManagementModule 
