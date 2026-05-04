@@ -52,6 +52,9 @@ export interface WorkOrder {
   Duration?: number;
   duration?: number;
   Cause?: string;
+  FailureCauseID?: string;
+  ServiceTypeID?: string;
+  WorkDetail?: string;
   Checklist?: { tarefa: string; completed: boolean; grupo?: string; equipamento?: string }[];
   requestedBy?: string;
   dueDate?: string | null;
@@ -251,6 +254,20 @@ export interface Requisition {
 }
 
 export interface ServiceArea {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: string;
+}
+
+export interface FailureCause {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: string;
+}
+
+export interface ServiceType {
   id: string;
   name: string;
   description?: string;

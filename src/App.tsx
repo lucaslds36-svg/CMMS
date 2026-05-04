@@ -17,6 +17,7 @@ import {
   Clock,
   Activity,
   AlertCircle,
+  Hash,
   Menu,
   X,
   ChevronRight,
@@ -98,7 +99,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
-import type { Asset, WorkOrder, PreventivePlan, PreventivePlanAsset, UserProfile, Employee, UserPermissions, Notification, ServiceArea } from './types';
+import type { Asset, WorkOrder, PreventivePlan, PreventivePlanAsset, UserProfile, Employee, UserPermissions, Notification, ServiceArea, FailureCause, ServiceType } from './types';
 import { 
   auth, 
   db,
@@ -137,6 +138,7 @@ import { PasswordManagement } from './components/PasswordManagement';
 import { ServiceDemand } from './types';
 import { EngineeringProject, ThirdPartyCompany } from './types';
 import { ThirdPartyModule } from './components/ThirdPartyModule';
+import { MasterDataModule } from './components/MasterDataModule';
 
 // ... (inside App component)
 
@@ -2057,6 +2059,8 @@ const WorkOrderList = ({
   onUpdateStatus,
   onUpdateChecklist,
   onDelete,
+  failureCauses = [],
+  serviceTypes = [],
   isPlanner = false,
   isAdmin = false,
   currentUserUid = '',
@@ -2068,9 +2072,11 @@ const WorkOrderList = ({
   assets: Asset[],
   onAdd: () => void,
   onEdit: (wo: WorkOrder) => void,
-  onUpdateStatus: (id: string, status: string, completedAt?: string, duration?: number) => void,
+  onUpdateStatus: (id: string, status: string, completedAt?: string, duration?: number, failureCauseId?: string, serviceTypeId?: string, workDetail?: string) => void,
   onUpdateChecklist?: (id: string, checklist: {tarefa: string, completed: boolean}[]) => void,
   onDelete: (id: string) => void,
+  failureCauses?: {id: string, name: string}[],
+  serviceTypes?: {id: string, name: string}[],
   isPlanner?: boolean,
   isAdmin?: boolean,
   currentUserUid?: string,
@@ -2084,6 +2090,9 @@ const WorkOrderList = ({
   const [viewingWO, setViewingWO] = useState<WorkOrder | null>(null);
   const [completedAt, setCompletedAt] = useState<string>(new Date().toISOString().split('T')[0]);
   const [actualDuration, setActualDuration] = useState<number>(0);
+  const [failureCauseId, setFailureCauseId] = useState<string>('');
+  const [serviceTypeId, setServiceTypeId] = useState<string>('');
+  const [workDetail, setWorkDetail] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   
@@ -2239,6 +2248,9 @@ const WorkOrderList = ({
                             setCompletingWO(wo);
                             setCompletedAt(new Date().toISOString().split('T')[0]);
                             setActualDuration(wo.Duration || wo.EstimatedTime || 0);
+                            setFailureCauseId(wo.FailureCauseID || '');
+                            setServiceTypeId(wo.ServiceTypeID || '');
+                            setWorkDetail(wo.WorkDetail || '');
                           }}
                           className="p-1 text-emerald-500 hover:text-emerald-700 transition-colors"
                           title="Concluir O.S."
@@ -2434,8 +2446,33 @@ const WorkOrderList = ({
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Técnico Responsável</label>
                       <p className="font-bold text-slate-900">{viewingWO.AssignedTo}</p>
                     </div>
+                    {viewingWO.Status === 'Concluída' && (
+                      <>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Causa da Falha</label>
+                          <p className="font-bold text-slate-900">
+                            {failureCauses.find(c => c.id === viewingWO.FailureCauseID)?.name || viewingWO.FailureCauseID || '-'}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tipo de Serviço</label>
+                          <p className="font-bold text-slate-900">
+                            {serviceTypes.find(t => t.id === viewingWO.ServiceTypeID)?.name || viewingWO.ServiceTypeID || '-'}
+                          </p>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
+
+                {viewingWO.Status === 'Concluída' && viewingWO.WorkDetail && (
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Detalhamento do Trabalho Realizado</label>
+                    <div className="p-6 bg-emerald-50/50 rounded-2xl border border-emerald-100 text-slate-800 text-sm leading-relaxed whitespace-pre-wrap font-medium font-mono">
+                      {viewingWO.WorkDetail}
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-3">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Descrição do Problema / Atividade</label>
@@ -2687,6 +2724,41 @@ const WorkOrderList = ({
                     placeholder={completingWO?.EstimatedTime?.toString() || '0'}
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Causa da Falha</label>
+                  <select 
+                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    value={failureCauseId}
+                    onChange={e => setFailureCauseId(e.target.value)}
+                  >
+                    <option value="">Selecione a causa...</option>
+                    {failureCauses.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Tipo de Serviço</label>
+                  <select 
+                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    value={serviceTypeId}
+                    onChange={e => setServiceTypeId(e.target.value)}
+                  >
+                    <option value="">Selecione o serviço...</option>
+                    {serviceTypes.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Detalhamento do Trabalho</label>
+                  <textarea 
+                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 min-h-[100px]"
+                    value={workDetail}
+                    onChange={e => setWorkDetail(e.target.value)}
+                    placeholder="Descreva o que foi feito..."
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end space-x-2">
@@ -2698,7 +2770,15 @@ const WorkOrderList = ({
                 </button>
                 <button 
                   onClick={() => {
-                    onUpdateStatus(completingWO?.ID || '', 'Concluída', completedAt, actualDuration);
+                    onUpdateStatus(
+                      completingWO?.ID || '', 
+                      'Concluída', 
+                      completedAt, 
+                      actualDuration,
+                      failureCauseId,
+                      serviceTypeId,
+                      workDetail
+                    );
                     setCompletingWO(null);
                   }}
                   className="px-4 py-2 text-sm font-medium text-white bg-emerald-500 hover:bg-emerald-600 rounded-xl transition-colors"
@@ -5063,6 +5143,8 @@ export default function App() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [thirdPartyCompanies, setThirdPartyCompanies] = useState<ThirdPartyCompany[]>([]);
   const [serviceAreas, setServiceAreas] = useState<ServiceArea[]>([]);
+  const [failureCauses, setFailureCauses] = useState<FailureCause[]>([]);
+  const [workOrderServiceTypes, setWorkOrderServiceTypes] = useState<ServiceType[]>([]);
   const [serviceDemands, setServiceDemands] = useState<ServiceDemand[]>([]);
   const [engineeringProjects, setEngineeringProjects] = useState<EngineeringProject[]>([]);
 
@@ -5319,6 +5401,9 @@ export default function App() {
     EstimatedTime: 0,
     Collaborators: 0,
     Cause: '',
+    FailureCauseID: '',
+    ServiceTypeID: '',
+    WorkDetail: '',
     requestedBy: '',
     dueDate: null,
     scope: '',
@@ -5676,6 +5761,12 @@ export default function App() {
     const unsubThirdPartyCompanies = subscribeToCollection<ThirdPartyCompany>('thirdPartyCompanies', (data) => {
       setThirdPartyCompanies(data);
     });
+    const unsubFailureCauses = subscribeToCollection<FailureCause>('failure_causes', (data) => {
+      setFailureCauses(data);
+    });
+    const unsubServiceTypes = subscribeToCollection<ServiceType>('work_order_service_types', (data) => {
+      setWorkOrderServiceTypes(data);
+    });
 
     return () => {
       unsubAssets();
@@ -5685,6 +5776,8 @@ export default function App() {
       unsubServiceDemands();
       unsubServiceAreas();
       unsubThirdPartyCompanies();
+      unsubFailureCauses();
+      unsubServiceTypes();
     };
   }, [authReady, user]);
 
@@ -5837,6 +5930,9 @@ export default function App() {
         Collaborators: newWO.Collaborators || 0,
         Duration: newWO.Duration || 0,
         Cause: newWO.Cause || '',
+        FailureCauseID: newWO.FailureCauseID || '',
+        ServiceTypeID: newWO.ServiceTypeID || '',
+        WorkDetail: newWO.WorkDetail || '',
         requestedBy: newWO.requestedBy || user?.uid || '',
         dueDate: newWO.dueDate || null,
         scope: newWO.scope || '',
@@ -5952,6 +6048,9 @@ export default function App() {
       EstimatedTime: wo.EstimatedTime || 0,
       Collaborators: wo.Collaborators || 0,
       Duration: wo.Duration || 0,
+      FailureCauseID: wo.FailureCauseID || '',
+      ServiceTypeID: wo.ServiceTypeID || '',
+      WorkDetail: wo.WorkDetail || '',
       PlanID: wo.PlanID || '',
       Cause: wo.Cause || '',
       componentId: wo.componentId || '',
@@ -6336,6 +6435,7 @@ export default function App() {
       title: 'Administração',
       items: [
         { id: 'database', label: 'Banco de Dados', icon: Database, permission: 'database' },
+        { id: 'master-data', label: 'Dados Mestres', icon: Hash, permission: 'database' },
         { id: 'users', label: 'Usuários', icon: ShieldCheck, permission: 'users' },
         { id: 'reports', label: 'Relatórios', icon: FileText, permission: 'database' },
       ]
@@ -6499,6 +6599,58 @@ export default function App() {
     } catch (error) {
       console.error('Error deleting area:', error);
       showToast('Erro ao excluir área', 'error');
+    }
+  };
+
+  const handleSaveFailureCause = async (cause: Partial<FailureCause>) => {
+    try {
+      if (cause.id && failureCauses.some(c => c.id === cause.id)) {
+        await updateDocument('failure_causes', cause.id, { ...cause });
+        showToast('Causa de falha atualizada!');
+      } else {
+        const id = `FC-${Math.random().toString(36).substr(2, 9)}`;
+        await createDocument('failure_causes', { ...cause, id, createdAt: new Date().toISOString() }, id);
+        showToast('Causa de falha cadastrada!');
+      }
+    } catch (error) {
+      console.error('Error saving failure cause:', error);
+      showToast('Erro ao salvar causa de falha', 'error');
+    }
+  };
+
+  const handleDeleteFailureCause = async (id: string) => {
+    try {
+      await deleteDocument('failure_causes', id);
+      showToast('Causa de falha excluída!');
+    } catch (error) {
+      console.error('Error deleting failure cause:', error);
+      showToast('Erro ao excluir causa de falha', 'error');
+    }
+  };
+
+  const handleSaveWorkOrderServiceType = async (type: Partial<ServiceType>) => {
+    try {
+      if (type.id && workOrderServiceTypes.some(t => t.id === type.id)) {
+        await updateDocument('work_order_service_types', type.id, { ...type });
+        showToast('Tipo de serviço atualizado!');
+      } else {
+        const id = `ST-${Math.random().toString(36).substr(2, 9)}`;
+        await createDocument('work_order_service_types', { ...type, id, createdAt: new Date().toISOString() }, id);
+        showToast('Tipo de serviço cadastrado!');
+      }
+    } catch (error) {
+      console.error('Error saving service type:', error);
+      showToast('Erro ao salvar tipo de serviço', 'error');
+    }
+  };
+
+  const handleDeleteWorkOrderServiceType = async (id: string) => {
+    try {
+      await deleteDocument('work_order_service_types', id);
+      showToast('Tipo de serviço excluído!');
+    } catch (error) {
+      console.error('Error deleting service type:', error);
+      showToast('Erro ao excluir tipo de serviço', 'error');
     }
   };
 
@@ -7393,6 +7545,9 @@ export default function App() {
                         EstimatedTime: wo.EstimatedTime || 0,
                         Collaborators: wo.Collaborators || 0,
                         Cause: wo.Cause || '',
+                        FailureCauseID: wo.FailureCauseID || '',
+                        ServiceTypeID: wo.ServiceTypeID || '',
+                        WorkDetail: wo.WorkDetail || '',
                         requestedBy: wo.requestedBy || '',
                         dueDate: wo.dueDate || null,
                         scope: wo.scope || '',
@@ -7408,7 +7563,17 @@ export default function App() {
                       setSelectedModelForWO(asset?.Model || '');
                       setShowWOModal(true);
                     }}
-                    onUpdateStatus={(id, status, completedAt, duration) => handleUpdateWorkOrder(id, { Status: status as any, CompletedAt: completedAt }, duration)}
+                    failureCauses={failureCauses}
+                    serviceTypes={workOrderServiceTypes}
+                    onUpdateStatus={(id, status, completedAt, duration, failureCauseId, serviceTypeId, workDetail) => 
+                      handleUpdateWorkOrder(id, { 
+                        Status: status as any, 
+                        CompletedAt: completedAt, 
+                        FailureCauseID: failureCauseId, 
+                        ServiceTypeID: serviceTypeId, 
+                        WorkDetail: workDetail 
+                      }, duration)
+                    }
                     onUpdateChecklist={(id, checklist) => handleUpdateWorkOrder(id, { Checklist: checklist })}
                     onDelete={handleDeleteWorkOrder}
                   />
@@ -7468,6 +7633,18 @@ export default function App() {
                     showToast={showToast}
                     selectedDemandId={selectedDemandId}
                     onClearSelectedDemandId={() => setSelectedDemandId(null)}
+                  />
+                )}
+                {activeTab === 'master-data' && (
+                  <MasterDataModule 
+                    failureCauses={failureCauses}
+                    serviceTypes={workOrderServiceTypes}
+                    onSaveFailureCause={handleSaveFailureCause}
+                    onDeleteFailureCause={handleDeleteFailureCause}
+                    onSaveServiceType={handleSaveWorkOrderServiceType}
+                    onDeleteServiceType={handleDeleteWorkOrderServiceType}
+                    showToast={showToast}
+                    isAdmin={isAdmin}
                   />
                 )}
                 {activeTab === 'maintenance-solutions' && (
@@ -8150,6 +8327,60 @@ export default function App() {
                       </div>
                     </div>
                   </div>
+
+                  {editingWO && (
+                    <div className="space-y-6 pt-6 border-t border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-6 bg-emerald-500 rounded-full" />
+                        <h4 className="text-sm font-black text-slate-900 uppercase tracking-wider">Dados de Fechamento (Opcional)</h4>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-1 gap-4">
+                            <div>
+                              <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Causa da Falha</label>
+                              <select 
+                                className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                                value={newWO.FailureCauseID || ''}
+                                onChange={e => setNewWO({...newWO, FailureCauseID: e.target.value})}
+                              >
+                                <option value="">Não informada</option>
+                                {failureCauses.map(cause => (
+                                  <option key={cause.id} value={cause.id}>{cause.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Tipo de Serviço</label>
+                              <select 
+                                className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                                value={newWO.ServiceTypeID || ''}
+                                onChange={e => setNewWO({...newWO, ServiceTypeID: e.target.value})}
+                              >
+                                <option value="">Não informado</option>
+                                {workOrderServiceTypes.map(type => (
+                                  <option key={type.id} value={type.id}>{type.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Detalhamento do Trabalho</label>
+                            <textarea 
+                              placeholder="Descreva o que foi realizado de fato..."
+                              className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 min-h-[140px]"
+                              value={newWO.WorkDetail || ''}
+                              onChange={e => setNewWO({...newWO, WorkDetail: e.target.value})}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="pt-6 border-t border-slate-100 flex gap-4">
                     <button 
