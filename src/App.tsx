@@ -46,7 +46,8 @@ import {
   Check,
   Building2,
   DollarSign,
-  Package
+  Package,
+  Layers
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
@@ -97,7 +98,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
-import type { Asset, WorkOrder, PreventivePlan, PreventivePlanAsset, UserProfile, Employee, UserPermissions, Notification } from './types';
+import type { Asset, WorkOrder, PreventivePlan, PreventivePlanAsset, UserProfile, Employee, UserPermissions, Notification, ServiceArea } from './types';
 import { 
   auth, 
   db,
@@ -1404,17 +1405,22 @@ const Dashboard = ({
 };
 
 // --- Asset List Component ---
-const AssetList = ({ assets, plans = [], onAdd, onEdit, onDelete, onImport, isAdmin = false, currentUserUid = '', showToast }: { assets: Asset[], plans?: PreventivePlan[], onAdd: () => void, onEdit: (asset: Asset) => void, onDelete: (id: string) => void, onImport: (assets: any[]) => void, isAdmin?: boolean, currentUserUid?: string, showToast?: (msg: string, type?: 'success' | 'error') => void }) => {
+const AssetList = ({ assets, plans = [], onAdd, onEdit, onDelete, onImport, isAdmin = false, currentUserUid = '', showToast }: { assets: Asset[], plans?: PreventivePlan[], onAdd: (parentId?: string) => void, onEdit: (asset: Asset) => void, onDelete: (id: string) => void, onImport: (assets: any[]) => void, isAdmin?: boolean, currentUserUid?: string, showToast?: (msg: string, type?: 'success' | 'error') => void }) => {
   const [search, setSearch] = useState('');
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [showMassEditModal, setShowMassEditModal] = useState(false);
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [massEditData, setMassEditData] = useState({
     Status: '',
     Plant: '',
-    Location: ''
+    Location: '',
+    Sector: '',
+    Category: '',
+    Family: '',
+    Criticality: ''
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const handlePrintReport = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -1446,7 +1452,10 @@ const AssetList = ({ assets, plans = [], onAdd, onEdit, onDelete, onImport, isAd
                 <th>TAG</th>
                 <th>Modelo</th>
                 <th>Descrição</th>
-                <th>Localização</th>
+                <th>Setor</th>
+                <th>Categoria</th>
+                <th>Família</th>
+                <th>Criticidade</th>
                 <th>Planta</th>
                 <th>Status</th>
               </tr>
@@ -1457,7 +1466,10 @@ const AssetList = ({ assets, plans = [], onAdd, onEdit, onDelete, onImport, isAd
                   <td>${a.Tag || '-'}</td>
                   <td>${a.Model || '-'}</td>
                   <td>${a.Description || '-'}</td>
-                  <td>${a.Location || '-'}</td>
+                  <td>${a.Sector || '-'}</td>
+                  <td>${a.Category || '-'}</td>
+                  <td>${a.Family || '-'}</td>
+                  <td>${a.Criticality || '-'}</td>
                   <td>${a.Plant || '-'}</td>
                   <td class="${a.Status === 'Ativo' ? 'status-ativo' : 'status-inativo'}">${a.Status || '-'}</td>
                 </tr>
@@ -1535,6 +1547,10 @@ const AssetList = ({ assets, plans = [], onAdd, onEdit, onDelete, onImport, isAd
         const tag = String(row['TAG'] || row['Tag'] || row['tag'] || '').trim();
         const model = String(row['MODELO'] || row['Modelo'] || row['modelo'] || '').trim();
         const description = String(row['DESCRIÇÃO'] || row['DESCRIÇAO'] || row['DESCRICAO'] || row['Descricao'] || row['descricao'] || '').trim();
+        const sector = String(row['SETOR'] || row['Setor'] || row['setor'] || '').trim();
+        const category = String(row['CATEGORIA'] || row['Categoria'] || row['categoria'] || '').trim();
+        const family = String(row['FAMÍLIA'] || row['FAMILIA'] || row['Família'] || row['familia'] || '').trim();
+        const criticality = String(row['CRITICIDADE'] || row['Criticidade'] || row['criticidade'] || '').trim() as 'A' | 'B' | 'C';
         const location = String(row['LOCALIZAÇÃO'] || row['LOCALIZAÇAO'] || row['LOCALIZACAO'] || row['Localizacao'] || row['localizacao'] || '').trim();
         const plant = String(row['PLANTA'] || row['Planta'] || row['planta'] || '').trim();
         const manufacturer = String(row['FABRICANTE'] || row['Fabricante'] || row['fabricante'] || '').trim();
@@ -1545,6 +1561,10 @@ const AssetList = ({ assets, plans = [], onAdd, onEdit, onDelete, onImport, isAd
           Tag: tag,
           Model: model,
           Description: description,
+          Sector: sector,
+          Category: category,
+          Family: family,
+          Criticality: ['A', 'B', 'C'].includes(criticality) ? criticality : undefined,
           Location: location,
           Plant: plant,
           Manufacturer: manufacturer,
@@ -1563,17 +1583,65 @@ const AssetList = ({ assets, plans = [], onAdd, onEdit, onDelete, onImport, isAd
     reader.readAsArrayBuffer(file);
   };
   
+  const toggleExpand = (id: string) => {
+    setExpandedNodes(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const getAssetLevel = (asset: Asset): number => {
+    let level = 1;
+    let current = asset;
+    while (current.parentId) {
+      const parent = assets.find(a => a.ID === current.parentId || a.id === current.parentId);
+      if (!parent || level > 10) break; // prevent infinite loop
+      current = parent;
+      level++;
+    }
+    return level;
+  };
+
   const filteredAssets = useMemo(() => {
-    return assets.filter(a => 
-      (a.Tag || '').toLowerCase().includes(search.toLowerCase()) || 
-      (a.Model || '').toLowerCase().includes(search.toLowerCase()) ||
-      (a.Description || '').toLowerCase().includes(search.toLowerCase()) ||
-      (a.Location || '').toLowerCase().includes(search.toLowerCase())
-    ).sort((a, b) => (a.Description || '').localeCompare(b.Description || ''));
-  }, [assets, search]);
+    if (search) {
+      return assets.filter(a => 
+        (a.Tag || '').toLowerCase().includes(search.toLowerCase()) || 
+        (a.Model || '').toLowerCase().includes(search.toLowerCase()) ||
+        (a.Description || '').toLowerCase().includes(search.toLowerCase()) ||
+        (a.Sector || '').toLowerCase().includes(search.toLowerCase()) ||
+        (a.Category || '').toLowerCase().includes(search.toLowerCase()) ||
+        (a.Family || '').toLowerCase().includes(search.toLowerCase()) ||
+        (a.Location || '').toLowerCase().includes(search.toLowerCase())
+      ).sort((a, b) => (a.Description || '').localeCompare(b.Description || ''));
+    }
+
+    // Tree Logic
+    const result: (Asset & { level: number; hasChildren: boolean })[] = [];
+    const buildTree = (parentId?: string, level = 1) => {
+      const children = assets
+        .filter(a => a.parentId === parentId)
+        .sort((a, b) => (a.Description || '').localeCompare(b.Description || ''));
+
+      children.forEach(child => {
+        const childId = child.ID || child.id || '';
+        const hasChildren = assets.some(a => a.parentId === childId);
+        result.push({ ...child, level, hasChildren });
+        
+        if (expandedNodes.has(childId)) {
+          buildTree(childId, level + 1);
+        }
+      });
+    };
+
+    buildTree(undefined, 1);
+    return result;
+  }, [assets, search, expandedNodes]);
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <div className="flex flex-col gap-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
       <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <h3 className="text-lg font-semibold text-slate-900">Inventário de Ativos</h3>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -1624,13 +1692,13 @@ const AssetList = ({ assets, plans = [], onAdd, onEdit, onDelete, onImport, isAd
             <button className="flex-1 sm:flex-none p-2 bg-slate-50 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors flex items-center justify-center">
               <Filter className="w-4 h-4" />
             </button>
-            <button 
-              onClick={onAdd}
-              className="flex-[3] sm:flex-none flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Novo Ativo</span>
-            </button>
+              <button 
+                onClick={() => onAdd(undefined)}
+                className="flex-[3] sm:flex-none flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Novo Ativo</span>
+              </button>
           </div>
         </div>
       </div>
@@ -1652,72 +1720,128 @@ const AssetList = ({ assets, plans = [], onAdd, onEdit, onDelete, onImport, isAd
                   }}
                 />
               </th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Descrição</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">TAG</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Modelo</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Localização</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Planta</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Ações</th>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Setor</th>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">TAG</th>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Modelo</th>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Descrição / Nível</th>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">Status</th>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredAssets.map((asset, i) => (
-              <tr key={asset.ID || i} className="hover:bg-slate-50/50 transition-colors">
-                <td className="px-6 py-4">
-                  <input 
-                    type="checkbox" 
-                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                    checked={selectedAssets.includes(asset.ID)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedAssets([...selectedAssets, asset.ID]);
-                      } else {
-                        setSelectedAssets(selectedAssets.filter(id => id !== asset.ID));
-                      }
-                    }}
-                  />
-                </td>
-                <td className="px-6 py-4 text-sm font-medium text-slate-900">{asset.Description || 'Sem descrição'}</td>
-                <td className="px-6 py-4 text-sm text-slate-600">{asset.Tag}</td>
-                <td className="px-6 py-4 text-sm text-slate-600">{asset.Model}</td>
-                <td className="px-6 py-4 text-sm text-slate-600">{asset.Location}</td>
-                <td className="px-6 py-4 text-sm text-slate-600">{asset.Plant}</td>
-                <td className="px-6 py-4">
-                  <span className={cn(
-                    "px-2.5 py-1 rounded-full text-xs font-medium",
-                    asset.Status === 'Ativo' ? "bg-emerald-50 text-emerald-700" : 
-                    asset.Status === 'Inativo' ? "bg-rose-50 text-rose-700" :
-                    asset.Status === 'Em Manutenção' ? "bg-amber-50 text-amber-700" :
-                    "bg-slate-50 text-slate-700"
-                  )}>
-                    {asset.Status}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center space-x-2">
-                    {(isAdmin || asset.createdBy === currentUserUid) && (
+            {filteredAssets.map((asset, i) => {
+              const level = (asset as any).level || 1;
+              const hasChildren = (asset as any).hasChildren;
+              const isExpanded = expandedNodes.has(asset.ID || asset.id || '');
+              
+              return (
+                <tr key={asset.ID || i} className={cn(
+                  "hover:bg-slate-50/50 transition-colors group",
+                  level > 1 && "bg-slate-50/30"
+                )}>
+                  <td className="px-6 py-4">
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      checked={selectedAssets.includes(asset.ID)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedAssets([...selectedAssets, asset.ID]);
+                        } else {
+                          setSelectedAssets(selectedAssets.filter(id => id !== asset.ID));
+                        }
+                      }}
+                    />
+                  </td>
+                  <td className="px-6 py-4 text-sm text-slate-600 font-medium">{asset.Location || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{asset.Plant || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{asset.Sector || '-'}</td>
+                  <td className="px-6 py-4 text-sm font-bold text-blue-600">{asset.Tag}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500">{asset.Model}</td>
+                  <td className="px-6 py-4 min-w-[300px]">
+                    <div 
+                      className="flex items-center gap-2"
+                      style={{ paddingLeft: `${(level - 1) * 24}px` }}
+                    >
+                      <div className="flex items-center gap-2">
+                        {hasChildren ? (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleExpand(asset.ID || asset.id || '');
+                            }}
+                            className="p-1 hover:bg-slate-200 rounded transition-colors text-slate-400 group-hover:text-slate-600"
+                          >
+                            {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                          </button>
+                        ) : (
+                          <div className="w-6" /> 
+                        )}
+                        <span className={cn(
+                          "px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider shrink-0",
+                          level === 1 ? "bg-blue-100 text-blue-700" :
+                          level === 2 ? "bg-indigo-100 text-indigo-700" :
+                          "bg-slate-200 text-slate-600"
+                        )}>
+                          N{level}
+                        </span>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium text-slate-900">
+                            {asset.Description || 'Sem descrição'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-normal uppercase tracking-wider">
+                            {asset.Category || (level === 1 ? 'Ativo Mestre' : level === 2 ? 'Componente' : 'Sub-item')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className={cn(
+                      "px-2.5 py-1 rounded-full text-xs font-medium inline-block",
+                      asset.Status === 'Ativo' ? "bg-emerald-50 text-emerald-700" : 
+                      asset.Status === 'Inativo' ? "bg-rose-50 text-rose-700" :
+                      asset.Status === 'Em Manutenção' ? "bg-amber-50 text-amber-700" :
+                      "bg-slate-50 text-slate-700"
+                    )}>
+                      {asset.Status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end space-x-2">
                       <button 
-                        onClick={() => onEdit(asset)}
-                        className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
-                        title="Editar Ativo"
+                        onClick={() => onAdd(asset.ID || asset.id || '')}
+                        title="Adicionar Componente"
+                        className="p-1 px-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1 group/add"
                       >
-                        <Pencil className="w-4 h-4" />
+                        <Plus className="w-3.5 h-3.5" />
+                        <span className="text-[9px] font-bold uppercase hidden sm:inline">ITEM</span>
                       </button>
-                    )}
-                    {isAdmin && (
-                      <button 
-                        onClick={() => onDelete(asset.ID)}
-                        className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
-                        title="Excluir Ativo"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
+                      {(isAdmin || asset.createdBy === currentUserUid) && (
+                        <button 
+                          onClick={() => onEdit(asset)}
+                          className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                          title="Editar"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      )}
+                      {isAdmin && (
+                        <button 
+                          onClick={() => onDelete(asset.ID)}
+                          className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
+                          title="Excluir"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -1776,6 +1900,49 @@ const AssetList = ({ assets, plans = [], onAdd, onEdit, onDelete, onImport, isAd
                     onChange={e => setMassEditData({...massEditData, Location: e.target.value})}
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Setor</label>
+                  <input 
+                    type="text"
+                    placeholder="Manter original"
+                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    value={massEditData.Sector}
+                    onChange={e => setMassEditData({...massEditData, Sector: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Categoria</label>
+                  <input 
+                    type="text"
+                    placeholder="Manter original"
+                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    value={massEditData.Category}
+                    onChange={e => setMassEditData({...massEditData, Category: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Família</label>
+                  <input 
+                    type="text"
+                    placeholder="Manter original"
+                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    value={massEditData.Family}
+                    onChange={e => setMassEditData({...massEditData, Family: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Criticidade</label>
+                  <select 
+                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                    value={massEditData.Criticality}
+                    onChange={e => setMassEditData({...massEditData, Criticality: e.target.value})}
+                  >
+                    <option value="">Manter original</option>
+                    <option value="A">Alta (A)</option>
+                    <option value="B">Média (B)</option>
+                    <option value="C">Baixa (C)</option>
+                  </select>
+                </div>
               </div>
 
               <div className="flex justify-end space-x-2 mt-6">
@@ -1791,6 +1958,10 @@ const AssetList = ({ assets, plans = [], onAdd, onEdit, onDelete, onImport, isAd
                     if (massEditData.Status) updates.Status = massEditData.Status;
                     if (massEditData.Plant) updates.Plant = massEditData.Plant;
                     if (massEditData.Location) updates.Location = massEditData.Location;
+                    if (massEditData.Sector) updates.Sector = massEditData.Sector;
+                    if (massEditData.Category) updates.Category = massEditData.Category;
+                    if (massEditData.Family) updates.Family = massEditData.Family;
+                    if (massEditData.Criticality) updates.Criticality = massEditData.Criticality;
                     
                     if (Object.keys(updates).length > 0) {
                       try {
@@ -1853,7 +2024,15 @@ const AssetList = ({ assets, plans = [], onAdd, onEdit, onDelete, onImport, isAd
                     }
                     setShowMassEditModal(false);
                     setSelectedAssets([]);
-                    setMassEditData({ Status: '', Plant: '', Location: '' });
+                    setMassEditData({
+                      Status: '',
+                      Plant: '',
+                      Location: '',
+                      Sector: '',
+                      Category: '',
+                      Family: '',
+                      Criticality: ''
+                    });
                   }}
                   className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors"
                 >
@@ -1864,6 +2043,7 @@ const AssetList = ({ assets, plans = [], onAdd, onEdit, onDelete, onImport, isAd
           </div>
         )}
       </AnimatePresence>
+    </div>
     </div>
   );
 };
@@ -1997,8 +2177,28 @@ const WorkOrderList = ({
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex flex-col">
-                    <span className="text-sm font-bold text-blue-600">{assets.find(a => a.ID === wo.AssetID)?.Tag || '-'}</span>
-                    <span className="text-[10px] text-slate-500 truncate max-w-[150px]">{assets.find(a => a.ID === wo.AssetID)?.Model || '-'}</span>
+                    <span className="text-sm font-bold text-blue-600">{assets.find(a => a.ID === wo.AssetID)?.Tag || wo.AssetID}</span>
+                    <div className="flex flex-col gap-0.5 mt-1">
+                      <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">
+                        {assets.find(a => a.ID === wo.AssetID)?.Description || '-'}
+                      </span>
+                      {(wo.componentId || wo.subComponentId) && (
+                        <div className="flex items-center gap-1 text-[9px] text-slate-400 font-bold uppercase overflow-hidden whitespace-nowrap">
+                          {wo.componentId && (
+                            <>
+                              <Layers className="w-2.5 h-2.5" />
+                              <span className="truncate max-w-[80px]">{assets.find(a => a.ID === wo.componentId)?.Description || wo.componentId}</span>
+                            </>
+                          )}
+                          {wo.subComponentId && (
+                            <>
+                              <ChevronRight className="w-2.5 h-2.5" />
+                              <span className="truncate max-w-[80px]">{assets.find(a => a.ID === wo.subComponentId)?.Description || wo.subComponentId}</span>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </td>
                 <td className="px-6 py-4 text-sm text-slate-600">{wo.Type || '-'}</td>
@@ -2158,9 +2358,37 @@ const WorkOrderList = ({
                     <div>
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Modelo do Equipamento</label>
                       <p className="font-bold text-slate-900">
-                        {assets.find(a => a.ID === viewingWO.AssetID)?.Model || '-'}
+                        {viewingWO.model || assets.find(a => a.ID === viewingWO.AssetID)?.Model || '-'}
                       </p>
                     </div>
+                    {viewingWO.componentId && (
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Componente</label>
+                        <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl mt-1 border border-slate-100">
+                          <Layers className="w-5 h-5 text-blue-600" />
+                          <div>
+                            <p className="text-sm font-bold text-slate-900">
+                              {assets.find(a => a.ID === viewingWO.componentId)?.Description || viewingWO.componentId}
+                            </p>
+                            <p className="text-[10px] text-slate-500 font-medium">TAG: {assets.find(a => a.ID === viewingWO.componentId)?.Tag || '-'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {viewingWO.subComponentId && (
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sub-componente</label>
+                        <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl mt-1 border border-slate-100">
+                          <Layers className="w-5 h-5 text-indigo-600" />
+                          <div>
+                            <p className="text-sm font-bold text-slate-900">
+                              {assets.find(a => a.ID === viewingWO.subComponentId)?.Description || viewingWO.subComponentId}
+                            </p>
+                            <p className="text-[10px] text-slate-500 font-medium">TAG: {assets.find(a => a.ID === viewingWO.subComponentId)?.Tag || '-'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     <div>
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ID da O.S.</label>
                       <p className="font-bold text-slate-900 text-lg">{viewingWO.ID}</p>
@@ -4550,6 +4778,9 @@ const ReportsModule = ({ wos, assets, employees, plans }: {
       const data = filtered.map(wo => ({
         ID: wo.ID,
         Equipamento: assets.find(a => a.ID === wo.AssetID)?.Tag || wo.AssetID,
+        Componente: assets.find(a => a.ID === wo.componentId)?.Description || wo.componentId || '-',
+        'Sub-componente': assets.find(a => a.ID === wo.subComponentId)?.Description || wo.subComponentId || '-',
+        Modelo: wo.model || assets.find(a => a.ID === wo.AssetID)?.Model || '-',
         Descrição: wo.Description,
         Tipo: wo.Type,
         Status: wo.Status,
@@ -4561,8 +4792,8 @@ const ReportsModule = ({ wos, assets, employees, plans }: {
       if (format === 'excel') {
         exportToExcel(data, 'Relatorio_Ordens_Servico');
       } else {
-        const headers = [['ID', 'Equipamento', 'Descrição', 'Tipo', 'Status', 'Prioridade', 'Data']];
-        const pdfData = data.map(d => [d.ID, d.Equipamento, d.Descrição, d.Tipo, d.Status, d.Prioridade, d.Data]);
+        const headers = [['ID', 'Equipamento', 'Componente', 'Sub-comp', 'Modelo', 'Descrição', 'Tipo', 'Status', 'Data']];
+        const pdfData = data.map(d => [d.ID, d.Equipamento, d.Componente, d['Sub-componente'], d.Modelo, d.Descrição, d.Tipo, d.Status, d.Data]);
         exportToPDF('Relatório de Ordens de Serviço', headers, pdfData, 'Relatorio_Ordens_Servico');
       }
     } else if (reportType === 'assets') {
@@ -4711,6 +4942,14 @@ export default function App() {
     });
     return sortedGrouped;
   }, [assets]);
+
+  const modelsOfRootAssets = useMemo(() => {
+    const models = new Set<string>();
+    assets.filter(a => !a.parentId).forEach(a => {
+      if (a.Model) models.add(a.Model);
+    });
+    return Array.from(models).sort();
+  }, [assets]);
   const [wos, setWos] = useState<WorkOrder[]>([]);
   const [plans, setPlans] = useState<PreventivePlan[]>([]);
   const [bditssData, setBditssData] = useState<any[]>([]);
@@ -4823,6 +5062,7 @@ export default function App() {
   const [chartData, setChartData] = useState<any[]>(mockChartData);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [thirdPartyCompanies, setThirdPartyCompanies] = useState<ThirdPartyCompany[]>([]);
+  const [serviceAreas, setServiceAreas] = useState<ServiceArea[]>([]);
   const [serviceDemands, setServiceDemands] = useState<ServiceDemand[]>([]);
   const [engineeringProjects, setEngineeringProjects] = useState<EngineeringProject[]>([]);
 
@@ -5054,6 +5294,11 @@ export default function App() {
     Manufacturer: '',
     Location: '',
     Plant: '',
+    Sector: '',
+    Category: '',
+    Family: '',
+    Criticality: '' as 'A' | 'B' | 'C' | '',
+    parentId: undefined as string | undefined,
     Status: 'Ativo' as any,
     InstallDate: new Date().toISOString().split('T')[0],
     statusChangedAt: undefined as string | null | undefined
@@ -5084,6 +5329,9 @@ export default function App() {
     executorName: '',
     hourlyRate: 0,
     totalCost: 0,
+    componentId: '',
+    subComponentId: '',
+    model: '',
     Status: 'Em Aberto',
     CompletedAt: '',
     Checklist: []
@@ -5422,6 +5670,9 @@ export default function App() {
     const unsubServiceDemands = subscribeToCollection<ServiceDemand>('serviceDemands', (data) => {
       setServiceDemands(data);
     });
+    const unsubServiceAreas = subscribeToCollection<ServiceArea>('service_areas', (data) => {
+      setServiceAreas(data);
+    });
     const unsubThirdPartyCompanies = subscribeToCollection<ThirdPartyCompany>('thirdPartyCompanies', (data) => {
       setThirdPartyCompanies(data);
     });
@@ -5432,6 +5683,7 @@ export default function App() {
       unsubPlans();
       unsubEmployees();
       unsubServiceDemands();
+      unsubServiceAreas();
       unsubThirdPartyCompanies();
     };
   }, [authReady, user]);
@@ -5490,7 +5742,27 @@ export default function App() {
         showToast('Ativo atualizado com sucesso!');
       } else {
         const id = `A${(assets.length + 1).toString().padStart(3, '0')}`;
+        // Support hierarchy in creation
+        const parentId = newAsset.parentId;
         let assetToCreate = { ...newAsset, ID: id, createdBy: user?.uid };
+        
+        // Auto-generate Tag for children if empty or if we want to enforce sequential tagging
+        if (parentId) {
+          const parent = assets.find(a => a.ID === parentId || a.id === parentId);
+          if (parent) {
+            // Inheritance
+            assetToCreate.Location = assetToCreate.Location || parent.Location || '';
+            assetToCreate.Plant = assetToCreate.Plant || parent.Plant || '';
+            assetToCreate.Sector = assetToCreate.Sector || parent.Sector || '';
+            
+            // Sequential Tag: ParentTag-01, ParentTag-02, etc.
+            if (!assetToCreate.Tag) {
+              const children = assets.filter(a => a.parentId === parentId);
+              const nextNum = (children.length + 1).toString().padStart(2, '0');
+              assetToCreate.Tag = `${parent.Tag}-${nextNum}`;
+            }
+          }
+        }
         
         if (assetToCreate.Status === 'Parado') {
           assetToCreate.statusChangedAt = new Date().toISOString();
@@ -5509,6 +5781,11 @@ export default function App() {
         Manufacturer: '',
         Location: '',
         Plant: '',
+        Sector: '',
+        Category: '',
+        Family: '',
+        Criticality: '',
+        parentId: undefined,
         Status: 'Ativo' as any,
         InstallDate: new Date().toISOString().split('T')[0],
         statusChangedAt: undefined
@@ -5549,6 +5826,9 @@ export default function App() {
         executorName: newWO.executorName || '',
         hourlyRate: newWO.hourlyRate || 0,
         totalCost: (newWO.Duration || newWO.EstimatedTime || 0) * (newWO.hourlyRate || 0),
+        componentId: newWO.componentId || '',
+        subComponentId: newWO.subComponentId || '',
+        model: newWO.model || '',
         Status: newWO.Status || 'Em Aberto',
         CompletedAt: newWO.CompletedAt || '',
         Checklist: newWO.Checklist || []
@@ -5622,6 +5902,11 @@ export default function App() {
       Manufacturer: asset.Manufacturer || '',
       Location: asset.Location || '',
       Plant: asset.Plant || '',
+      Sector: asset.Sector || '',
+      Category: asset.Category || '',
+      Family: asset.Family || '',
+      Criticality: asset.Criticality || '',
+      parentId: asset.parentId,
       Status: asset.Status || 'Ativo',
       InstallDate: asset.InstallDate || '',
       statusChangedAt: asset.statusChangedAt
@@ -5648,6 +5933,9 @@ export default function App() {
       Duration: wo.Duration || 0,
       PlanID: wo.PlanID || '',
       Cause: wo.Cause || '',
+      componentId: wo.componentId || '',
+      subComponentId: wo.subComponentId || '',
+      model: wo.model || '',
       Status: wo.Status || 'Em Aberto',
       CompletedAt: wo.CompletedAt || '',
       Checklist: wo.Checklist || []
@@ -6164,6 +6452,32 @@ export default function App() {
     } catch (error) {
       console.error('Erro detalhado ao excluir demanda:', error);
       showToast('Erro ao excluir demanda: ' + (error instanceof Error ? error.message : 'Erro desconhecido'), 'error');
+    }
+  };
+
+  const handleSaveServiceArea = async (area: Partial<ServiceArea>) => {
+    try {
+      if (area.id && serviceAreas.some(a => a.id === area.id)) {
+        await updateDocument('service_areas', area.id, { ...area });
+        showToast('Área atualizada com sucesso!');
+      } else {
+        const id = `SA-${Math.random().toString(36).substr(2, 9)}`;
+        await createDocument('service_areas', { ...area, id, createdAt: new Date().toISOString() }, id);
+        showToast('Área cadastrada com sucesso!');
+      }
+    } catch (error) {
+      console.error('Error saving area:', error);
+      showToast('Erro ao salvar área', 'error');
+    }
+  };
+
+  const handleDeleteServiceArea = async (areaId: string) => {
+    try {
+      await deleteDocument('service_areas', areaId);
+      showToast('Área excluída com sucesso!');
+    } catch (error) {
+      console.error('Error deleting area:', error);
+      showToast('Erro ao excluir área', 'error');
     }
   };
 
@@ -6944,7 +7258,7 @@ export default function App() {
                         setLoading(false);
                       }
                     }}
-                    onAdd={() => {
+                    onAdd={(parentId) => {
                       setEditingAsset(null);
                       setNewAsset({
                         Tag: '',
@@ -6953,6 +7267,11 @@ export default function App() {
                         Manufacturer: '',
                         Location: '',
                         Plant: '',
+                        Sector: '',
+                        Category: '',
+                        Family: '',
+                        Criticality: '',
+                        parentId,
                         Status: 'Ativo' as any,
                         InstallDate: new Date().toISOString().split('T')[0],
                         statusChangedAt: undefined
@@ -7085,6 +7404,7 @@ export default function App() {
                 {activeTab === 'service-management' && (
                   <ServiceManagementModule 
                     demands={serviceDemands}
+                    areas={serviceAreas}
                     employees={employees}
                     companies={thirdPartyCompanies}
                     userProfile={userProfile}
@@ -7092,6 +7412,8 @@ export default function App() {
                     onDelete={handleDeleteServiceDemand}
                     onUpdateStatus={handleUpdateServiceDemandStatus}
                     onAddScopeChange={handleAddServiceDemandScopeChange}
+                    onSaveArea={handleSaveServiceArea}
+                    onDeleteArea={handleDeleteServiceArea}
                     showToast={showToast}
                     selectedDemandId={selectedDemandId}
                     onClearSelectedDemandId={() => setSelectedDemandId(null)}
@@ -7335,7 +7657,7 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden"
+              className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden"
             >
               <div className="p-8">
                 <div className="flex items-center justify-between mb-6">
@@ -7349,7 +7671,7 @@ export default function App() {
                 </div>
 
                 <form onSubmit={handleCreateAsset} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase mb-1">TAG</label>
                       <input 
@@ -7372,6 +7694,19 @@ export default function App() {
                         <option value="Inativo">Inativo</option>
                         <option value="Em Manutenção">Em Manutenção</option>
                         <option value="Parado">Parado</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Criticidade</label>
+                      <select 
+                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 font-bold"
+                        value={newAsset.Criticality}
+                        onChange={e => setNewAsset({...newAsset, Criticality: e.target.value as any})}
+                      >
+                        <option value="">Não definir</option>
+                        <option value="A" className="text-rose-600">Alta (A)</option>
+                        <option value="B" className="text-amber-600">Média (B)</option>
+                        <option value="C" className="text-emerald-600">Baixa (C)</option>
                       </select>
                     </div>
                   </div>
@@ -7406,47 +7741,92 @@ export default function App() {
                     <textarea 
                       required
                       placeholder="Descrição detalhada do ativo"
-                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 min-h-[80px]"
+                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 min-h-[60px]"
                       value={newAsset.Description}
                       onChange={e => setNewAsset({...newAsset, Description: e.target.value})}
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Localização</label>
-                      <input 
-                        required
-                        type="text"
-                        placeholder="Ex: Galpão A"
-                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newAsset.Location}
-                        onChange={e => setNewAsset({...newAsset, Location: e.target.value})}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Planta</label>
-                      <input 
-                        required
-                        type="text"
-                        placeholder="Ex: Planta 1"
-                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newAsset.Plant}
-                        onChange={e => setNewAsset({...newAsset, Plant: e.target.value})}
-                      />
-                    </div>
-                  </div>
+                  {!newAsset.parentId && (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Setor</label>
+                          <input 
+                            type="text"
+                            placeholder="Ex: Trefilagem"
+                            className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                            value={newAsset.Sector}
+                            onChange={e => setNewAsset({...newAsset, Sector: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Categoria (Sub-grupo)</label>
+                          <input 
+                            type="text"
+                            placeholder="Ex: Produção"
+                            className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                            value={newAsset.Category}
+                            onChange={e => setNewAsset({...newAsset, Category: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Família</label>
+                          <input 
+                            type="text"
+                            placeholder="Ex: Motores CA"
+                            className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                            value={newAsset.Family}
+                            onChange={e => setNewAsset({...newAsset, Family: e.target.value})}
+                          />
+                        </div>
+                      </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Data de Instalação</label>
-                    <input 
-                      required
-                      type="date"
-                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                      value={newAsset.InstallDate}
-                      onChange={e => setNewAsset({...newAsset, InstallDate: e.target.value})}
-                    />
-                  </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Localização</label>
+                          <input 
+                            required
+                            type="text"
+                            placeholder="Ex: Galpão A"
+                            className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                            value={newAsset.Location}
+                            onChange={e => setNewAsset({...newAsset, Location: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Planta</label>
+                          <input 
+                            required
+                            type="text"
+                            placeholder="Ex: Planta 1"
+                            className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                            value={newAsset.Plant}
+                            onChange={e => setNewAsset({...newAsset, Plant: e.target.value})}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {!newAsset.parentId ? (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Data de Instalação</label>
+                      <input 
+                        required
+                        type="date"
+                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                        value={newAsset.InstallDate}
+                        onChange={e => setNewAsset({...newAsset, InstallDate: e.target.value})}
+                      />
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                      <p className="text-xs text-blue-600 font-medium">
+                        <strong>Nota:</strong> Setor, Localização e Planta são herdados automaticamente do ativo pai.
+                      </p>
+                    </div>
+                  )}
 
                   <button 
                     type="submit"
@@ -7479,539 +7859,259 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl max-h-[90vh] overflow-y-auto"
+              className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl max-h-[90vh] overflow-y-auto"
             >
               <div className="p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold">{editingWO ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço'}</h3>
+                <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
+                  <div>
+                    <h3 className="text-2xl font-bold text-slate-900">{editingWO ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço'}</h3>
+                    <p className="text-sm text-slate-500 mt-1">Gere e planeje atividades de manutenção de forma estruturada.</p>
+                  </div>
                   <button onClick={() => {
                     setShowWOModal(false);
                     setEditingWO(null);
-                  }} className="p-2 hover:bg-slate-100 rounded-full">
-                    <X className="w-5 h-5" />
+                  }} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">
+                    <X className="w-6 h-6" />
                   </button>
                 </div>
 
-                <form onSubmit={handleCreateWorkOrder} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Modelo do Equipamento</label>
-                      <select 
-                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={selectedModelForWO}
-                        onChange={e => {
-                          setSelectedModelForWO(e.target.value);
-                          setNewWO({...newWO, AssetID: ''});
-                        }}
-                      >
-                        <option value="">Todos os Modelos</option>
-                        {Object.keys(assetsByModel).map(model => (
-                          <option key={model} value={model}>{model}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Ativo (Descrição)</label>
-                      <select 
-                        required
-                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newWO.AssetID}
-                        onChange={e => setNewWO({...newWO, AssetID: e.target.value})}
-                      >
-                        <option value="">Selecione um ativo</option>
-                        {selectedModelForWO ? (
-                          assetsByModel[selectedModelForWO]?.map(a => (
-                            <option key={a.ID} value={a.ID}>{a.Description || a.Tag} ({a.Tag})</option>
-                          ))
-                        ) : (
-                          Object.entries(assetsByModel).map(([model, modelAssets]) => (
-                            <optgroup key={model} label={model}>
-                              {modelAssets.map(a => (
-                                <option key={a.ID} value={a.ID}>{a.Description || a.Tag} ({a.Tag})</option>
-                              ))}
-                            </optgroup>
-                          ))
-                        )}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Descrição</label>
-                    <textarea 
-                      required
-                      placeholder="Descreva o problema ou tarefa..."
-                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 min-h-[100px]"
-                      value={newWO.Description}
-                      onChange={e => setNewWO({...newWO, Description: e.target.value})}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Tipo de Manutenção</label>
-                      <select 
-                        required
-                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newWO.Type}
-                        onChange={e => setNewWO({...newWO, Type: e.target.value as any})}
-                      >
-                        <option value="">Selecione o tipo</option>
-                        <option value="Preventiva">Preventiva</option>
-                        <option value="Corretiva">Corretiva</option>
-                        <option value="Preditiva">Preditiva</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Natureza</label>
-                      <select 
-                        required
-                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newWO.Nature}
-                        onChange={e => setNewWO({...newWO, Nature: e.target.value as any})}
-                      >
-                        <option value="">Selecione a natureza</option>
-                        <option value="Emergencial">Emergencial</option>
-                        <option value="Programada">Programada</option>
-                        <option value="Oportunidade">Oportunidade</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Tipo de Atividade</label>
-                    <select 
-                      required
-                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                      value={newWO.ActivityType}
-                      onChange={e => setNewWO({...newWO, ActivityType: e.target.value as any})}
-                    >
-                      <option value="">Selecione a atividade</option>
-                      <option value="Lubrificação">Lubrificação</option>
-                      <option value="Inspeção">Inspeção</option>
-                      <option value="Ajuste">Ajuste</option>
-                      <option value="Reparo">Reparo</option>
-                      <option value="Substituição">Substituição</option>
-                    </select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Prioridade</label>
-                      <select 
-                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newWO.Priority}
-                        onChange={e => setNewWO({...newWO, Priority: e.target.value as any})}
-                      >
-                        <option value="Baixa">Baixa</option>
-                        <option value="Média">Média</option>
-                        <option value="Alta">Alta</option>
-                        <option value="Crítica">Crítica</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Tipo de Executor</label>
-                      <select 
-                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newWO.executorType}
-                        onChange={e => setNewWO({...newWO, executorType: e.target.value as any})}
-                      >
-                        <option value="Próprio">Próprio</option>
-                        <option value="Terceiro">Terceiro</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    {newWO.executorType === 'Terceiro' ? (
-                      <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Empresa Terceira</label>
+                <form onSubmit={handleCreateWorkOrder} className="space-y-6">
+                  <div className="bg-slate-50/50 p-6 rounded-3xl border border-slate-100 space-y-4">
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                       <Box className="w-4 h-4" /> Seleção do Ativo e Hierarquia
+                    </h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">1. Filtrar por Modelo do Equipamento (Nível 1)</label>
                         <select 
-                          className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                          value={newWO.companyId}
+                          className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 shadow-sm transition-all"
+                          value={selectedModelForWO}
                           onChange={e => {
-                            const company = thirdPartyCompanies.find(c => c.id === e.target.value);
-                            setNewWO({
-                              ...newWO, 
-                              companyId: e.target.value,
-                              companyName: company?.name || ''
-                            });
+                            setSelectedModelForWO(e.target.value);
+                            setNewWO({...newWO, AssetID: '', componentId: '', subComponentId: ''});
                           }}
                         >
-                          <option value="">Selecione uma empresa</option>
-                          {thirdPartyCompanies.map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
+                          <option value="">Todos os Modelos de Equipamentos Mastres</option>
+                          {modelsOfRootAssets.map(model => (
+                            <option key={model} value={model}>{model}</option>
                           ))}
                         </select>
                       </div>
-                    ) : (
+
                       <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Técnico Responsável</label>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">2. Equipamento (Nível 1)</label>
                         <select 
                           required
-                          className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                          value={newWO.TechnicianID}
+                          className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 shadow-sm"
+                          value={newWO.AssetID}
                           onChange={e => {
-                            const emp = employees.find(emp => emp.ID === e.target.value);
+                            const asset = assets.find(a => a.ID === e.target.value || a.id === e.target.value);
                             setNewWO({
                               ...newWO, 
-                              TechnicianID: e.target.value,
-                              AssignedTo: emp ? emp.Name : e.target.value,
-                              hourlyRate: emp?.hourlyRate || 0
+                              AssetID: e.target.value,
+                              model: asset?.Model || '',
+                              componentId: '',
+                              subComponentId: ''
                             });
                           }}
                         >
-                          <option value="">Selecione um técnico</option>
-                          {employees.filter(emp => emp.Status === 'Ativo').map(emp => (
-                            <option key={emp.ID} value={emp.ID}>{emp.Name} ({emp.Function})</option>
-                          ))}
+                          <option value="">Selecione o Equipamento</option>
+                          {selectedModelForWO ? (
+                            assetsByModel[selectedModelForWO]
+                              ?.filter(a => !a.parentId)
+                              .map(a => (
+                              <option key={a.ID} value={a.ID}>{a.Description || a.Tag} ({a.Tag})</option>
+                            ))
+                          ) : (
+                            Object.entries(assetsByModel).map(([model, modelAssets]) => {
+                              const rootAssets = modelAssets.filter(a => !a.parentId);
+                              if (rootAssets.length === 0) return null;
+                              return (
+                                <optgroup key={model} label={model}>
+                                  {rootAssets.map(a => (
+                                    <option key={a.ID} value={a.ID}>{a.Description || a.Tag} ({a.Tag})</option>
+                                  ))}
+                                </optgroup>
+                              );
+                            })
+                          )}
                         </select>
                       </div>
-                    )}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Custo Total Est./Real (R$)</label>
-                      <div className="w-full px-4 py-3 bg-slate-100 border-none rounded-xl text-sm font-bold text-blue-700">
-                        R$ {((newWO.Duration || newWO.EstimatedTime || 0) * (newWO.hourlyRate || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">3. Componente (Nível 2)</label>
+                        <select 
+                          className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 shadow-sm disabled:opacity-50"
+                          value={newWO.componentId}
+                          onChange={e => setNewWO({...newWO, componentId: e.target.value, subComponentId: ''})}
+                          disabled={!newWO.AssetID}
+                        >
+                          <option value="">Nenhum Componente</option>
+                          {newWO.AssetID && assets
+                            .filter(a => a.parentId === newWO.AssetID)
+                            .map(a => (
+                              <option key={a.ID} value={a.ID}>{a.Description || a.Tag} ({a.Tag})</option>
+                            ))
+                          }
+                        </select>
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">4. Sub-item (Nível 3)</label>
+                        <select 
+                          className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 shadow-sm disabled:opacity-50"
+                          value={newWO.subComponentId}
+                          onChange={e => setNewWO({...newWO, subComponentId: e.target.value})}
+                          disabled={!newWO.componentId}
+                        >
+                          <option value="">Nenhum Sub-item</option>
+                          {newWO.componentId && assets
+                            .filter(a => a.parentId === newWO.componentId)
+                            .map(a => (
+                              <option key={a.ID} value={a.ID}>{a.Description || a.Tag} ({a.Tag})</option>
+                            ))
+                          }
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+                      <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Resumo da Hierarquia Selecionada</span>
+                      <div className="flex flex-wrap items-center gap-2 text-sm text-blue-700 font-bold">
+                        <span className="bg-blue-100 px-2.5 py-1 rounded-lg">N1: {assets.find(a => a.ID === newWO.AssetID)?.Description || '...'}</span>
+                        {newWO.componentId && (
+                          <>
+                            <ChevronRight className="w-4 h-4 text-blue-300" />
+                            <span className="bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-lg border border-indigo-100">N2: {assets.find(a => a.ID === newWO.componentId)?.Description || '...'}</span>
+                          </>
+                        )}
+                        {newWO.subComponentId && (
+                          <>
+                            <ChevronRight className="w-4 h-4 text-blue-300" />
+                            <span className="bg-slate-800 text-white px-2.5 py-1 rounded-lg">N3: {assets.find(a => a.ID === newWO.subComponentId)?.Description || '...'}</span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {newWO.executorType === 'Terceiro' && (
-                    <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
                       <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Nome do Executor</label>
-                        <select 
-                          className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                          value={newWO.TechnicianID || ''}
-                          onChange={e => {
-                            const emp = employees.find(emp => emp.ID === e.target.value);
-                            const company = emp?.companyId ? thirdPartyCompanies.find(c => c.id === emp.companyId) : null;
-                            setNewWO({
-                              ...newWO, 
-                              TechnicianID: e.target.value,
-                              executorName: emp ? emp.Name : '',
-                              AssignedTo: emp ? emp.Name : '',
-                              hourlyRate: emp?.hourlyRate || newWO.hourlyRate || 0,
-                              companyId: emp?.companyId || newWO.companyId || '',
-                              companyName: company?.name || newWO.companyName || ''
-                            });
-                          }}
-                        >
-                          <option value="">Selecione um executor</option>
-                          {employees.filter(emp => emp.Status === 'Ativo').map(emp => (
-                            <option key={emp.ID} value={emp.ID}>{emp.Name} ({emp.Type === 'Terceiro' ? 'Terceiro' : 'Próprio'})</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Valor Hora (R$)</label>
-                        <input 
-                          type="number"
-                          className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                          value={Number.isNaN(newWO.hourlyRate) || newWO.hourlyRate === 0 ? '' : newWO.hourlyRate}
-                          onChange={e => setNewWO({...newWO, hourlyRate: parseFloat(e.target.value) || 0})}
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Descrição do Serviço</label>
+                        <textarea 
+                          required
+                          placeholder="Descreva detalhadamente o serviço a ser realizado..."
+                          className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 min-h-[140px]"
+                          value={newWO.Description}
+                          onChange={e => setNewWO({...newWO, Description: e.target.value})}
                         />
                       </div>
                     </div>
-                  )}
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Data de Geração</label>
-                      <input 
-                        type="date"
-                        disabled
-                        className="w-full px-4 py-3 bg-slate-100 border-none rounded-xl text-sm text-slate-500"
-                        value={editingWO ? editingWO.CreatedAt : new Date().toISOString().split('T')[0]}
-                      />
-                    </div>
-                    <div className="flex flex-col justify-end">
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Programação</label>
-                      <input 
-                        type="date"
-                        required
-                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newWO.ScheduledDate || ''}
-                        onChange={e => setNewWO({...newWO, ScheduledDate: e.target.value})}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Início Real</label>
-                      <input 
-                        type="date"
-                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newWO.StartDate || ''}
-                        onChange={e => setNewWO({...newWO, StartDate: e.target.value})}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Fim Real</label>
-                      <input 
-                        type="date"
-                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newWO.EndDate || ''}
-                        onChange={e => setNewWO({...newWO, EndDate: e.target.value})}
-                      />
-                    </div>
-                  </div>
-
-                  {newWO.Type === 'Corretiva' && (
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Causa da Falha</label>
-                      <textarea 
-                        required
-                        placeholder="Descreva a causa da falha..."
-                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={newWO.Cause || ''}
-                        onChange={e => setNewWO({...newWO, Cause: e.target.value})}
-                      />
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Tempo Est. (h)</label>
-                      <input 
-                        type="number"
-                        step="0.5"
-                        min="0"
-                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={Number.isNaN(newWO.EstimatedTime) || newWO.EstimatedTime === 0 ? '' : newWO.EstimatedTime}
-                        onChange={e => setNewWO({...newWO, EstimatedTime: parseFloat(e.target.value) || 0})}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Duração Real (h)</label>
-                      <input 
-                        type="number"
-                        step="0.5"
-                        min="0"
-                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={Number.isNaN(newWO.Duration) || newWO.Duration === 0 ? '' : newWO.Duration}
-                        onChange={e => setNewWO({...newWO, Duration: parseFloat(e.target.value) || 0})}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Nº Colaboradores</label>
-                      <input 
-                        type="number"
-                        min="1"
-                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={Number.isNaN(newWO.Collaborators) || newWO.Collaborators === 0 ? '' : newWO.Collaborators}
-                        onChange={e => setNewWO({...newWO, Collaborators: parseInt(e.target.value) || 0})}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">ID do Plano (Opcional)</label>
-                      <div className="flex gap-2">
-                        {newWO.Type === 'Preventiva' ? (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Tipo Manutenção</label>
                           <select 
-                            className="flex-1 px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                            value={newWO.PlanID || ''}
-                            onChange={async (e) => {
-                              const planId = e.target.value;
-                              const selectedPlan = plans.find(p => p.ID === planId);
-                              if (selectedPlan) {
-                                // Fetch checklist from subcollection
-                                const q = query(collection(db, `preventive-plans/${planId}/checklist_itens`));
-                                const snapshot = await getDocs(q);
-                                const items = snapshot.docs.map(doc => {
-                                  const data = doc.data();
-                                  return {
-                                    tarefa: data.tarefa || data.text || data.task || data.Description || data.Tarefa || data.Atividade || data.atividade || 'Atividade sem descrição',
-                                    completed: false,
-                                    grupo: data.grupo || 'Geral',
-                                    equipamento: data.equipamento || 'Geral'
-                                  };
-                                });
-                                
-                                setNewWO({
-                                  ...newWO,
-                                  PlanID: planId,
-                                  Description: `[PREVENTIVA] ${selectedPlan.Task}`,
-                                  Priority: selectedPlan.Criticality || 'Média',
-                                  EstimatedTime: selectedPlan.EstimatedTime || 0,
-                                  Collaborators: selectedPlan.Collaborators || 1,
-                                  Checklist: items.length > 0 ? items : (selectedPlan.Checklist || []).map(t => ({ tarefa: t, completed: false, grupo: 'Geral', equipamento: 'Geral' }))
-                                });
-                              } else {
-                                setNewWO({...newWO, PlanID: planId});
-                              }
-                            }}
+                            required
+                            className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                            value={newWO.Type}
+                            onChange={e => setNewWO({...newWO, Type: e.target.value as any})}
                           >
-                            <option value="">Selecionar Plano...</option>
-                            {plans.filter(p => !newWO.AssetID || p.AssetIDs?.includes(newWO.AssetID) || p.assets?.some(a => a.assetId === newWO.AssetID)).map(p => (
-                              <option key={p.ID} value={p.ID}>{p.ID} - {p.Task}</option>
-                            ))}
+                            <option value="Corretiva">Corretiva</option>
+                            <option value="Preventiva">Preventiva</option>
+                            <option value="Preditiva">Preditiva</option>
                           </select>
-                        ) : (
-                          <input 
-                            type="text"
-                            placeholder="Ex: PLAN-123"
-                            className="flex-1 px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                            value={newWO.PlanID || ''}
-                            onChange={e => setNewWO({...newWO, PlanID: e.target.value})}
-                          />
-                        )}
-                        
-                        {(newWO.PlanID || (editingWO && (editingWO as any).planId)) && (
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              const pId = newWO.PlanID || (editingWO as any).planId;
-                              const plan = plans.find(p => p.ID === pId);
-                              if (!plan) {
-                                showToast('Plano não encontrado', 'error');
-                                return;
-                              }
-                              const q = query(collection(db, `preventive-plans/${plan.ID}/checklist_itens`));
-                              const snapshot = await getDocs(q);
-                              const items = snapshot.docs.map(doc => {
-                                const data = doc.data();
-                                return {
-                                  tarefa: data.tarefa || data.text || data.task || data.Description || data.Tarefa || data.Atividade || data.atividade || 'Atividade sem descrição',
-                                  completed: false,
-                                  grupo: data.grupo || 'Geral',
-                                  equipamento: data.equipamento || 'Geral'
-                                };
-                              });
-                              
-                              const finalItems = items.length > 0 ? items : (plan.Checklist || []).map(t => ({ tarefa: t, completed: false, grupo: 'Geral', equipamento: 'Geral' }));
-                              
-                              if (finalItems.length > 0) {
-                                setNewWO({ ...newWO, Checklist: finalItems });
-                                showToast('Check-list importado com sucesso!');
-                              } else {
-                                showToast('O plano não possui itens de check-list', 'error');
-                              }
-                            }}
-                            className="px-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors flex items-center justify-center"
-                            title="Importar Check-list"
-                          >
-                            <Download className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {editingWO && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Status</label>
-                        <select 
-                          disabled={userProfile?.workOrderRole !== 'planner' && userProfile?.role !== 'admin'}
-                          className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                          value={newWO.Status || 'Em Aberto'}
-                          onChange={e => setNewWO({...newWO, Status: e.target.value as any})}
-                        >
-                          <option value="Em Aberto">Em Aberto</option>
-                          <option value="Em Execução">Em Execução</option>
-                          <option value="Concluída">Concluída</option>
-                          <option value="Cancelada">Cancelada</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Data Limite (Due Date)</label>
-                        <input 
-                          type="date"
-                          disabled={userProfile?.workOrderRole !== 'planner' && userProfile?.role !== 'admin'}
-                          className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                          value={newWO.dueDate || ''}
-                          onChange={e => setNewWO({...newWO, dueDate: e.target.value})}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Escopo (Scope)</label>
-                    <textarea 
-                      disabled={userProfile?.workOrderRole !== 'planner' && userProfile?.role !== 'admin'}
-                      placeholder="Escopo do serviço..."
-                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                      value={newWO.scope || ''}
-                      onChange={e => setNewWO({...newWO, scope: e.target.value})}
-                    />
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <input 
-                      type="checkbox"
-                      id="needsMaterial"
-                      disabled={userProfile?.workOrderRole !== 'planner' && userProfile?.role !== 'admin'}
-                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 disabled:opacity-50"
-                      checked={newWO.needsMaterial || false}
-                      onChange={e => setNewWO({...newWO, needsMaterial: e.target.checked})}
-                    />
-                    <label htmlFor="needsMaterial" className="text-sm font-bold text-slate-700">
-                      Necessita Material
-                    </label>
-                  </div>
-
-                  {/* Checklist Section */}
-                  <div className="space-y-3 pt-4 border-t border-slate-100">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Checklist de Atividades</label>
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          const newItem = { tarefa: '', completed: false };
-                          setNewWO({
-                            ...newWO,
-                            Checklist: [...(newWO.Checklist || []), newItem]
-                          });
-                        }}
-                        className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      {(newWO.Checklist || []).map((item, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <input 
-                            type="text"
-                            placeholder="Descreva a atividade..."
-                            className="flex-1 px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
-                            value={item.tarefa || (item as any).text || (item as any).task || (item as any).Description || ''}
-                            onChange={e => {
-                              const newList = [...(newWO.Checklist || [])];
-                              newList[index].tarefa = e.target.value;
-                              setNewWO({...newWO, Checklist: newList});
-                            }}
-                          />
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              const newList = (newWO.Checklist || []).filter((_, i) => i !== index);
-                              setNewWO({...newWO, Checklist: newList});
-                            }}
-                            className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
                         </div>
-                      ))}
-                      {(newWO.Checklist || []).length === 0 && (
-                        <p className="text-center py-4 text-xs text-slate-400 italic">Nenhuma atividade adicionada.</p>
-                      )}
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Natureza</label>
+                          <select 
+                            required
+                            className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                            value={newWO.Nature}
+                            onChange={e => setNewWO({...newWO, Nature: e.target.value as any})}
+                          >
+                            <option value="Programada">Programada</option>
+                            <option value="Emergencial">Emergencial</option>
+                            <option value="Oportunidade">Oportunidade</option>
+                          </select>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Atividade</label>
+                          <select 
+                            required
+                            className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                            value={newWO.ActivityType}
+                            onChange={e => setNewWO({...newWO, ActivityType: e.target.value as any})}
+                          >
+                            <option value="Reparo">Reparo</option>
+                            <option value="Inspeção">Inspeção</option>
+                            <option value="Lubrificação">Lubrificação</option>
+                            <option value="Ajuste">Ajuste</option>
+                            <option value="Substituição">Substituição</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Prioridade</label>
+                          <select 
+                            className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                            value={newWO.Priority}
+                            onChange={e => setNewWO({...newWO, Priority: e.target.value as any})}
+                          >
+                            <option value="Baixa">Baixa</option>
+                            <option value="Média">Média</option>
+                            <option value="Alta">Alta</option>
+                            <option value="Crítica">Crítica</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Executor</label>
+                          <select 
+                            className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                            value={newWO.executorType}
+                            onChange={e => setNewWO({...newWO, executorType: e.target.value as any})}
+                          >
+                            <option value="Próprio">Próprio</option>
+                            <option value="Terceiro">Terceiro</option>
+                          </select>
+                        </div>
+                        <div className="flex flex-col justify-end">
+                          <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Programação</label>
+                          <input 
+                            type="date"
+                            required
+                            className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                            value={newWO.ScheduledDate || ''}
+                            onChange={e => setNewWO({...newWO, ScheduledDate: e.target.value})}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <button 
-                    type="submit"
-                    className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all mt-4 shadow-lg shadow-blue-200"
-                  >
-                    {editingWO ? 'Salvar Alterações' : 'Criar Ordem de Serviço'}
-                  </button>
+                  <div className="pt-6 border-t border-slate-100 flex gap-4">
+                    <button 
+                      type="button"
+                      onClick={() => setShowWOModal(false)}
+                      className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all font-sans"
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      type="submit"
+                      className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 font-sans"
+                    >
+                      {editingWO ? 'Salvar Alterações' : 'Gerar Ordem de Serviço'}
+                    </button>
+                  </div>
                 </form>
               </div>
             </motion.div>

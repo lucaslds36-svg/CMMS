@@ -5,7 +5,8 @@ import {
   Clock, 
   CheckCircle2, 
   AlertCircle, 
-  X, 
+  X,
+  Settings,
   Pencil, 
   History, 
   Package, 
@@ -31,7 +32,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import { toPng } from 'html-to-image';
-import type { ServiceDemand, Employee, UserProfile, MaterialRequisition, ServiceDemandScopeChange, ServiceDemandStatusChange, ThirdPartyCompany } from '../types';
+import type { ServiceDemand, Employee, UserProfile, MaterialRequisition, ServiceDemandScopeChange, ServiceDemandStatusChange, ThirdPartyCompany, ServiceArea } from '../types';
 
 const safeParseISO = (dateStr: string | undefined | null) => {
   if (!dateStr) return new Date();
@@ -50,6 +51,7 @@ function cn(...inputs: ClassValue[]) {
 
 interface ServiceManagementModuleProps {
   demands: ServiceDemand[];
+  areas: ServiceArea[];
   employees: Employee[];
   companies: ThirdPartyCompany[];
   userProfile: UserProfile | null;
@@ -57,6 +59,8 @@ interface ServiceManagementModuleProps {
   onDelete?: (demandId: string) => Promise<void>;
   onUpdateStatus: (demandId: string, status: ServiceDemand['status']) => Promise<void>;
   onAddScopeChange: (demandId: string, description: string) => Promise<void>;
+  onSaveArea: (area: Partial<ServiceArea>) => Promise<void>;
+  onDeleteArea: (areaId: string) => Promise<void>;
   showToast: (msg: string, type?: 'success' | 'error') => void;
   selectedDemandId?: string | null;
   onClearSelectedDemandId?: () => void;
@@ -339,6 +343,8 @@ const GanttView = ({ filteredDemands, ptBR }: GanttViewProps) => {
                 </div>
               </div>
 
+              {/* No locations display here anymore */}
+
               <button 
                 className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 active:scale-[0.98]"
                 onClick={() => setSelectedDemand(null)}
@@ -355,6 +361,7 @@ const GanttView = ({ filteredDemands, ptBR }: GanttViewProps) => {
 
 export const ServiceManagementModule = ({
   demands,
+  areas,
   employees,
   companies,
   userProfile,
@@ -362,11 +369,17 @@ export const ServiceManagementModule = ({
   onDelete,
   onUpdateStatus,
   onAddScopeChange,
+  onSaveArea,
+  onDeleteArea,
   showToast,
   selectedDemandId,
   onClearSelectedDemandId
 }: ServiceManagementModuleProps) => {
   const [showModal, setShowModal] = useState(false);
+  const [showAreaModal, setShowAreaModal] = useState(false);
+  const [editingArea, setEditingArea] = useState<ServiceArea | null>(null);
+  const [areaFormData, setAreaFormData] = useState({ name: '', description: '' });
+  
   const [editingDemand, setEditingDemand] = useState<ServiceDemand | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [search, setSearch] = useState('');
@@ -375,6 +388,36 @@ export const ServiceManagementModule = ({
   const [filterPriority, setFilterPriority] = useState<string>('Todas');
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+
+  const areaNames = useMemo(() => areas.map(a => a.name).sort(), [areas]);
+  
+  const handleSaveArea = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await onSaveArea(editingArea ? { ...editingArea, ...areaFormData } : areaFormData);
+      setShowAreaModal(false);
+      setEditingArea(null);
+      setAreaFormData({ name: '', description: '' });
+    } catch (error) {
+      showToast('Erro ao salvar área', 'error');
+    }
+  };
+
+  const handleEditArea = (area: ServiceArea) => {
+    setEditingArea(area);
+    setAreaFormData({ name: area.name, description: area.description || '' });
+    setShowAreaModal(true);
+  };
+
+  const handleDeleteArea = async (areaId: string) => {
+    if (confirm('Tem certeza que deseja excluir esta área?')) {
+      try {
+        await onDeleteArea(areaId);
+      } catch (error) {
+        showToast('Erro ao excluir área', 'error');
+      }
+    }
+  };
 
   const requestSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -408,7 +451,7 @@ export const ServiceManagementModule = ({
 
   const [formData, setFormData] = useState<Partial<ServiceDemand>>({
     description: '',
-    area: 'Trefila',
+    area: areaNames[0] || '',
     executorType: 'Próprio',
     responsibleId: '',
     priority: 'Média',
@@ -425,7 +468,6 @@ export const ServiceManagementModule = ({
     collaborators: []
   });
 
-  const areas = ['Trefila', 'Cordeira Car', 'Cordeira Truck', 'Semi Pronto', 'Logistica', 'Centralizado', 'Área externa', 'Utilidades'];
   const priorities = ['Alta', 'Média', 'Baixa'];
   const statuses = ['Não Iniciado', 'Em andamento', 'Parado', 'Cancelado', 'Concluído'];
 
@@ -500,7 +542,7 @@ export const ServiceManagementModule = ({
       setShowModal(false);
       setFormData({
         description: '',
-        area: 'Trefila',
+        area: areaNames[0] || '',
         executorType: 'Próprio',
         responsibleId: '',
         priority: 'Média',
@@ -902,6 +944,13 @@ export const ServiceManagementModule = ({
             </button>
           </div>
           <button 
+            onClick={() => setShowAreaModal(true)}
+            className="flex items-center justify-center space-x-2 px-6 py-3 bg-slate-100 text-slate-700 rounded-2xl font-bold hover:bg-slate-200 transition-all border border-slate-200"
+          >
+            <Settings className="w-5 h-5" />
+            <span>Áreas</span>
+          </button>
+          <button 
             onClick={handleGenerateReport}
             className="flex items-center justify-center space-x-2 px-6 py-3 bg-slate-100 text-slate-700 rounded-2xl font-bold hover:bg-slate-200 transition-all border border-slate-200"
           >
@@ -969,7 +1018,7 @@ export const ServiceManagementModule = ({
                 className="px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
               >
                 <option value="Todas">Todas as Áreas</option>
-                {areas.map(a => <option key={a} value={a}>{a}</option>)}
+                {areaNames.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
             </div>
             
@@ -1175,10 +1224,10 @@ export const ServiceManagementModule = ({
                       <select 
                         required
                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
-                        value={formData.area || 'Trefila'}
+                        value={formData.area || (areaNames[0] || '')}
                         onChange={e => setFormData({...formData, area: e.target.value as any})}
                       >
-                        {areas.map(a => <option key={a} value={a}>{a}</option>)}
+                        {areaNames.map(a => <option key={a} value={a}>{a}</option>)}
                       </select>
                     </div>
 
@@ -1419,6 +1468,118 @@ export const ServiceManagementModule = ({
       </AnimatePresence>
 
       <AnimatePresence>
+        {showAreaModal && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { setShowAreaModal(false); setEditingArea(null); setAreaFormData({ name: '', description: '' }); }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900">Gerenciar Áreas (Locais)</h3>
+                  <p className="text-slate-500 text-xs">Adicione ou remova setores de atendimento</p>
+                </div>
+                <button 
+                  onClick={() => { setShowAreaModal(false); setEditingArea(null); setAreaFormData({ name: '', description: '' }); }}
+                  className="p-2 hover:bg-slate-100 rounded-full"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto">
+                <form onSubmit={handleSaveArea} className="mb-8 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Nome da Área</label>
+                      <div className="flex gap-2">
+                        <input 
+                          required
+                          type="text"
+                          value={areaFormData.name}
+                          onChange={e => setAreaFormData({ ...areaFormData, name: e.target.value })}
+                          className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                          placeholder="Ex: Trefila, Logística..."
+                        />
+                        <button 
+                          type="submit"
+                          className="px-6 py-2 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all shadow-md active:scale-95"
+                        >
+                          {editingArea ? 'Salvar' : 'Adicionar'}
+                        </button>
+                        {editingArea && (
+                          <button 
+                            type="button"
+                            onClick={() => { setEditingArea(null); setAreaFormData({ name: '', description: '' }); }}
+                            className="px-4 py-2 bg-slate-200 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-300 transition-all"
+                          >
+                            Cancelar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </form>
+
+                <div className="space-y-2">
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-2">Áreas Cadastradas</h4>
+                  {areas.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-2">
+                      {areas.map(area => (
+                        <div key={area.id} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-xl hover:border-blue-200 hover:shadow-sm transition-all group">
+                          <div>
+                            <p className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{area.name}</p>
+                            {area.description && <p className="text-[10px] text-slate-500">{area.description}</p>}
+                          </div>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              onClick={() => handleEditArea(area)}
+                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteArea(area.id)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-10 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                      <p className="text-slate-400 text-xs">Nenhuma área cadastrada.</p>
+                      <p className="text-slate-400 text-[10px] mt-1">Utilize o campo acima para adicionar.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end">
+                <button 
+                  onClick={() => { setShowAreaModal(false); setEditingArea(null); setAreaFormData({ name: '', description: '' }); }}
+                  className="px-8 py-2 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all shadow-lg active:scale-95"
+                >
+                  Concluir
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {editingDemand && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div 
@@ -1465,7 +1626,17 @@ export const ServiceManagementModule = ({
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Área</label>
-                        <p className="text-sm font-bold text-slate-900">{editingDemand.area}</p>
+                        {isEditing ? (
+                          <select 
+                            className="w-full px-4 py-2 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                            value={editingDemand.area || (areaNames[0] || '')}
+                            onChange={e => setEditingDemand({...editingDemand, area: e.target.value})}
+                          >
+                            {areaNames.map(a => <option key={a} value={a}>{a}</option>)}
+                          </select>
+                        ) : (
+                          <p className="text-sm font-bold text-slate-900">{editingDemand.area}</p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Executor</label>

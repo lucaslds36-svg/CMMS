@@ -129,9 +129,77 @@
         "Collaborators": { "type": "number" }
       },
       "required": ["ID", "AssetIDs", "Task", "Frequency", "LastDone", "NextDue", "Type", "Criticality"]
+    },
+    "Asset": {
+      "title": "Asset",
+      "description": "Represents an industrial asset or equipment.",
+      "type": "object",
+      "properties": {
+        "ID": { "type": "string" },
+        "Tag": { "type": "string" },
+        "Model": { "type": "string" },
+        "Description": { "type": "string" },
+        "Location": { "type": "string" },
+        "Plant": { "type": "string" },
+        "Sector": { "type": "string" },
+        "Category": { "type": "string" },
+        "Family": { "type": "string" },
+        "Criticality": { "type": "string", "enum": ["A", "B", "C"] },
+        "Manufacturer": { "type": "string" },
+        "Status": { "type": "string", "enum": ["Ativo", "Inativo", "Em Manutenção", "Parado"] },
+        "InstallDate": { "type": "string" },
+        "parentId": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "statusChangedAt": { "type": "string" }
+      },
+      "required": ["ID", "Tag", "Model", "Description", "Status"]
+    },
+    "WorkOrder": {
+      "title": "WorkOrder",
+      "description": "Represents a maintenance work order.",
+      "type": "object",
+      "properties": {
+        "ID": { "type": "string" },
+        "AssetID": { "type": "string" },
+        "componentId": { "type": "string" },
+        "subComponentId": { "type": "string" },
+        "model": { "type": "string" },
+        "Description": { "type": "string" },
+        "Status": { "type": "string", "enum": ["Em Aberto", "Em Execução", "Concluída", "Cancelada"] },
+        "Priority": { "type": "string" },
+        "Type": { "type": "string" },
+        "AssignedTo": { "type": "string" },
+        "CreatedAt": { "type": "string" },
+        "CompletedAt": { "type": "string" }
+      },
+      "required": ["ID", "AssetID", "Description", "Status"]
+    },
+    "ServiceArea": {
+      "title": "ServiceArea",
+      "description": "Represents a physical area or sector for service demands.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name"]
     }
   },
   "firestore": {
+    "service_areas/{id}": {
+      "schema": "ServiceArea",
+      "description": "Stores physical areas where services are performed."
+    },
+    "assets/{assetId}": {
+      "schema": "Asset",
+      "description": "Stores industrial assets."
+    },
+    "work-orders/{woId}": {
+      "schema": "WorkOrder",
+      "description": "Stores maintenance work orders."
+    },
     "users/{uid}/databaseEntries/{key}": {
       "schema": "DatabaseEntry",
       "description": "Stores database entries for each user."

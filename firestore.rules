@@ -29,8 +29,16 @@ service cloud.firestore {
     // ===============================================================
     // Helper Functions
     // ===============================================================
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
     function isAuthenticated() {
       return request.auth != null;
+    }
+
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
     }
 
     function isAdmin() {
@@ -65,16 +73,32 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidAsset(data) {
-      return hasOnlyAllowedFields(['ID', 'Tag', 'Model', 'Description', 'Location', 'Plant', 'Manufacturer', 'Status', 'InstallDate', 'id', 'createdBy', 'statusChangedAt']) &&
-             data.ID is string && data.ID.size() > 0 &&
-             data.Tag is string && data.Tag.size() > 0 &&
-             data.Model is string && data.Model.size() > 0 &&
-             data.Status in ['Ativo', 'Inativo', 'Em Manutenção', 'Parado'];
+      return hasOnlyAllowedFields(['ID', 'Tag', 'Model', 'Description', 'Location', 'Plant', 'Sector', 'Category', 'Family', 'Criticality', 'Manufacturer', 'Status', 'InstallDate', 'id', 'createdBy', 'statusChangedAt', 'parentId']) &&
+             data.ID is string && data.ID.size() > 0 && data.ID.size() < 100 &&
+             data.Tag is string && data.Tag.size() > 0 && data.Tag.size() < 100 &&
+             data.Model is string && data.Model.size() > 0 && data.Model.size() < 200 &&
+             data.Status in ['Ativo', 'Inativo', 'Em Manutenção', 'Parado'] &&
+             (!('Description' in data) || (data.Description is string && data.Description.size() < 2000)) &&
+             (!('Location' in data) || (data.Location is string && data.Location.size() < 500)) &&
+             (!('Plant' in data) || (data.Plant is string && data.Plant.size() < 500)) &&
+             (!('Sector' in data) || (data.Sector is string && data.Sector.size() < 500)) &&
+             (!('Category' in data) || (data.Category is string && data.Category.size() < 500)) &&
+             (!('Family' in data) || (data.Family is string && data.Family.size() < 500)) &&
+             (!('Criticality' in data) || data.Criticality in ['A', 'B', 'C', '']) &&
+             (!('Manufacturer' in data) || (data.Manufacturer is string && data.Manufacturer.size() < 500)) &&
+             (!('InstallDate' in data) || (data.InstallDate is string && data.InstallDate.size() < 100)) &&
+             (!('parentId' in data) || (data.parentId is string && data.parentId.size() < 100)) &&
+             (!('createdBy' in data) || (data.createdBy is string && data.createdBy.size() < 100)) &&
+             (!('statusChangedAt' in data) || (data.statusChangedAt is string && data.statusChangedAt.size() < 100)) &&
+             (!('id' in data) || (data.id is string && data.id.size() < 128));
     }
 
     function isValidWorkOrder(data) {
       return data.ID is string && data.ID.size() < 100 &&
              (data.AssetID is string || data.assetId is string) &&
+             (!('componentId' in data) || (data.componentId is string && data.componentId.size() < 128)) &&
+             (!('subComponentId' in data) || (data.subComponentId is string && data.subComponentId.size() < 128)) &&
+             (!('model' in data) || (data.model is string && data.model.size() < 200)) &&
              (data.PlanID is string || !('PlanID' in data)) &&
              (data.TechnicianID is string || !('TechnicianID' in data)) &&
              (data.Priority in ['Baixa', 'Média', 'Alta', 'Crítica'] || data.priority in ['Baixa', 'Média', 'Alta', 'Crítica']) &&
@@ -300,8 +324,8 @@ service cloud.firestore {
 
     match /assets/{assetId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidAsset(request.resource.data);
-      allow update: if (isMasterOrOwner('createdBy') || !('createdBy' in resource.data)) && isValidAsset(request.resource.data);
+      allow create: if isAuthenticated() && isValidId(assetId) && isValidAsset(request.resource.data);
+      allow update: if (isValidId(assetId) && (isAdmin() || isMasterOrOwner('createdBy') || !('createdBy' in resource.data))) && isValidAsset(request.resource.data);
       allow delete: if isAdmin();
     }
 

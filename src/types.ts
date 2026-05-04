@@ -7,6 +7,11 @@ export interface Asset {
   Status: 'Ativo' | 'Inativo' | 'Em Manutenção' | 'Parado';
   Location: string;
   Plant: string;
+  parentId?: string; // ID do ativo pai (para componentes/sub-componentes)
+  Sector?: string; // New: Setor/Departamento
+  Category?: string; // New: Categoria (Ex: Produção, Utilidades, Infra)
+  Family?: string; // New: Família (Ex: Motores, Bombas, Painéis)
+  Criticality?: 'A' | 'B' | 'C'; // New: Criticidade
   Manufacturer: string;
   InstallDate: string;
   statusChangedAt?: string;
@@ -17,6 +22,9 @@ export interface WorkOrder {
   ID: string;
   AssetID: string;
   assetId?: string;
+  componentId?: string;
+  subComponentId?: string;
+  model?: string;
   PlanID?: string;
   planId?: string;
   TechnicianID?: string;
@@ -242,13 +250,20 @@ export interface Requisition {
   createdBy?: string;
 }
 
+export interface ServiceArea {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: string;
+}
+
 export interface ServiceDemand {
   id: string;
   openedAt: string;
   requesterUid: string;
   requesterName: string;
   description: string;
-  area: 'Trefila' | 'Cordeira Car' | 'Cordeira Truck' | 'Semi Pronto' | 'Logistica' | 'Centralizado' | 'Área externa' | 'Utilidades';
+  area: string;
   executorType: 'Próprio' | 'Terceiro';
   responsibleId: string;
   responsibleName: string;
