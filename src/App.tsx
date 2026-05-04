@@ -1614,7 +1614,7 @@ const AssetList = ({ assets, plans = [], onAdd, onEdit, onDelete, onImport, isAd
         (a.Category || '').toLowerCase().includes(search.toLowerCase()) ||
         (a.Family || '').toLowerCase().includes(search.toLowerCase()) ||
         (a.Location || '').toLowerCase().includes(search.toLowerCase())
-      ).sort((a, b) => (a.Description || '').localeCompare(b.Description || ''));
+      ).sort((a, b) => (a.Tag || '').localeCompare(b.Tag || ''));
     }
 
     // Tree Logic
@@ -1622,7 +1622,7 @@ const AssetList = ({ assets, plans = [], onAdd, onEdit, onDelete, onImport, isAd
     const buildTree = (parentId?: string, level = 1) => {
       const children = assets
         .filter(a => a.parentId === parentId)
-        .sort((a, b) => (a.Description || '').localeCompare(b.Description || ''));
+        .sort((a, b) => (a.Tag || '').localeCompare(b.Tag || ''));
 
       children.forEach(child => {
         const childId = child.ID || child.id || '';
@@ -5741,25 +5741,46 @@ export default function App() {
         await updateDocument('assets', editingAsset.ID, finalAsset);
         showToast('Ativo atualizado com sucesso!');
       } else {
-        const id = `A${(assets.length + 1).toString().padStart(3, '0')}`;
+        // IMPROVED ID generation: Find the maximum numerical ID to avoid collisions
+        let maxIdNum = 0;
+        assets.forEach(a => {
+          const idMatch = (a.ID || '').match(/^A(\d+)$/);
+          if (idMatch) {
+            const num = parseInt(idMatch[1]);
+            if (num > maxIdNum) maxIdNum = num;
+          }
+        });
+        const id = `A${(maxIdNum + 1).toString().padStart(3, '0')}`;
+        
         // Support hierarchy in creation
         const parentId = newAsset.parentId;
-        let assetToCreate = { ...newAsset, ID: id, createdBy: user?.uid };
+        let assetToCreate = { ...newAsset, ID: id, id, createdBy: user?.uid };
         
         // Auto-generate Tag for children if empty or if we want to enforce sequential tagging
         if (parentId) {
           const parent = assets.find(a => a.ID === parentId || a.id === parentId);
           if (parent) {
-            // Inheritance
+            // Inheritance - Ensure these are always copied if they exist on parent
             assetToCreate.Location = assetToCreate.Location || parent.Location || '';
             assetToCreate.Plant = assetToCreate.Plant || parent.Plant || '';
             assetToCreate.Sector = assetToCreate.Sector || parent.Sector || '';
+            assetToCreate.Category = assetToCreate.Category || parent.Category || '';
+            assetToCreate.Family = assetToCreate.Family || parent.Family || '';
+            assetToCreate.Criticality = assetToCreate.Criticality || parent.Criticality || '';
             
-            // Sequential Tag: ParentTag-01, ParentTag-02, etc.
-            if (!assetToCreate.Tag) {
+            // Sequential Tag: ParentTag.01, ParentTag.02, etc.
+            if (!assetToCreate.Tag || !assetToCreate.Tag.includes('.')) {
               const children = assets.filter(a => a.parentId === parentId);
-              const nextNum = (children.length + 1).toString().padStart(2, '0');
-              assetToCreate.Tag = `${parent.Tag}-${nextNum}`;
+              let childMaxNum = 0;
+              children.forEach(c => {
+                const parts = c.Tag.split('.');
+                const lastPart = parseInt(parts[parts.length - 1]);
+                if (!isNaN(lastPart) && lastPart > childMaxNum) {
+                  childMaxNum = lastPart;
+                }
+              });
+              const nextNum = (childMaxNum + 1).toString().padStart(2, '0');
+              assetToCreate.Tag = `${parent.Tag}.${nextNum}`;
             }
           }
         }
@@ -7259,17 +7280,47 @@ export default function App() {
                       }
                     }}
                     onAdd={(parentId) => {
-                      setEditingAsset(null);
-                      setNewAsset({
-                        Tag: '',
-                        Model: '',
-                        Description: '',
-                        Manufacturer: '',
+                      let tag = '';
+                      let inheritedData = {
                         Location: '',
                         Plant: '',
                         Sector: '',
                         Category: '',
-                        Family: '',
+                        Family: ''
+                      };
+                      
+                      if (parentId) {
+                        const parent = assets.find(a => a.ID === parentId || a.id === parentId);
+                        if (parent) {
+                          const children = assets.filter(a => a.parentId === parentId);
+                          let maxNum = 0;
+                          children.forEach(c => {
+                            const parts = c.Tag.split('.');
+                            const lastPart = parseInt(parts[parts.length - 1]);
+                            if (!isNaN(lastPart) && lastPart > maxNum) {
+                              maxNum = lastPart;
+                            }
+                          });
+                          const nextNum = (maxNum + 1).toString().padStart(2, '0');
+                          tag = `${parent.Tag}.${nextNum}`;
+                          
+                          inheritedData = {
+                            Location: parent.Location || '',
+                            Plant: parent.Plant || '',
+                            Sector: parent.Sector || '',
+                            Category: parent.Category || '',
+                            Family: parent.Family || ''
+                          };
+                        }
+                      }
+
+                      setEditingAsset(null);
+                      setNewAsset({
+                        Tag: tag,
+                        Model: '',
+                        Description: '',
+                        Manufacturer: '',
+                        ...inheritedData,
                         Criticality: '',
                         parentId,
                         Status: 'Ativo' as any,
@@ -7673,12 +7724,15 @@ export default function App() {
                 <form onSubmit={handleCreateAsset} className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">TAG</label>
+                      <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
+                        TAG {newAsset.parentId && <span className="text-blue-500 font-normal normal-case ml-1">(automático)</span>}
+                      </label>
                       <input 
                         required
+                        readOnly={!!newAsset.parentId}
                         type="text"
                         placeholder="Ex: MTR-001"
-                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500"
+                        className={`w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 ${newAsset.parentId ? 'opacity-70 cursor-not-allowed' : ''}`}
                         value={newAsset.Tag}
                         onChange={e => setNewAsset({...newAsset, Tag: e.target.value})}
                       />

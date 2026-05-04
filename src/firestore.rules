@@ -65,11 +65,18 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidAsset(data) {
-      return hasOnlyAllowedFields(['ID', 'Tag', 'Model', 'Description', 'Location', 'Plant', 'Manufacturer', 'Status', 'InstallDate', 'id']) &&
+      return hasOnlyAllowedFields(['ID', 'Tag', 'Model', 'Description', 'Location', 'Plant', 'Manufacturer', 'Status', 'InstallDate', 'id', 'parentId', 'Sector', 'Category', 'Family', 'Criticality', 'createdBy', 'statusChangedAt']) &&
              data.ID is string && data.ID.size() > 0 &&
              data.Tag is string && data.Tag.size() > 0 &&
              data.Model is string && data.Model.size() > 0 &&
-             data.Status in ['Ativo', 'Inativo', 'Em Manutenção', 'Parado'];
+             data.Status in ['Ativo', 'Inativo', 'Em Manutenção', 'Parado'] &&
+             (!('parentId' in data) || data.parentId is string || data.parentId == null) &&
+             (!('Sector' in data) || data.Sector is string) &&
+             (!('Category' in data) || data.Category is string) &&
+             (!('Family' in data) || data.Family is string) &&
+             (!('Criticality' in data) || data.Criticality in ['A', 'B', 'C', '']) &&
+             (!('createdBy' in data) || data.createdBy is string) &&
+             (!('statusChangedAt' in data) || data.statusChangedAt is string || data.statusChangedAt == null);
     }
 
     function isValidWorkOrder(data) {
@@ -111,6 +118,14 @@ service cloud.firestore {
              (data.photoURL is string || data.photoURL == null) &&
              data.createdAt is string &&
              (!('permissions' in data) || data.permissions is map);
+    }
+
+    function isValidServiceArea(data) {
+      return hasOnlyAllowedFields(['id', 'name', 'description', 'createdAt']) &&
+             data.id is string && data.id.size() > 0 &&
+             data.name is string && data.name.size() > 0 &&
+             (data.description is string || !('description' in data)) &&
+             data.createdAt is string;
     }
 
     function isValidServiceDemand(data) {
@@ -264,6 +279,12 @@ service cloud.firestore {
 
     match /serviceDemands/{id} {
       allow read, write: if isAuthenticated();
+    }
+
+    match /service_areas/{id=**} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null;
+      allow delete: if isAdmin();
     }
 
     match /users/{userId} {

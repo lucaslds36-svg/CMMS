@@ -407,6 +407,12 @@ service cloud.firestore {
       allow update, delete: if isAuthenticated();
     }
 
+    match /service_areas/{id=**} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
     match /requisitions/{id} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
